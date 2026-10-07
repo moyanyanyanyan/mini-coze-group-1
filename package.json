@@ -1,0 +1,20 @@
+{
+  "name": "minicoze",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@12.9.1",
+  "scripts": {
+    "dev": "concurrently -n web,backend,agent -c cyan,green,yellow \"pnpm dev:web\" \"pnpm dev:backend\" \"pnpm dev:agent\"",
+    "dev:web": "pnpm --filter @minicoze/web dev",
+    "dev:backend": "pnpm --filter @minicoze/backend start:dev",
+    "dev:agent": "cd apps/agent && python -m app.main",
+    "build": "pnpm -r --if-present build",
+    "typecheck": "pnpm -r --if-present typecheck && pnpm typecheck:agent",
+    "typecheck:agent": "python -m compileall -q apps/agent/app",
+    "test": "pnpm -r --if-present test && pnpm test:agent",
+    "test:agent": "python -m pytest apps/agent/tests"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
