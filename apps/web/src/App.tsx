@@ -1,29 +1,37 @@
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api';
+import type { ReactNode } from 'react';
+import { AgentBuilderPage } from './features/agent-builder';
+import { AgentChatPage } from './features/agent-chat';
+import { KnowledgePage } from './features/knowledge';
+import { LandingPage } from './features/landing/LandingPage';
+import { PluginsPage } from './features/plugins';
+import { PublishSdkPage } from './features/publish-sdk';
+import { WorkflowPage } from './features/workflow-editor';
+import { WorkspacePage } from './features/workspace';
+import { WorkspaceLayout } from './shared/layout/WorkspaceLayout';
+import { usePathname } from './shared/routing/navigation';
+
+const workspaceRoutes: Record<string, ReactNode> = {
+  '/workspace': <WorkspacePage />,
+  '/workspace/agents/create': <AgentBuilderPage />,
+  '/workspace/chat': <AgentChatPage />,
+  '/workspace/knowledge': <KnowledgePage />,
+  '/workspace/plugins': <PluginsPage />,
+  '/workspace/workflows': <WorkflowPage />,
+  '/workspace/publish': <PublishSdkPage />,
+};
 
 export function App() {
-  return (
-    <main className="shell">
-      <section className="card">
-        <span className="eyebrow">MINICOZE MVP</span>
-        <h1>开发骨架已就绪</h1>
-        <p className="intro">
-          当前仓库仅包含 React、NestJS、FastAPI 和 PostgreSQL/pgvector 的基础边界，业务模块由各负责人继续实现。
-        </p>
-        <dl className="services">
-          <div>
-            <dt>Web</dt>
-            <dd><span className="status" />运行中</dd>
-          </div>
-          <div>
-            <dt>Backend API</dt>
-            <dd><code>{apiBaseUrl}</code></dd>
-          </div>
-          <div>
-            <dt>Agent Service</dt>
-            <dd>仅由 Backend 内部调用</dd>
-          </div>
-        </dl>
-      </section>
-    </main>
-  );
+  const pathname = usePathname();
+
+  if (pathname === '/') {
+    return <LandingPage />;
+  }
+
+  const page = workspaceRoutes[pathname];
+
+  if (page) {
+    return <WorkspaceLayout pathname={pathname}>{page}</WorkspaceLayout>;
+  }
+
+  return <LandingPage />;
 }
