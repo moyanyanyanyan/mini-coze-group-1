@@ -19,35 +19,60 @@ export function LandingPage() {
 
       <main>
         <section className="hero-section" id="top">
-          <OrganicPattern position="hero" />
-          <div className="hero-content">
-            <p className="section-kicker">欢迎来到 MiniCoze</p>
-            <h1>让智能体创作<br />变得简单</h1>
-            <p className="hero-description">
-              在一个轻盈的工作台里，搭建、连接并发布你的智能体。
-            </p>
-            <div className="hero-actions">
-              <a className="button button-primary" href="#modules">了解主要模块</a>
-              <a className="button button-quiet" href="#quick-start">快速开始</a>
+          <LinearPattern position="hero" />
+          <div className="hero-grid">
+            <div className="hero-content">
+              <p className="section-kicker"><span>01</span> Agent development platform</p>
+              <h1>让智能体创作，<br />拥有更清晰的路径。</h1>
+              <p className="hero-description">
+                从工作流、插件到 SDK，让每个模块独立生长、自然连接。
+              </p>
+              <div className="hero-actions">
+                <AppLink className="button button-primary" to="/workspace">进入工作台 <span aria-hidden="true">→</span></AppLink>
+                <a className="button button-quiet" href="#modules">查看功能模块</a>
+              </div>
+            </div>
+
+            <div className="capability-map" aria-hidden="true">
+              <span className="map-label map-label-start">MiniCoze</span>
+              <span className="map-label map-label-create">创建</span>
+              <span className="map-label map-label-compose">编排</span>
+              <span className="map-label map-label-publish">发布</span>
+              <svg viewBox="0 0 500 390">
+                <path className="map-line" d="M28 194h112c42 0 42-95 86-95h70" />
+                <path className="map-line" d="M140 194h156" />
+                <path className="map-line" d="M140 194c42 0 42 95 86 95h70" />
+                <path className="map-line map-line-out" d="M296 99h120M296 194h120M296 289h120" />
+                <circle cx="140" cy="194" r="5" />
+                <circle cx="296" cy="99" r="5" />
+                <circle cx="296" cy="194" r="5" />
+                <circle cx="296" cy="289" r="5" />
+                <circle cx="416" cy="99" r="3" />
+                <circle cx="416" cy="194" r="3" />
+                <circle cx="416" cy="289" r="3" />
+              </svg>
+              <span className="map-coordinate">35°41′N · 139°41′E</span>
             </div>
           </div>
           <a className="scroll-cue" href="#modules" aria-label="滚动查看主要模块">
-            <span>向下探索</span>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5" /></svg>
+            <span>向下探索</span><i aria-hidden="true" />
           </a>
         </section>
 
         <section className="modules-section" id="modules">
-          <OrganicPattern position="modules" />
+          <LinearPattern position="modules" />
           <div className="section-heading">
-            <p className="section-kicker">主要能力</p>
-            <h2>探索主要模块</h2>
-            <p>每个模块独立开发，也能自然连接。</p>
+            <p className="section-kicker"><span>02</span> Capabilities</p>
+            <div>
+              <h2>主要能力</h2>
+              <p>每个模块独立开发，也可以自由组合。</p>
+            </div>
           </div>
 
           <div className="module-grid">
-            {landingModules.map((item) => (
+            {landingModules.map((item, index) => (
               <AppLink className="module-tile" key={item.id} to={item.route}>
+                <span className="module-index">{String(index + 1).padStart(2, '0')}</span>
                 <span className="module-icon"><Icon name={item.id === 'publish-sdk' ? 'api' : item.icon} /></span>
                 <span className="module-copy">
                   <strong>{item.title}</strong>
@@ -60,12 +85,14 @@ export function LandingPage() {
         </section>
 
         <section className="quick-section" id="quick-start">
-          <OrganicPattern position="quick" />
+          <LinearPattern position="quick" />
           <div className="quick-inner">
             <div className="section-heading quick-heading">
-              <p className="section-kicker">快速开始</p>
-              <h2>选择一个入口，开始搭建</h2>
-              <p>从最适合你的路径进入，随时可以切换到其他模块。</p>
+              <p className="section-kicker"><span>03</span> Quick start</p>
+              <div>
+                <h2>准备好开始了吗？</h2>
+                <p>选择一个入口进入工作台，之后可以随时切换模块。</p>
+              </div>
             </div>
 
             <div className="quick-actions">
@@ -90,18 +117,18 @@ export function LandingPage() {
 
       <footer className="landing-footer">
         <span>MiniCoze</span>
-        <small>轻盈地连接每一种智能体能力</small>
+        <small>Make agents, with clarity.</small>
       </footer>
     </div>
   );
 }
 
-function OrganicPattern({ position }: { position: 'hero' | 'modules' | 'quick' }) {
+function LinearPattern({ position }: { position: 'hero' | 'modules' | 'quick' }) {
   return (
-    <svg className={`organic-pattern organic-pattern-${position}`} viewBox="0 0 420 220" aria-hidden="true">
-      <path className="pattern-line" d="M-20 146c62-58 111-24 161-52 54-31 86-92 157-67 40 14 63 49 143 17" />
-      <path className="pattern-line pattern-line-soft" d="M8 179c60-28 95 6 153-21 51-23 82-73 142-55 39 12 61 39 126 18" />
-      <path className="pattern-petal" d="M327 155c9-13 20-10 18 3-2 11-12 16-18 18-6-7-7-14 0-21Zm0 21c-13 9-22 2-14-8 7-9 17-8 24-5 0 9-3 12-10 13Z" />
+    <svg className={`linear-pattern linear-pattern-${position}`} viewBox="0 0 520 280" aria-hidden="true">
+      <path d="M-10 214C94 126 152 252 260 152S420 104 538 26" />
+      <path d="M-10 246C92 158 164 270 272 180S422 140 538 62" />
+      <path className="pattern-soft" d="M-10 180C86 94 156 214 242 122S404 58 538-10" />
     </svg>
   );
 }

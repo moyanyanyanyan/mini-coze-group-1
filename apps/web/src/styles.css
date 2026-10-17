@@ -1,18 +1,27 @@
 :root {
   font-family: Inter, "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", ui-sans-serif, system-ui, sans-serif;
-  color: #244457;
-  background: #f8fcfd;
+  color: #252232;
+  background: #fbfaff;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  --sky-50: #f5fbfd;
-  --sky-100: #eaf7fc;
-  --sky-200: #d8eff8;
-  --sky-500: #69b9db;
-  --ink-900: #244457;
-  --ink-700: #3f6071;
-  --ink-500: #7895a3;
-  --ink-400: #93aab4;
-  --surface: #fafdfe;
+  --violet-50: #f5f2fc;
+  --violet-100: #eee9fa;
+  --violet-200: #dfd7f3;
+  --violet-300: #c4b6e8;
+  --violet-400: #9c88d2;
+  --violet-500: #8269c9;
+  --violet-600: #6f56d9;
+  --violet-700: #5a42bd;
+  --ink-900: #252232;
+  --ink-800: #373244;
+  --ink-700: #514b60;
+  --ink-600: #686273;
+  --ink-500: #746e80;
+  --ink-400: #787283;
+  --line: #ddd8e9;
+  --line-strong: #cbc3dc;
+  --line-soft: rgba(111, 86, 217, 0.055);
+  --surface: #fbfaff;
 }
 
 * { box-sizing: border-box; }
@@ -22,7 +31,7 @@ body { min-width: 320px; min-height: 100vh; margin: 0; }
 button, a { -webkit-tap-highlight-color: transparent; }
 
 a:focus-visible, button:focus-visible {
-  outline: 3px solid rgba(105, 185, 219, 0.42);
+  outline: 3px solid rgba(111, 86, 217, 0.34);
   outline-offset: 3px;
 }
 
