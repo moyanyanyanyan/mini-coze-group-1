@@ -1,3 +1,5 @@
+import type { ComponentType } from 'react';
+
 export type IconName =
   | 'home'
   | 'edit'
@@ -15,4 +17,10 @@ export interface FeatureManifest {
   description: string;
   route: string;
   icon: IconName;
+}
+
+export interface FeatureDefinition extends FeatureManifest {
+  Component: ComponentType;
+  showInLanding: boolean;
+  showInNavigation: boolean;
 }

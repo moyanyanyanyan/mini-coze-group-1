@@ -1,4 +1,4 @@
-import { landingModules } from '../../app/navigation';
+import { landingModules } from '../../app/feature-registry';
 import { AppLink } from '../../shared/routing/AppLink';
 import { Icon } from '../../shared/ui/Icon';
 import './landing.css';

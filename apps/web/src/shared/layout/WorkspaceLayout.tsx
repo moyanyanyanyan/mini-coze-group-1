@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { workspaceNavigation } from '../../app/navigation';
+import { workspaceNavigation } from '../../app/feature-registry';
 import { AppLink } from '../routing/AppLink';
 import { Icon } from '../ui/Icon';
 import './workspace-layout.css';
