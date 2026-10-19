@@ -2,8 +2,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
+from app.api import api_router
+from app.common.logging import configure_logging
 from app.config import get_settings
 
+configure_logging()
 settings = get_settings()
 app = FastAPI(title="MiniCoze Agent Service", version="0.1.0")
 app.add_middleware(
@@ -13,11 +16,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok", "service": "agent"}
+app.include_router(api_router)
 
 
 if __name__ == "__main__":
