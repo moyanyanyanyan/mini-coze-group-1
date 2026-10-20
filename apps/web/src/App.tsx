@@ -1,29 +1,41 @@
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api';
+import { Routes, Route, Navigate,useNavigate } from "react-router";
+import { LandingPage } from "./pages/LandingPage";
+import { LoginPage } from "./pages/LoginPage";
+import { RegisterPage } from "./pages/RegisterPage";
+import { AppShell } from "./pages/AppShell";
+
+// 临时占位页：等各模块负责人的页面交付后，把 <ComingSoon> 换成对应的真页面
+function ComingSoon({ title }: { title: string }) {
+  return (
+    <div>
+      <h2 style={{ marginTop: 0 }}>{title}</h2>
+      <p>这块由对应同学负责，页面还没接进来。</p>
+    </div>
+  );
+}
 
 export function App() {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    // TODO: 登录/鉴权做完后，这里要先清掉 token 再跳转
+    navigate("/login");
+  };
+
   return (
-    <main className="shell">
-      <section className="card">
-        <span className="eyebrow">MINICOZE MVP</span>
-        <h1>开发骨架已就绪</h1>
-        <p className="intro">
-          当前仓库仅包含 React、NestJS、FastAPI 和 PostgreSQL/pgvector 的基础边界，业务模块由各负责人继续实现。
-        </p>
-        <dl className="services">
-          <div>
-            <dt>Web</dt>
-            <dd><span className="status" />运行中</dd>
-          </div>
-          <div>
-            <dt>Backend API</dt>
-            <dd><code>{apiBaseUrl}</code></dd>
-          </div>
-          <div>
-            <dt>Agent Service</dt>
-            <dd>仅由 Backend 内部调用</dd>
-          </div>
-        </dl>
-      </section>
-    </main>
+    <Routes>
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
+      <Route path="/app" element={<AppShell onLogout={handleLogout} />}>
+        <Route index element={<Navigate to="/app/chat" replace />} />
+        <Route path="chat" element={<ComingSoon title="对话" />} />
+        <Route path="agents" element={<ComingSoon title="智能体" />} />
+        <Route path="knowledge" element={<ComingSoon title="知识库" />} />
+        <Route path="plugins" element={<ComingSoon title="插件" />} />
+        <Route path="workflows" element={<ComingSoon title="工作流" />} />
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
