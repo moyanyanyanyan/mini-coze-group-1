@@ -1,0 +1,31 @@
+model Workflow {
+  id               String        @id @default(uuid())
+  workspaceId      String
+  creatorId        String
+  name             String
+  description      String?
+  status           String        @default("DRAFT")
+  draftDefinition  Json?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  runs             WorkflowRun[]
+
+  @@index([workspaceId, creatorId, updatedAt])
+}
+
+model WorkflowRun {
+  id          String    @id @default(uuid())
+  workflowId  String
+  userId      String
+  status      String    @default("RUNNING")
+  definition  Json
+  input       Json
+  output      Json?
+  nodeResults Json?
+  error       Json?
+  startedAt   DateTime  @default(now())
+  endedAt     DateTime?
+  workflow    Workflow  @relation(fields: [workflowId], references: [id])
+
+  @@index([workflowId, startedAt])
+}

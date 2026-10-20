@@ -12,6 +12,7 @@ interface ErrorResponse {
   message: string | string[];
   path: string;
   timestamp: string;
+  details?: unknown;
 }
 
 @Catch()
@@ -40,6 +41,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
     };
 
+    if (typeof exceptionResponse === 'object' && exceptionResponse !== null && 'details' in exceptionResponse) {
+      body.details = exceptionResponse.details;
+    }
     response.status(status).json(body);
   }
 }
