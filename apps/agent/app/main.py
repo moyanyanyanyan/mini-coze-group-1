@@ -3,9 +3,15 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 from app.config import get_settings
+from app.runtime.errors import ModelError
+from app.runtime.routes import router, runtime_error, validation_error
+from fastapi.exceptions import RequestValidationError
 
 settings = get_settings()
 app = FastAPI(title="MiniCoze Agent Service", version="0.1.0")
+app.include_router(router)
+app.add_exception_handler(ModelError, runtime_error)
+app.add_exception_handler(RequestValidationError, validation_error)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.backend_origin],
