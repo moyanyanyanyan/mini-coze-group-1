@@ -9,7 +9,7 @@ from pydantic import ValidationError
 from app.config import Settings
 from app.main import app
 from app.runtime import ModelError, call_model
-from app.runtime import routes
+from app.api import runtime as routes
 from app.runtime.deepseek import stream_model
 from app.runtime.schemas import KnowledgeResult, ModelInput, RuntimeRequest
 from app.runtime.service import RuntimeService

@@ -1,104 +1,40 @@
 :root {
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #172033;
-  background: #f3f6fb;
+  font-family: Inter, "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", ui-sans-serif, system-ui, sans-serif;
+  color: #252232;
+  background: #fbfaff;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+  --violet-50: #f5f2fc;
+  --violet-100: #eee9fa;
+  --violet-200: #dfd7f3;
+  --violet-300: #c4b6e8;
+  --violet-400: #9c88d2;
+  --violet-500: #8269c9;
+  --violet-600: #6f56d9;
+  --violet-700: #5a42bd;
+  --ink-900: #252232;
+  --ink-800: #373244;
+  --ink-700: #514b60;
+  --ink-600: #686273;
+  --ink-500: #746e80;
+  --ink-400: #787283;
+  --line: #ddd8e9;
+  --line-strong: #cbc3dc;
+  --line-soft: rgba(111, 86, 217, 0.055);
+  --surface: #fbfaff;
 }
 
-* {
-  box-sizing: border-box;
+* { box-sizing: border-box; }
+
+html { min-width: 320px; scroll-behavior: smooth; }
+body { min-width: 320px; min-height: 100vh; margin: 0; }
+button, a { -webkit-tap-highlight-color: transparent; }
+
+a:focus-visible, button:focus-visible {
+  outline: 3px solid rgba(111, 86, 217, 0.34);
+  outline-offset: 3px;
 }
 
-body {
-  margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
-}
-
-.shell {
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 32px;
-  background: radial-gradient(circle at top left, #dfe9ff 0, transparent 38%), #f3f6fb;
-}
-
-.card {
-  width: min(720px, 100%);
-  padding: 48px;
-  border: 1px solid #dce3ef;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 24px 70px rgba(55, 73, 109, 0.12);
-}
-
-.eyebrow {
-  color: #4263eb;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-}
-
-h1 {
-  margin: 12px 0;
-  font-size: clamp(32px, 6vw, 48px);
-  line-height: 1.1;
-}
-
-.intro {
-  margin: 0 0 32px;
-  color: #59657a;
-  line-height: 1.75;
-}
-
-.services {
-  display: grid;
-  gap: 1px;
-  overflow: hidden;
-  margin: 0 0 24px;
-  border: 1px solid #e5eaf2;
-  border-radius: 12px;
-  background: #e5eaf2;
-}
-
-.services div {
-  display: grid;
-  grid-template-columns: 150px 1fr;
-  gap: 16px;
-  padding: 16px 18px;
-  background: #fff;
-}
-
-dt {
-  font-weight: 650;
-}
-
-dd {
-  margin: 0;
-  color: #667085;
-}
-
-code {
-  overflow-wrap: anywhere;
-}
-
-.status {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  margin-right: 8px;
-  border-radius: 50%;
-  background: #20a464;
-}
-
-@media (max-width: 560px) {
-  .card {
-    padding: 28px;
-  }
-
-  .services div {
-    grid-template-columns: 1fr;
-    gap: 6px;
-  }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
 }

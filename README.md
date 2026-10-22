@@ -1,18 +1,18 @@
 # MiniCoze
 
-MiniCoze MVP 的 Monorepo。当前包含应用骨架、健康检查、本地基础设施与 Week 2 Agent Runtime；登录、配置管理、真实 RAG/插件和工作流执行仍需对应模块接入。
+MiniCoze MVP 的多人协作 Monorepo。当前包含应用骨架、领域目录、健康检查、数据库工具链与 Week 2 Agent Runtime；登录、配置管理、真实 RAG/插件和工作流执行仍需对应模块接入。
 
 ## 目录
 
 - `apps/web`：React + Vite 前端。
 - `apps/backend`：NestJS 业务 API，也是数据库的唯一访问入口。
 - `apps/agent`：FastAPI Agent 服务，后续承载模型、检索和工作流执行。
-- `packages/shared`：前端与 NestJS 共用的 TypeScript 契约。
+- `packages/shared`：前端与 NestJS 已经实际共用的稳定 TypeScript 类型；当前仅包含健康检查响应。
 - `docs`：架构边界和协作约定。
 
 ## 环境要求
 
-- Node.js 22+
+- Node.js 22.12+
 - pnpm 12+
 - Python 3.11+
 - Docker Desktop（用于 PostgreSQL/pgvector）
@@ -25,6 +25,7 @@ pnpm install
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r apps/agent/requirements.txt
+pnpm --filter @minicoze/backend prisma:generate
 ```
 
 ## 本地启动
@@ -62,7 +63,7 @@ pnpm test
 docker compose config --quiet
 ```
 
-开发前请先阅读 [架构与协作约定](docs/architecture.md)。真实密钥和本地 `.env` 不得提交到仓库。
+开发前请阅读 [架构与协作约定](docs/architecture.md)和[开发指南](docs/development.md)。真实密钥和本地 `.env` 不得提交到仓库。
 
 ## Agent Runtime（Week 2）
 

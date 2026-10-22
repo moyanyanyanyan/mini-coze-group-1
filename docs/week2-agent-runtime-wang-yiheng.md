@@ -2,6 +2,10 @@
 
 记录日期：2026-10-22。依据项目实施方案 revision 1258 的 Week 2 分工及个人/联调文档模板。当前为本地代码交付及验证记录，不代表多人远程联调已通过。
 
+2026-10-23 更新：初次实现已提交并推送（65f0428）；本次接入 main 的 a665b2a，合并 README 双方有效内容，保留新的根目录环境加载、日志及统一 API 入口，并将 Runtime HTTP 层迁至 app/api/runtime.py。接口路径和工作流公开函数不变。
+
+合并后验证：使用已安装的 Node 22.19.0 与 pnpm 12.9.1，按现有锁文件安装依赖；Prisma 6.19.0 客户端生成、根 pnpm typecheck、pnpm test、pnpm build 均通过。测试合计前端3项、后端1项、Python25项。未执行数据库迁移，未新增或升级 Runtime 依赖，未修改系统默认 Node。
+
 ## 完成内容
 
 已实现内部 HTTP run/stream、DeepSeek 非思考文本调用、SSE 增量解码、统一事件、历史校验及成对裁剪、模型与总运行超时、断开清理、服务间鉴权，以及工作流可直接调用的异步函数。run 聚合同一流式执行逻辑，不另造第二套聊天实现。
@@ -12,14 +16,14 @@
 
 ## 代码说明
 
-个人分支：`codex/feature/wangyiheng/agent-runtime`。团队分支样例使用 feature/姓名/内容，本机按 Codex 分支约定增加 codex/ 前缀。分支仅在本地，尚未提交或推送。
+个人分支：`codex/feature/wangyiheng/agent-runtime`，已推送至 origin。团队分支样例使用 feature/姓名/内容，本机按 Codex 分支约定增加 codex/ 前缀。本次基于主分支 a665b2a 解决合并冲突；多人真实联调结果另行记录。
 
 | 路径 | 职责 |
 | --- | --- |
 | apps/agent/app/runtime/schemas.py | 请求、结果、历史、知识库与插件契约 |
 | apps/agent/app/runtime/deepseek.py | 单次调用与供应商事件流读取 |
 | apps/agent/app/runtime/service.py | 上下文、Provider 注入与运行事件 |
-| apps/agent/app/runtime/routes.py | 内部鉴权、run/stream、心跳、取消及 HTTP 错误 |
+| apps/agent/app/api/runtime.py | 内部鉴权、run/stream、心跳、取消及 HTTP 错误，经 api/router.py 统一注册 |
 | apps/agent/tests/test_runtime.py | 离线契约、流式时序、异常与资源释放测试 |
 | apps/agent/scripts/smoke_runtime.py | 显式 --live 的真实 HTTP/工作流验收 |
 
@@ -123,7 +127,7 @@ $env:PYTHONPATH='apps/agent'
 
 真实模型硬目标受账号余额不可用阻塞；需用户/账号维护者补充余额或提供可用凭据，然后重跑显式 live 脚本。普通本地启动还需配置 INTERNAL_SERVICE_TOKEN（验收脚本使用临时随机值）；不将内部凭证写进联调消息。
 
-真实知识库、插件、Agent 配置及聊天/公开 API 代码尚未在本地分支集成。远程联调分支未建立，个人分支也未推送，因此其他成员尚不能从远程拉取本次实现。不得把本地测试记录写成团队联调成功。
+主分支新地基已接入，个人分支已发布，可供其他成员拉取。真实知识库、插件、Agent 配置及聊天/公开 API 业务代码仍未集成到本次 Runtime 链路；团队 integration 分支未建立。不得把地基合并或本地测试记录写成团队业务联调成功。
 
 ## 需要联调成员
 
