@@ -40,6 +40,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
     };
 
+    if (request.path === '/internal/knowledge/retrieval') {
+      response.status(status).json({ code: status, message: Array.isArray(message) ? message.join('; ') : message, data: null });
+      return;
+    }
     response.status(status).json(body);
   }
 }

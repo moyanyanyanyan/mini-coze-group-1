@@ -12,6 +12,12 @@ class Settings(BaseSettings):
     backend_origin: str = Field(
         default="http://localhost:3000", validation_alias="BACKEND_ORIGIN"
     )
+    internal_service_token: str = Field(default="", validation_alias="INTERNAL_SERVICE_TOKEN")
+    embedding_model: str = Field(default="BAAI/bge-small-zh-v1.5", validation_alias="EMBEDDING_MODEL")
+    embedding_model_revision: str = Field(
+        default="7999e1d3359715c523056ef9478215996d62a620",
+        validation_alias="EMBEDDING_MODEL_REVISION",
+    )
 
     model_config = SettingsConfigDict(env_file=ROOT_ENV_FILE, extra="ignore")
 
