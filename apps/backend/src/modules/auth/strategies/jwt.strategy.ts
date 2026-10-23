@@ -22,8 +22,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   ) {
     // 提取并检验jwt
     super({
-      // 从请求头 Authorization: Bearer xxx 里取 token
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      // 双通道：先 cookie（Web 端），再 Authorization: Bearer（公开 API / 第三方服务端）
+      // cookie 由 main.ts 的 cookieParser() 解析后才存在
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        (req: Request) => (req as Request & { cookies?: Record<string, string> }).cookies?.access_token??null,
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+      ]),
       // 过期的 token 直接拒绝，不装没看见
       ignoreExpiration: false,
       // 验签密钥必须和签发时一致，读不到直接启动失败
