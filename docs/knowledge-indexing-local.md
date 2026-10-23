@@ -40,6 +40,20 @@ pnpm dev:agent
 
 ## 第 5 步：检索自测
 
+### 可复现的合成样例
+
+仓库提供 [合成餐费文本](fixtures/rag-reimbursement-sample.txt) 和 `apps/backend/scripts/seed-rag-demo.ts`。启动 PostgreSQL、NestJS、Python Embedding 服务后，在仓库根目录运行：
+
+```powershell
+pnpm --filter @minicoze/backend exec ts-node scripts/seed-rag-demo.ts
+```
+
+脚本只访问本机 `http://localhost:3000/api` 和演示工作空间 `ws-local-demo`。如果后端使用其他本机端口，可设置 `KNOWLEDGE_API_BASE_URL`（需以 `/api` 结尾）。它创建或复用 `RAG联调-命中库-20261023`、`RAG联调-空库-20261023`，为命中库录入一份合成文本，等待文档 `READY`，检查切片包含餐费上限，再分别验证 `HIT` 与确定性 `NO_HIT`。重复运行不会重复录入；如果同名样例库已有其他资料，脚本会报错，不会删除或覆盖。输出包含当前数据库实际生成的 KB、文档 ID，这些 ID 不能在别人的数据库直接复用。
+
+该文本只含虚构规则，可以提交到 GitHub。脚本不验证内部检索入口的服务身份、Agent 绑定或用户权限；这些仍需与 Agent/Auth/Runtime 联调。
+
+### 手动检索
+
 知识库页面提供三个选项卡：先在左侧选知识库；“文档管理”中录入资料，点击已 `READY` 文档的“查看切片”会直接切到“切片查看”；“检索预览”中输入问题可查看当前知识库匹配的片段、文档标题与分数。长片段列表在内容面板中滚动。页面预览接口仅允许本机开发环境和 `ws-local-demo`，不代替 Runtime 的权限联调。启动 PostgreSQL、NestJS 和 Python 服务，并确认目标知识库已有 `READY` 文档后，也可在仓库根目录运行开发自测脚本：
 
 文档列表提供“删除文档”，知识库标题区提供“删除知识库”。操作前会显示确认提示；删除文档会连同它的切片和向量删除，删除知识库会连同所有文档、切片和向量删除，无法在页面撤销。正在处理的文档不能删除；知识库中存在正在处理的文档时，也不能删除知识库。删除接口目前仅允许本机开发环境的 `ws-local-demo` 使用，正式接入用户和工作空间鉴权后再开放其他工作空间。
