@@ -76,7 +76,12 @@ export function KnowledgePage() {
   }, [selectedId, hasProcessing]);
 
   useEffect(() => {
-    if (!selectedId || !selectedDocumentId) { setChunks(null); return; }
+    if (!selectedId || !selectedDocumentId) {
+      setChunks(null);
+      setChunkLoading(false);
+      setChunkError('');
+      return;
+    }
     let active = true;
     setChunkLoading(true);
     setChunkError('');
@@ -304,7 +309,7 @@ export function KnowledgePage() {
                   </select>
                 </label>
                 {chunkError && <p className="knowledge-error" role="alert">{chunkError}</p>}
-                {chunkLoading ? <p className="knowledge-empty">正在读取切片…</p> : !selectedDocument ? <p className="knowledge-empty">先录入资料，处理完成后即可查看切片。</p> : chunks?.items.length === 0 ? (
+                {documentLoading ? <p className="knowledge-empty">正在读取文档…</p> : !selectedDocument ? <p className="knowledge-empty">暂无切片。请先录入资料并等待处理完成。</p> : chunkLoading ? <p className="knowledge-empty">正在读取切片…</p> : chunks?.items.length === 0 ? (
                   <p className="knowledge-empty">这份文档暂无切片。</p>
                 ) : <ol className="knowledge-snippets knowledge-snippets-scroll">{chunks?.items.map((chunk) => (
                   <li key={chunk.id}>
