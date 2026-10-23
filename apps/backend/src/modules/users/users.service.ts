@@ -20,8 +20,7 @@ export class UsersService{
         };
     }
     // 按照邮箱查询用户,查不到返回null，不抛错
-    // 查询数据库需要等待，用异步可使程序同时处理其他事情67 
-    // 查用户
+    // 查询数据库需要等待，用异步可使程序同时处理其他事情
     async findByEmail(email:string):Promise<User|null>{
         return this.prisma.user.findUnique({
             // 输出邮箱转为小写去掉收尾空格
@@ -29,6 +28,14 @@ export class UsersService{
         })
     }
 
+
+    // 根据ID查询用户
+
+    async findById(id:string):Promise<User|null>{
+        return this.prisma.user.findUnique({
+            where:{id},
+        })
+    }
 
     //创建用户
     // 创建新用户，并且把明文密码哈希掉，最后返回
