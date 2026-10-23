@@ -1,3 +1,7 @@
+// MiniCoze Agent 域 Prisma Schema
+// 协作定稿字段：Agent.creatorId → ownerId、加 maxTokens、AgentPluginBinding.enabled Boolean、AgentWorkflow.sortOrder
+// push 后数据库将从旧表结构对齐到协作定稿结构（只改本 5 张表，不影响其他 26 张表）
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -5,4 +9,90 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+enum AgentStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+/// Agent：协作定稿字段
+model Agent {
+  id               String      @id @default(cuid())
+  workspaceId      String?     // 待裁决 A
+  ownerId          String      // 归属 CurrentUser.id（裁决后 creatorId → ownerId）
+  name             String
+  description      String?
+  avatarUrl        String?
+  systemPrompt     String
+  model            String      @default("deepseek-chat")
+  temperature      Float       @default(0.7)
+  maxTokens        Int         @default(4096)
+  contextLimit     Int         @default(20)
+  openingMessage   String?
+  status           AgentStatus @default(DRAFT)
+  currentVersionId String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  versions              AgentVersion[] @relation("AgentVersions")
+  pluginBindings        AgentPluginBinding[]
+  knowledgeBaseBindings KnowledgeBaseAgentBinding[]
+  workflowBindings      AgentWorkflow[]
+}
+
+model AgentVersion {
+  id        String   @id @default(cuid())
+  agentId   String
+  version   Int
+  snapshot  Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agent Agent @relation("AgentVersions", fields: [agentId], references: [id])
+
+  @@unique([agentId, version])
+  @@index([agentId])
+}
+
+/// AgentPluginBinding：协作定稿 enabled Boolean，替代旧表 status 枚举
+model AgentPluginBinding {
+  id         String  @id @default(cuid())
+  agentId    String
+  pluginId   String
+  enabled    Boolean @default(true)
+  autoInvoke Boolean @default(true)
+  sortOrder  Int     @default(0)
+  config     Json?
+
+  agent Agent @relation(fields: [agentId], references: [id])
+
+  @@unique([agentId, pluginId])
+  @@index([agentId, enabled])
+}
+
+model KnowledgeBaseAgentBinding {
+  id              String  @id @default(cuid())
+  agentId         String
+  knowledgeBaseId String
+  enabled         Boolean @default(true)
+  config          Json?
+
+  agent Agent @relation(fields: [agentId], references: [id])
+
+  @@unique([agentId, knowledgeBaseId])
+}
+
+/// AgentWorkflow：协作定稿加 sortOrder
+model AgentWorkflow {
+  id         String  @id @default(cuid())
+  agentId    String
+  workflowId String
+  enabled    Boolean @default(true)
+  sortOrder  Int     @default(0)
+
+  agent Agent @relation(fields: [agentId], references: [id])
+
+  @@unique([agentId, workflowId])
 }
