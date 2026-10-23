@@ -1,6 +1,7 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import { CreateKnowledgeBaseDto } from './dto/create-knowledge-base.dto';
+import { UpdateKnowledgeBaseStatusDto } from './dto/update-knowledge-base-status.dto';
 import { assertLocalKnowledgeRequest } from './knowledge-local-access';
 import { KnowledgeService } from './knowledge.service';
 
@@ -19,6 +20,12 @@ export class KnowledgeController {
   async create(@Body() body: CreateKnowledgeBaseDto) {
     const data = await this.knowledge.create(body);
     return { code: 200, message: 'ok', data };
+  }
+
+  @Patch(':id/status')
+  async updateStatus(@Req() request: Request, @Param('id') id: string, @Body() body: UpdateKnowledgeBaseStatusDto) {
+    assertLocalKnowledgeRequest(request, body.workspaceId);
+    return { code: 200, message: 'ok', data: await this.knowledge.updateStatus(id, body.workspaceId, body.status) };
   }
 
   @Delete(':id')

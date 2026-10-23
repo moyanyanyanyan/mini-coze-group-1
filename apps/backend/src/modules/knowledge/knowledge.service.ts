@@ -6,6 +6,16 @@ import { CreateKnowledgeBaseDto } from './dto/create-knowledge-base.dto';
 export class KnowledgeService {
   constructor(private readonly prisma: PrismaService) {}
 
+  // Internal catalog lookup for Agent binding validation. The caller decides
+  // whether the returned KBs may be bound by its authenticated user/Agent.
+  async findByIds(ids: string[]) {
+    if (ids.length === 0) return [];
+    return this.prisma.knowledgeBase.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, name: true, status: true, workspaceId: true },
+    });
+  }
+
   async list(workspaceId: string) {
     const normalizedWorkspaceId = workspaceId?.trim();
     if (!normalizedWorkspaceId) {
@@ -29,6 +39,14 @@ export class KnowledgeService {
     return this.prisma.knowledgeBase.create({
       data: { workspaceId, name, description },
     });
+  }
+
+  async updateStatus(id: string, workspaceId: string, status: 'ACTIVE' | 'DISABLED') {
+    const updated = await this.prisma.knowledgeBase.updateMany({
+      where: { id, workspaceId }, data: { status },
+    });
+    if (updated.count === 0) throw new NotFoundException('知识库不存在');
+    return this.prisma.knowledgeBase.findUniqueOrThrow({ where: { id } });
   }
 
   async remove(id: string, workspaceId: string) {

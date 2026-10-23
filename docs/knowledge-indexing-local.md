@@ -58,6 +58,8 @@ pnpm --filter @minicoze/backend exec ts-node scripts/seed-rag-demo.ts
 
 文档列表提供“删除文档”，知识库标题区提供“删除知识库”。操作前会显示确认提示；删除文档会连同它的切片和向量删除，删除知识库会连同所有文档、切片和向量删除，无法在页面撤销。正在处理的文档不能删除；知识库中存在正在处理的文档时，也不能删除知识库。删除接口目前仅允许本机开发环境的 `ws-local-demo` 使用，正式接入用户和工作空间鉴权后再开放其他工作空间。
 
+知识库标题区也可“停用知识库”或“重新启用”，使用 `PATCH /api/knowledge-bases/:id/status`，请求体为 `{workspaceId:"ws-local-demo",status:"DISABLED"|"ACTIVE"}`。停用保留文档、切片与向量；页面暂停录入、切片查看和检索。后端对停用库拒绝新增文档、重试处理、检索预览和内部检索，Agent 绑定目录查询仍返回该库及其 `DISABLED` 状态，供 Agent 拒绝新绑定。状态修改目前同样只允许本机开发环境的 `ws-local-demo`；正式用户权限接入后需替换此限制。停用不会中断已在处理中的文档任务，任务完成后数据仍保留但不可检索。
+
 ```powershell
 pnpm --filter @minicoze/backend exec ts-node scripts/retrieval-smoke.ts <真实知识库ID> "报销标准是什么？" HIT
 ```
@@ -71,3 +73,7 @@ pnpm --filter @minicoze/backend exec ts-node scripts/retrieval-smoke.ts <空知�
 检索核心对每个知识库最多取 5 条，使用相同模型生成问题向量，通过 pgvector 余弦距离计算 `score = 1 - cosine_distance`，只查询 ACTIVE 知识库中 READY 文档的已启用片段。不同模型的旧向量不会混入结果。无分数阈值，因此“无关问题”不保证返回 `NO_HIT`。
 
 Runtime 契约入口是 `POST /internal/knowledge/retrieval`，请求含 `{runId,actorId,agentId,knowledgeBaseIds,query,topK:5}`，成功外壳为 `{code:200,message:"ok",data:{status:"HIT"|"NO_HIT",hits:[...]}}`。当前仓库没有 Agent 绑定与用户权限实现，该 HTTP 入口在服务凭证通过后仍会返回 `403`，避免越权检索。Agent/Auth 模块提供权威校验后，应替换 `KnowledgeRetrievalAccess.assertAllowed()` 并做真实联调；不要通过本地脚本代替权限验收。内部接口错误统一返回 `{code,message,data:null}`。
+
+## Agent 绑定目录查询（待联调）
+
+`KnowledgeModule` 已导出 `KnowledgeService`。同一 NestJS 进程中的 Agent 模块可注入并调用 `findByIds(ids: string[])`，返回找到的知识库 `{id,name,status,workspaceId}`；未知 ID 不返回，空数组直接返回空结果。此方法只提供目录事实，不做用户授权，也不自行过滤 `DISABLED`。Agent 侧需将返回项与请求 ID 对照，并结合可信的 Agent/workspace 归属校验可绑定范围。用户与 workspace 的关系仍待团队确定；当前不要用浏览器传入的 `workspaceId` 作为授权依据。此内部 Service 方法不是新增的公开 HTTP 接口。

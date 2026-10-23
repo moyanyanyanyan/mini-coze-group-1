@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { createKnowledgeBase, createTextDocument, deleteKnowledgeBase, deleteKnowledgeDocument, listDocumentChunks, listKnowledgeBases, listKnowledgeDocuments, previewKnowledgeSearch, retryKnowledgeDocument, uploadDocumentFile, type KnowledgeBase, type KnowledgeChunkPage, type KnowledgeDocument, type KnowledgeSearchResult } from './knowledge.api';
+import { createKnowledgeBase, createTextDocument, deleteKnowledgeBase, deleteKnowledgeDocument, listDocumentChunks, listKnowledgeBases, listKnowledgeDocuments, previewKnowledgeSearch, retryKnowledgeDocument, updateKnowledgeBaseStatus, uploadDocumentFile, type KnowledgeBase, type KnowledgeChunkPage, type KnowledgeDocument, type KnowledgeSearchResult } from './knowledge.api';
 import './knowledge.css';
 
 const demoWorkspaceId = 'ws-local-demo';
@@ -19,6 +19,7 @@ export function KnowledgePage() {
   const [documentLoading, setDocumentLoading] = useState(false);
   const [documentSaving, setDocumentSaving] = useState(false);
   const [deletingBase, setDeletingBase] = useState(false);
+  const [updatingBaseStatus, setUpdatingBaseStatus] = useState(false);
   const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
   const [sourceMode, setSourceMode] = useState<'text' | 'file'>('text');
   const [documentTitle, setDocumentTitle] = useState('');
@@ -35,6 +36,7 @@ export function KnowledgePage() {
   const [searchError, setSearchError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchGenerationRef = useRef(0);
+  const selectedBaseStatus = items.find((item) => item.id === selectedId)?.status;
 
   useEffect(() => {
     let active = true;
@@ -55,10 +57,16 @@ export function KnowledgePage() {
     setSearchResult(null);
     setSearchError('');
     setSearching(false);
-  }, [selectedId]);
+  }, [selectedId, selectedBaseStatus]);
 
   useEffect(() => {
-    if (!selectedId) { setDocuments([]); return; }
+    if (!selectedId || selectedBaseStatus !== 'ACTIVE') {
+      setDocuments([]);
+      setDocumentLoading(false);
+      setDocumentError('');
+      setSelectedDocumentId(null);
+      return;
+    }
     let active = true;
     setDocumentLoading(true);
     const refresh = () => listKnowledgeDocuments(selectedId, demoWorkspaceId)
@@ -73,10 +81,10 @@ export function KnowledgePage() {
     void refresh();
     const timer = hasProcessing ? window.setInterval(() => void refresh(), 2000) : undefined;
     return () => { active = false; if (timer !== undefined) window.clearInterval(timer); };
-  }, [selectedId, hasProcessing]);
+  }, [selectedId, selectedBaseStatus, hasProcessing]);
 
   useEffect(() => {
-    if (!selectedId || !selectedDocumentId) {
+    if (!selectedId || selectedBaseStatus !== 'ACTIVE' || !selectedDocumentId) {
       setChunks(null);
       setChunkLoading(false);
       setChunkError('');
@@ -90,7 +98,7 @@ export function KnowledgePage() {
       .catch((cause: unknown) => { if (active) { setChunks(null); setChunkError(getMessage(cause)); } })
       .finally(() => { if (active) setChunkLoading(false); });
     return () => { active = false; };
-  }, [selectedId, selectedDocumentId, chunkPage]);
+  }, [selectedId, selectedBaseStatus, selectedDocumentId, chunkPage]);
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -114,7 +122,7 @@ export function KnowledgePage() {
 
   async function handleDocumentSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedId || documentSaving) return;
+    if (!selectedId || selectedBaseStatus !== 'ACTIVE' || documentSaving) return;
     setDocumentSaving(true);
     setDocumentError('');
     try {
@@ -146,8 +154,23 @@ export function KnowledgePage() {
     }
   }
 
+  async function handleToggleBaseStatus() {
+    if (!selectedId || !selectedBaseStatus || updatingBaseStatus || deletingBase) return;
+    const status = selectedBaseStatus === 'ACTIVE' ? 'DISABLED' : 'ACTIVE';
+    setUpdatingBaseStatus(true);
+    setError('');
+    try {
+      const updated = await updateKnowledgeBaseStatus(selectedId, demoWorkspaceId, status);
+      setItems((current) => current.map((item) => item.id === updated.id ? updated : item));
+    } catch (cause) {
+      setError(getMessage(cause));
+    } finally {
+      setUpdatingBaseStatus(false);
+    }
+  }
+
   async function handleDeleteBase() {
-    if (!selectedId || deletingBase) return;
+    if (!selectedId || deletingBase || updatingBaseStatus) return;
     const baseId = selectedId;
     const base = items.find((item) => item.id === baseId);
     if (!window.confirm(`确定删除知识库「${base?.name ?? '当前知识库'}」吗？其中的 ${documents.length} 份文档、切片和向量也会永久删除，无法恢复。`)) return;
@@ -191,7 +214,7 @@ export function KnowledgePage() {
 
   async function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedId || !query.trim() || searching) return;
+    if (!selectedId || selectedBaseStatus !== 'ACTIVE' || !query.trim() || searching) return;
     setSearching(true);
     setSearchError('');
     setSearchResult(null);
@@ -231,8 +254,8 @@ export function KnowledgePage() {
                 <p className="knowledge-empty">还没有知识库，先在下方创建一个。</p>
               ) : <ul>{items.map((item) => (
                 <li key={item.id}>
-                  <button type="button" className={`knowledge-catalog-item ${selectedId === item.id ? 'is-selected' : ''}`} disabled={deletingBase || deletingDocumentId !== null} onClick={() => setSelectedId(item.id)} aria-current={selectedId === item.id ? 'page' : undefined}>
-                    <span><strong>{item.name}</strong><span className="knowledge-status">{item.status === 'ACTIVE' ? '可用' : '已停用'}</span></span>
+                  <button type="button" className={`knowledge-catalog-item ${selectedId === item.id ? 'is-selected' : ''}`} disabled={deletingBase || updatingBaseStatus || deletingDocumentId !== null} onClick={() => setSelectedId(item.id)} aria-current={selectedId === item.id ? 'page' : undefined}>
+                    <span><strong>{item.name}</strong><span className={`knowledge-status ${item.status === 'DISABLED' ? 'is-disabled' : ''}`}>{item.status === 'ACTIVE' ? '可用' : '已停用'}</span></span>
                     <small>{item.description || '暂无说明'}</small>
                   </button>
                 </li>
@@ -254,10 +277,15 @@ export function KnowledgePage() {
               <div className="knowledge-workbench-heading">
                 <div><p>当前知识库</p><h2>{selectedBase?.name ?? '知识库'}</h2><span>{selectedBase?.description || '暂无说明'}</span></div>
                 <div className="knowledge-workbench-actions">
-                  <div className="knowledge-workbench-stats"><span>{documents.length} 份文档</span><span>{documents.reduce((sum, document) => sum + document.chunkCount, 0)} 个切片</span></div>
-                  <button className="knowledge-delete" type="button" disabled={deletingBase || hasProcessing} title={hasProcessing ? '请等待文档处理完成' : undefined} onClick={() => void handleDeleteBase()}>{deletingBase ? '删除中…' : '删除知识库'}</button>
+                  {selectedBaseStatus === 'ACTIVE' ? <div className="knowledge-workbench-stats"><span>{documents.length} 份文档</span><span>{documents.reduce((sum, document) => sum + document.chunkCount, 0)} 个切片</span></div> : <span className="knowledge-status is-disabled">已停用 · 资料保留</span>}
+                  <div className="knowledge-status-actions">
+                    <button className="knowledge-status-toggle" type="button" disabled={updatingBaseStatus || deletingBase} onClick={() => void handleToggleBaseStatus()}>{updatingBaseStatus ? '更新中…' : selectedBaseStatus === 'DISABLED' ? '重新启用' : '停用知识库'}</button>
+                    <button className="knowledge-delete" type="button" disabled={deletingBase || updatingBaseStatus || hasProcessing} title={hasProcessing ? '请等待文档处理完成' : undefined} onClick={() => void handleDeleteBase()}>{deletingBase ? '删除中…' : '删除知识库'}</button>
+                  </div>
                 </div>
               </div>
+              {selectedBaseStatus === 'DISABLED' && <section className="knowledge-card knowledge-disabled-panel" role="status"><h2>知识库已停用</h2><p>资料、切片和向量仍保留。停用期间不能录入资料、查看切片或检索；重新启用后可继续使用。</p></section>}
+              {selectedBaseStatus === 'ACTIVE' && <>
               <div className="knowledge-tabs" role="tablist" aria-label="知识库功能">
                 <button type="button" role="tab" aria-selected={activeTab === 'documents'} className={activeTab === 'documents' ? 'is-active' : ''} onClick={() => setActiveTab('documents')}>文档管理</button>
                 <button type="button" role="tab" aria-selected={activeTab === 'chunks'} className={activeTab === 'chunks' ? 'is-active' : ''} onClick={() => setActiveTab('chunks')}>切片查看</button>
@@ -343,6 +371,7 @@ export function KnowledgePage() {
                   ))}</ol>}
                 </div>}
               </section>}
+              </>}
             </> : <div className="knowledge-card knowledge-empty-workbench"><h2>选择知识库</h2><p>从左侧选择一个知识库，开始管理文档、查看切片或预览检索。</p></div>}
           </div>
         </div>
