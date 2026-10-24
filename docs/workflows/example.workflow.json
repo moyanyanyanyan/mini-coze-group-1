@@ -2,7 +2,7 @@
   "version": "1.0",
   "nodes": [
     {"id":"node-start-1","type":"start","position":{"x":80,"y":160},"data":{"label":"开始","inputs":[{"name":"query","type":"string","required":true}]}},
-    {"id":"node-llm-1","type":"llm","position":{"x":360,"y":160},"data":{"model":"deepseek-chat","temperature":0.7,"maxTokens":2048,"systemPrompt":"你是一个助手","userPromptTemplate":"{{node-start-1.query}}","outputs":[{"name":"text","type":"string"}]}},
+    {"id":"node-llm-1","type":"llm","position":{"x":360,"y":160},"data":{"model":"deepseek-flash","temperature":0.7,"maxTokens":2048,"systemPrompt":"你是一个助手","userPromptTemplate":"{{node-start-1.query}}","outputs":[{"name":"text","type":"string"}]}},
     {"id":"node-end-1","type":"end","position":{"x":640,"y":160},"data":{"outputs":[{"name":"result","type":"string","valueFrom":"node-llm-1.text"}]}}
   ],
   "edges": [

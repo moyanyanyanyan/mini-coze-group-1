@@ -45,6 +45,10 @@ export class ListWorkflowsDto {
   @IsIn(['DRAFT', 'ACTIVE', 'ARCHIVED'])
   status?: string;
 }
+export class ListRunsDto {
+  @Type(() => Number) @IsInt() @Min(1) page = 1;
+  @Type(() => Number) @IsInt() @Min(1) @Max(50) size = 10;
+}
 export class SaveDraftDto {
   @IsObject()
   definition!: Record<string, unknown>;

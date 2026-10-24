@@ -6,6 +6,8 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
+from app.runtime import ModelError, ModelResult
+from app.workflow import runtime_adapter
 from app.workflow.validation import validate, validate_input
 from app.workflow.execution import execute
 from app.workflow.runtime_adapter import RuntimeAdapter
@@ -125,7 +127,12 @@ def test_failure(definition, failure, code):
     assert "secret-key" not in json.dumps(result)
 
 
-def test_http(definition):
+def test_http(definition, monkeypatch):
+    async def unavailable(**kwargs):
+        raise RuntimeError("provider down")
+
+    # Never reach the real model from tests.
+    monkeypatch.setattr(app.state, "workflow_complete", unavailable)
     with TestClient(app) as client:
         assert client.post(
             "/internal/workflow/validate", json={"definition": definition}
@@ -148,3 +155,62 @@ def test_http(definition):
         )
         assert result.status_code == 200
         assert result.json()["status"] == "FAILED"  # No silent mock fallback.
+
+
+def test_main_installs_runtime_provider():
+    assert app.state.workflow_complete is runtime_adapter.runtime_complete
+
+
+def test_runtime_complete_maps_call_model(monkeypatch):
+    calls = []
+
+    async def fake_call_model(**kwargs):
+        calls.append(kwargs)
+        return ModelResult(
+            content="答",
+            finishReason="length",
+            usage=dict(promptTokens=1, completionTokens=2, totalTokens=3),
+        )
+
+    monkeypatch.setattr(runtime_adapter, "call_model", fake_call_model)
+    result = asyncio.run(
+        runtime_adapter.runtime_complete(
+            model="m", system_prompt="", user_prompt="问", temperature=0.5, max_tokens=8
+        )
+    )
+    # Empty system prompt is omitted: Runtime rejects empty message content.
+    assert calls[0]["messages"] == [{"role": "user", "content": "问"}]
+    assert result == {
+        "text": "答",
+        "finishReason": "length",
+        "usage": {"promptTokens": 1, "completionTokens": 2, "totalTokens": 3},
+    }
+    asyncio.run(
+        runtime_adapter.runtime_complete(
+            model="m", system_prompt="S", user_prompt="问", temperature=0.5, max_tokens=8
+        )
+    )
+    assert calls[1]["messages"][0] == {"role": "system", "content": "S"}
+
+
+@pytest.mark.parametrize(
+    "error,code",
+    [
+        (ModelError("MODEL_TIMEOUT", "模型生成超时", 504, True), "LLM_TIMEOUT"),
+        (ModelError("MODEL_QUOTA_EXCEEDED", "余额不足", 503), "LLM_UNAVAILABLE"),
+        (ModelError("INVALID_REQUEST", "模型不在允许列表", 400), "LLM_UNAVAILABLE"),
+    ],
+)
+def test_runtime_errors_map_to_node_codes(definition, monkeypatch, error, code):
+    async def fake_call_model(**kwargs):
+        raise error
+
+    monkeypatch.setattr(runtime_adapter, "call_model", fake_call_model)
+    result = asyncio.run(
+        execute(
+            definition,
+            {"query": "hi"},
+            RuntimeAdapter(runtime_adapter.runtime_complete),
+        )
+    )
+    assert result["nodeResults"][1]["error"]["code"] == code

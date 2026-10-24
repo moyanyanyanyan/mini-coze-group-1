@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import {
   CreateWorkflowDto,
+  ListRunsDto,
   ListWorkflowsDto,
   RunWorkflowDto,
   SaveDraftDto,
@@ -116,5 +117,17 @@ export class WorkflowsController {
   @HttpCode(200)
   run(@Param('id') id: string, @Body() dto: RunWorkflowDto) {
     return this.service.run(id, dto.input);
+  }
+
+  /**
+   * 分页查询运行历史，最新的在前。
+   * @param id 路径中的工作流 ID。
+   * @param dto 页码和每页数量。
+   * @returns items、total、page、size；列表项含 runId、状态、输入输出、节点结果和起止时间。
+   * @throws NotFoundException 工作流不存在、已归档或不属于当前身份。
+   */
+  @Get(':id/runs')
+  runs(@Param('id') id: string, @Query() dto: ListRunsDto) {
+    return this.service.runs(id, dto.page, dto.size);
   }
 }

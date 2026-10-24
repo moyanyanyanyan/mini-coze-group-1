@@ -304,4 +304,25 @@ export class WorkflowsService {
     });
     return { runId: run.id, ...result };
   }
+
+  /**
+   * 分页查询工作流的运行历史，按开始时间倒序。
+   * @param id 工作流 ID，用于校验归属。
+   * @param page 页码，从 1 开始。
+   * @param size 每页数量，1–50。
+   * @returns items、total、page、size；列表项不含 Definition 快照，RUNNING 记录 endedAt 为 null。
+   * @throws NotFoundException 工作流不可访问（404）。
+   */
+  async runs(id: string, page: number, size: number) {
+    await this.owned(id);
+    const result = await this.repository.listRuns(id, page, size);
+    return {
+      ...result,
+      items: result.items.map(({ id: runId, nodeResults, ...run }) => ({
+        runId,
+        ...run,
+        nodeResults: nodeResults ?? [],
+      })),
+    };
+  }
 }
