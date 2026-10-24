@@ -6,8 +6,10 @@ from starlette.concurrency import run_in_threadpool
 
 from app.config import get_settings
 from app.knowledge.embedding import embed_texts
+from app.api.runtime import router as runtime_router
 
 api_router = APIRouter()
+api_router.include_router(runtime_router)
 
 
 @api_router.get("/health")
@@ -24,7 +26,7 @@ async def create_embeddings(
     request: EmbeddingRequest,
     authorization: str = Header(default=""),
 ) -> dict:
-    token = get_settings().internal_service_token
+    token = get_settings().internal_service_token.get_secret_value()
     if not token:
         raise HTTPException(status_code=503, detail="Internal service token is not configured")
     if not compare_digest(authorization, f"Bearer {token}"):
