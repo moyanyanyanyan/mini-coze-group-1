@@ -24,6 +24,7 @@ def provider(handler):
 def test_hit_maps_citations_and_limits_public_context():
     def respond(req):
         assert req.url.path == "/internal/knowledge/retrieval"
+        assert req.url.host == "nest.test"
         assert req.headers["Authorization"] == "Bearer test-token"
         assert json.loads(req.content)["topK"] == 5
         hit = {"knowledgeBaseId": "kb-1", "documentId": "doc-1", "chunkId": "chunk-1",

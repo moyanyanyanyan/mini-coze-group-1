@@ -97,7 +97,7 @@ class KnowledgeRequest(DTO):
     agentId: Identifier
     knowledgeBaseIds: list[Identifier]
     query: str
-    topK: int = Field(default=5, ge=1, le=10)
+    topK: Literal[5] = 5
 
 
 class KnowledgeChunk(DTO):
