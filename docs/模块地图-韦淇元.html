@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>韦淇元 · 模块总览对照图</title>
+<style>
+  :root{
+    --primary:#4f46e5; --primary-soft:#eef2ff; --ink:#111827; --muted:#6b7280;
+    --line:#e5e7eb; --bg:#f8fafc; --ok:#16a34a; --warn:#d97706; --todo:#94a3b8;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;padding:32px;background:var(--bg);color:var(--ink);
+    font-family:"PingFang SC","Microsoft YaHei","Hiragino Sans GB",system-ui,sans-serif;}
+  .wrap{max-width:1280px;margin:0 auto;}
+  header{display:flex;align-items:flex-end;justify-content:space-between;
+    border-bottom:2px solid var(--ink);padding-bottom:14px;margin-bottom:8px;}
+  h1{margin:0;font-size:26px;letter-spacing:.5px;}
+  .sub{color:var(--muted);font-size:13px;margin-top:6px;}
+  .stats{display:flex;gap:10px;}
+  .stat{background:#fff;border:1px solid var(--line);border-radius:10px;
+    padding:8px 14px;text-align:center;min-width:84px;}
+  .stat b{display:block;font-size:20px;color:var(--primary);}
+  .stat span{font-size:11px;color:var(--muted);}
+
+  .legend{display:flex;gap:18px;font-size:12px;color:var(--muted);
+    margin:14px 0 18px;align-items:center;}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;}
+  .d-ok{background:var(--ok);} .d-warn{background:var(--warn);} .d-todo{background:var(--todo);}
+
+  /* 横向契约带 */
+  .contract{background:var(--primary-soft);border:1px dashed var(--primary);
+    border-radius:14px;padding:16px 18px;margin-bottom:14px;}
+  .contract h2{margin:0 0 4px;font-size:16px;color:var(--primary);}
+  .contract .note{font-size:12px;color:var(--muted);margin-bottom:12px;}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;}
+  .chip{background:#fff;border:1px solid var(--line);border-radius:8px;
+    padding:6px 10px;font-size:12.5px;line-height:1.4;}
+  .chip b{color:var(--primary);margin-right:6px;font-size:11.5px;}
+
+  .arrowdown{text-align:center;color:var(--primary);font-size:18px;margin:6px 0 14px;}
+
+  /* 四个大模块 */
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+  .card{background:#fff;border:1px solid var(--line);border-radius:14px;
+    padding:14px;display:flex;flex-direction:column;}
+  .card .tag{display:inline-block;font-size:11px;color:#fff;background:var(--primary);
+    border-radius:999px;padding:3px 10px;margin-bottom:8px;align-self:flex-start;}
+  .card h3{margin:0 0 2px;font-size:15px;}
+  .card .goal{font-size:11.5px;color:var(--muted);margin-bottom:12px;line-height:1.5;}
+  .items{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px;}
+  .items li{border-left:3px solid var(--todo);padding:2px 0 2px 9px;}
+  .items li.warn{border-left-color:var(--warn);}
+  .items li.ok{border-left-color:var(--ok);}
+  .items .t{font-size:12.5px;font-weight:600;}
+  .items .d{font-size:11px;color:var(--muted);line-height:1.45;margin-top:2px;}
+  .card .foot{margin-top:auto;padding-top:10px;font-size:11px;color:var(--muted);
+    border-top:1px dashed var(--line);}
+
+  /* 底部 */
+  .bottom{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px;}
+  .panel{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;}
+  .panel h4{margin:0 0 8px;font-size:13.5px;}
+  .panel ol{margin:0;padding-left:18px;font-size:12.5px;line-height:1.9;color:#374151;}
+  .cut{color:#b91c1c;}
+  .keep{color:#15803d;font-weight:600;}
+  footer{margin-top:16px;font-size:11.5px;color:var(--muted);text-align:center;}
+  @media print{body{background:#fff;padding:0;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>韦淇元 · 模块总览对照图</h1>
+      <div class="sub">MiniCoze 小组项目｜分工：登录、用户、对话与发布｜2026-10-18（Week 2）</div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b>5</b><span>大模块</span></div>
+      <div class="stat"><b>30</b><span>小模块</span></div>
+      <div class="stat"><b>0</b><span>已完成</span></div>
+      <div class="stat"><b>5</b><span>半成品</span></div>
+      <div class="stat"><b>25</b><span>未开始</span></div>
+    </div>
+  </header>
+
+  <div class="legend">
+    <span><i class="dot d-ok"></i>已落地</span>
+    <span><i class="dot d-warn"></i>半成品（壳/草案/示例代码）</span>
+    <span><i class="dot d-todo"></i>未开始</span>
+    <span style="margin-left:auto;">依赖顺序：A → B → C → D，E 横向贯穿、最优先交付</span>
+  </div>
+
+  <!-- E 横向 -->
+  <section class="contract">
+    <h2>E. 契约与对齐（横向模块 · 全组都等你，最优先）</h2>
+    <div class="note">不产生页面，但别人都要 import / 遵循它。建议今天就把 E1、E2 发群。</div>
+    <div class="chips">
+      <div class="chip"><b>E1</b>CurrentUser 类型（packages/shared）</div>
+      <div class="chip"><b>E2</b>401/403 统一错误格式</div>
+      <div class="chip"><b>E3</b>Conversation / Message 契约</div>
+      <div class="chip"><b>E4</b>SSE 事件表（7 种 + 信封）</div>
+      <div class="chip"><b>E5</b>API Key 与公开 API 契约</div>
+    </div>
+  </section>
+
+  <div class="arrowdown">▼ 消费 E 的契约，依次实现 ▼</div>
+
+  <!-- A B C D -->
+  <div class="grid">
+
+    <div class="card">
+      <span class="tag">A · 地基</span>
+      <h3>认证与用户</h3>
+      <div class="goal">让人能进来，且每个接口都知道"现在是谁"</div>
+      <ul class="items">
+        <li class="todo"><div class="t">A1 User 数据模型</div><div class="d">Prisma User 表 + 首条 migrate</div></li>
+        <li class="todo"><div class="t">A2 用户名密码注册</div><div class="d">bcrypt 哈希，禁明文/MD5</div></li>
+        <li class="todo"><div class="t">A3 登录 + 签发 JWT</div><div class="d">有效期 7 天，不做 refresh</div></li>
+        <li class="todo"><div class="t">A4 JWT 守卫 + @Public()</div><div class="d">JwtAuthGuard / 公开接口标记</div></li>
+        <li class="todo"><div class="t">A5 CurrentUser 注入</div><div class="d">@CurrentUser() 装饰器</div></li>
+        <li class="warn"><div class="t">A6 401/403 错误格式</div><div class="d">过滤器已有，鉴权码未接</div></li>
+        <li class="todo"><div class="t">A7 Google OAuth</div><div class="d">可砍：网络不通先降级</div></li>
+        <li class="warn"><div class="t">A8 前端登录态</div><div class="d">页面壳已有，未接接口</div></li>
+      </ul>
+      <div class="foot">验收条 1：注册→登录→读用户→退出</div>
+    </div>
+
+    <div class="card">
+      <span class="tag">B · 容器</span>
+      <h3>会话与历史</h3>
+      <div class="goal">给聊天一个"盒子"，消息能存能翻</div>
+      <ul class="items">
+        <li class="todo"><div class="t">B1 Conversation / Message</div><div class="d">含 role、status、JSON 扩展列</div></li>
+        <li class="todo"><div class="t">B2 会话与消息接口</div><div class="d">创建 / 列表 / 历史（游标分页）</div></li>
+        <li class="todo"><div class="t">B3 归属校验</div><div class="d">越权 403/404，删除策略待定</div></li>
+        <li class="todo"><div class="t">B4 前端会话区 UI</div><div class="d">左侧列表 + 消息区 + 输入框</div></li>
+      </ul>
+      <div class="foot">/app/chat 目前还是 ComingSoon 占位</div>
+    </div>
+
+    <div class="card">
+      <span class="tag">C · 核心</span>
+      <h3>流式对话（SSE）</h3>
+      <div class="goal">送进 Runtime，一个字一个字吐回页面</div>
+      <ul class="items">
+        <li class="warn"><div class="t">C1 RuntimeClientService</div><div class="d">fetch + 流式解析，契约里有示例代码</div></li>
+        <li class="warn"><div class="t">C2 ChatService（唯一路径）</div><div class="d">网页与公开 API 共用，绝不复制两份</div></li>
+        <li class="todo"><div class="t">C3 网页流式接口</div><div class="d">/api/agents/:id/chat/stream</div></li>
+        <li class="todo"><div class="t">C4 中断生成</div><div class="d">abort → cancelled，保留 partial</div></li>
+        <li class="todo"><div class="t">C5 并发控制</div><div class="d">同会话 409 CONVERSATION_BUSY</div></li>
+        <li class="todo"><div class="t">C6 前端 SSE 消费</div><div class="d">打字机 + 停止 + 重试（不用 EventSource）</div></li>
+        <li class="todo"><div class="t">C7 本地 Mock Runtime</div><div class="d">.env 切 URL，不阻塞王一恒</div></li>
+      </ul>
+      <div class="foot">验收条 2：网页 + 公开 API 同一条路径</div>
+    </div>
+
+    <div class="card">
+      <span class="tag">D · 出口</span>
+      <h3>发布与公开 API</h3>
+      <div class="goal">Agent 发布出去，别人拿 Key 就能调</div>
+      <ul class="items">
+        <li class="todo"><div class="t">D1 发布动作与状态流</div><div class="d">draft → published，接口归属待定</div></li>
+        <li class="todo"><div class="t">D2 AgentConfig 快照</div><div class="d">发布时冻结 revision</div></li>
+        <li class="todo"><div class="t">D3 API Key 生成</div><div class="d">mk- 前缀，存哈希，只展示一次</div></li>
+        <li class="todo"><div class="t">D4 公开接口 + Key 守卫</div><div class="d">/v1/agents/:id/chat，Bearer</div></li>
+        <li class="todo"><div class="t">D5 公开流式一致性</div><div class="d">复用 C2，同一套 SSE 事件</div></li>
+        <li class="todo"><div class="t">D6 发布页 / 密钥管理</div><div class="d">TS SDK 归属待确认</div></li>
+      </ul>
+      <div class="foot">验收条 3：密钥只放 .env</div>
+    </div>
+
+  </div>
+
+  <!-- 底部 -->
+  <div class="bottom">
+    <div class="panel">
+      <h4>建议实现顺序（依赖不能反）</h4>
+      <ol>
+        <li><b>E1 + E2</b>：CurrentUser 类型 + 401/403 → 今天就能发群（全组等你）</li>
+        <li><b>A1 → A6</b>：User 表 → 注册 → 登录 → JWT → 守卫 → CurrentUser</li>
+        <li><b>A8 + B1~B4</b>：前端登录态 + 会话容器</li>
+        <li><b>C7 → C1 → C2 → C3/C6</b>：先 Mock 跑通，再接真实 Runtime</li>
+        <li><b>C4/C5</b>：中断 + 并发（细节，可后置）</li>
+        <li><b>D3 → D4 → D5 → D1/D2/D6</b>：Key 先行，发布流程收尾</li>
+      </ol>
+    </div>
+    <div class="panel">
+      <h4>时间不够时的砍法</h4>
+      <ol>
+        <li class="cut">先砍 <b>A7 Google OAuth</b>（降级 Week 3，验收时说明）</li>
+        <li class="cut">再砍 <b>D5 公开 API 的 SSE</b>（先出非流式 JSON 保底）</li>
+        <li class="cut">可选砍 <b>D6 TS SDK</b>（等组会确认归属）</li>
+        <li class="keep">不许砍：用户名密码登录、聊天页 + SSE、API Key + Bearer 鉴权</li>
+      </ol>
+    </div>
+  </div>
+
+  <footer>配套文档：《模块清单-韦淇元-总览对照表.md》《调研计划 v2.1》《联调方案-韦淇元与王一恒》《联调契约-NestJS 调用 Runtime》</footer>
+
+</div>
+</body>
+</html>

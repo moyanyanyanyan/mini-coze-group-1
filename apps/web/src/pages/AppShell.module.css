@@ -1,0 +1,19 @@
+.shell {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.body {
+  flex: 1;
+  min-height: 0;   /* 不加这行子元素会把父容器撑破 */
+  display: flex;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;    /* 横向同理 */
+  overflow-y: auto;
+  padding: 24px 28px;
+}
