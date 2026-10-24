@@ -14,8 +14,10 @@ export class KnowledgeRetrievalController {
     const token = process.env.INTERNAL_SERVICE_TOKEN;
     if (!token || !sameToken(authorization, `Bearer ${token}`)) throw new UnauthorizedException('内部服务凭证无效');
 
-    await this.access.assertAllowed(input.actorId, input.agentId, input.knowledgeBaseIds);
-    const data = await this.retrieval.searchAuthorized(input.knowledgeBaseIds, input.query, input.topK);
+    const allowedIds = await this.access.allowedIds(input.actorId, input.agentId, input.knowledgeBaseIds);
+    const data = allowedIds.length
+      ? await this.retrieval.searchAuthorized(allowedIds, input.query, input.topK)
+      : { status: 'NO_HIT' as const, hits: [] };
     return { code: 200, message: 'ok', data };
   }
 }

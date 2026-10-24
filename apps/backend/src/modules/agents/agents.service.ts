@@ -34,6 +34,7 @@ export class AgentsService {
     const agent = await this.prisma.agent.create({
       data: {
         ownerId: user.id,
+        workspaceId: user.id,
         name: dto.name,
         description: dto.description,
         avatarUrl: dto.avatarUrl,
@@ -199,6 +200,8 @@ export class AgentsService {
       if (missing.length > 0) throw new BadRequestException(`以下知识库不存在：[${missing.join(', ')}]`);
       const inactive = catalogs.filter((c) => c.status !== 'ACTIVE').map((c) => c.id);
       if (inactive.length > 0) throw new BadRequestException(`以下知识库不可用：[${inactive.join(', ')}]`);
+      const foreign = catalogs.filter((c) => c.workspaceId !== user.id).map((c) => c.id);
+      if (foreign.length > 0) throw new ForbiddenException('不能绑定其他用户的知识库');
     }
 
     await this.prisma.$transaction([

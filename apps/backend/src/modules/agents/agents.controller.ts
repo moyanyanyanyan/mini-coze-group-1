@@ -8,9 +8,11 @@ import {
   Post,
   Put,
   Query,
-  Headers,
   UseInterceptors,
+  UseGuards,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ResponseInterceptor } from '../../common/response.interceptor';
 import { AgentsService } from './agents.service';
 import type { CurrentUserPayload } from './types';
@@ -23,115 +25,99 @@ import { ReplaceWorkflowBindingsDto } from './dto/replace-workflow-bindings.dto'
 
 @Controller('agents')
 @UseInterceptors(ResponseInterceptor)
+@UseGuards(AuthGuard('jwt'))
 export class AgentsController {
   constructor(private readonly agentsService: AgentsService) {}
-
-  private resolveUser(queryUserId?: string, headers?: Record<string, string | string[] | undefined>): CurrentUserPayload {
-    const headerVal = headers?.['x-user-id'];
-    const id = queryUserId || (typeof headerVal === 'string' ? headerVal : undefined) || 'dev-stub-user';
-    return { id };
-  }
 
   @Post()
   create(
     @Body() dto: CreateAgentDto,
-    @Query('userId') userId?: string,
-    @Headers() headers?: Record<string, string | string[] | undefined>,
+    @CurrentUser() user: CurrentUserPayload,
   ) {
-    return this.agentsService.create(dto, this.resolveUser(userId, headers));
+    return this.agentsService.create(dto, user);
   }
 
   @Get()
   list(
     @Query() query: ListAgentsQueryDto,
-    @Query('userId') userId?: string,
-    @Headers() headers?: Record<string, string | string[] | undefined>,
+    @CurrentUser() user: CurrentUserPayload,
   ) {
-    return this.agentsService.list(query, this.resolveUser(userId, headers));
+    return this.agentsService.list(query, user);
   }
 
   @Get(':agentId')
   findOne(
     @Param('agentId') agentId: string,
-    @Query('userId') userId?: string,
-    @Headers() headers?: Record<string, string | string[] | undefined>,
+    @CurrentUser() user: CurrentUserPayload,
   ) {
-    return this.agentsService.findOne(agentId, this.resolveUser(userId, headers));
+    return this.agentsService.findOne(agentId, user);
   }
 
   @Patch(':agentId')
   update(
     @Param('agentId') agentId: string,
     @Body() dto: UpdateAgentDto,
-    @Query('userId') userId?: string,
-    @Headers() headers?: Record<string, string | string[] | undefined>,
+    @CurrentUser() user: CurrentUserPayload,
   ) {
-    return this.agentsService.update(agentId, dto, this.resolveUser(userId, headers));
+    return this.agentsService.update(agentId, dto, user);
   }
 
   @Delete(':agentId')
   remove(
     @Param('agentId') agentId: string,
-    @Query('userId') userId?: string,
-    @Headers() headers?: Record<string, string | string[] | undefined>,
+    @CurrentUser() user: CurrentUserPayload,
   ) {
-    return this.agentsService.remove(agentId, this.resolveUser(userId, headers));
+    return this.agentsService.remove(agentId, user);
   }
 
   @Get(':agentId/plugins')
   getPluginBindings(
     @Param('agentId') agentId: string,
-    @Query('userId') userId?: string,
-    @Headers() headers?: Record<string, string | string[] | undefined>,
+    @CurrentUser() user: CurrentUserPayload,
   ) {
-    return this.agentsService.getPluginBindings(agentId, this.resolveUser(userId, headers));
+    return this.agentsService.getPluginBindings(agentId, user);
   }
 
   @Put(':agentId/plugins')
   replacePluginBindings(
     @Param('agentId') agentId: string,
     @Body() dto: ReplacePluginBindingsDto,
-    @Query('userId') userId?: string,
-    @Headers() headers?: Record<string, string | string[] | undefined>,
+    @CurrentUser() user: CurrentUserPayload,
   ) {
-    return this.agentsService.replacePluginBindings(agentId, dto, this.resolveUser(userId, headers));
+    return this.agentsService.replacePluginBindings(agentId, dto, user);
   }
 
   @Get(':agentId/knowledge-bases')
   getKnowledgeBindings(
     @Param('agentId') agentId: string,
-    @Query('userId') userId?: string,
-    @Headers() headers?: Record<string, string | string[] | undefined>,
+    @CurrentUser() user: CurrentUserPayload,
   ) {
-    return this.agentsService.getKnowledgeBindings(agentId, this.resolveUser(userId, headers));
+    return this.agentsService.getKnowledgeBindings(agentId, user);
   }
 
   @Put(':agentId/knowledge-bases')
   replaceKnowledgeBindings(
     @Param('agentId') agentId: string,
     @Body() dto: ReplaceKnowledgeBindingsDto,
-    @Query('userId') userId?: string,
-    @Headers() headers?: Record<string, string | string[] | undefined>,
+    @CurrentUser() user: CurrentUserPayload,
   ) {
-    return this.agentsService.replaceKnowledgeBindings(agentId, dto, this.resolveUser(userId, headers));
+    return this.agentsService.replaceKnowledgeBindings(agentId, dto, user);
   }
 
   @Get(':agentId/workflows')
   getWorkflowBindings(
     @Param('agentId') agentId: string,
-    @Query('userId') userId?: string,
-    @Headers() headers?: Record<string, string | string[] | undefined>,
+    @CurrentUser() user: CurrentUserPayload,
   ) {
-    return this.agentsService.getWorkflowBindings(agentId, this.resolveUser(userId, headers));
+    return this.agentsService.getWorkflowBindings(agentId, user);
   }
 
   @Put(':agentId/workflows')
   replaceWorkflowBindings(
     @Param('agentId') agentId: string,
     @Body() dto: ReplaceWorkflowBindingsDto,
-    @Query('userId') userId?: string,
-    @Headers() headers?: Record<string, string | string[] | undefined>,
+    @CurrentUser() user: CurrentUserPayload,
   ) {
-    return this.agentsService.replaceWorkflowBindings(agentId, dto, this.resolveUser(userId, headers));
+    return this.agentsService.replaceWorkflowBindings(agentId, dto, user);
   }
 }

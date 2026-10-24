@@ -9,10 +9,11 @@ import { KnowledgeRetrievalService } from './retrieval/knowledge-retrieval.servi
 import { KnowledgeRetrievalAccess } from './retrieval/knowledge-retrieval-access';
 import { KnowledgePreviewController } from './preview/knowledge-preview.controller';
 import { KnowledgePreviewService } from './preview/knowledge-preview.service';
+import { KnowledgeWorkspaceGuard } from './knowledge-workspace.guard';
 
 @Module({
   controllers: [KnowledgeController, KnowledgeDocumentController, KnowledgeRetrievalController, KnowledgePreviewController],
-  providers: [KnowledgeService, KnowledgeDocumentService, KnowledgeRetrievalService, KnowledgeRetrievalAccess, KnowledgePreviewService, EmbeddingClient],
+  providers: [KnowledgeService, KnowledgeDocumentService, KnowledgeRetrievalService, KnowledgeRetrievalAccess, KnowledgePreviewService, KnowledgeWorkspaceGuard, EmbeddingClient],
   exports: [KnowledgeService],
 })
 export class KnowledgeModule {}

@@ -58,7 +58,17 @@ interface ApiEnvelope<T> {
   data: T;
 }
 
-const apiBase = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api';
+const apiBase = import.meta.env.VITE_API_BASE_URL ?? '/api';
+
+export async function getKnowledgeWorkspaceId(): Promise<string> {
+  const response = await fetch(`${apiBase}/auth/me`, { credentials: 'include' });
+  if (response.ok) {
+    const user = await response.json() as { id: string };
+    return user.id;
+  }
+  if (import.meta.env.DEV && response.status === 401) return 'ws-local-demo';
+  throw new Error('请先登录后使用知识库');
+}
 
 async function readResponse<T>(response: Response): Promise<T> {
   const body = await response.json() as ApiEnvelope<T> | { message?: string | string[] };
@@ -71,13 +81,13 @@ async function readResponse<T>(response: Response): Promise<T> {
 
 export async function listKnowledgeDocuments(knowledgeBaseId: string, workspaceId: string): Promise<KnowledgeDocument[]> {
   const params = new URLSearchParams({ workspaceId });
-  const response = await fetch(`${apiBase}/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/documents?${params}`);
+  const response = await fetch(`${apiBase}/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/documents?${params}`, { credentials: 'include' });
   return readResponse<KnowledgeDocument[]>(response);
 }
 
 export async function createTextDocument(knowledgeBaseId: string, input: { workspaceId: string; title: string; text: string }): Promise<KnowledgeDocument> {
   const response = await fetch(`${apiBase}/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/documents/text`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+    method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
   });
   return readResponse<KnowledgeDocument>(response);
 }
@@ -87,41 +97,42 @@ export async function uploadDocumentFile(knowledgeBaseId: string, input: { works
   form.append('workspaceId', input.workspaceId);
   if (input.title.trim()) form.append('title', input.title.trim());
   form.append('file', input.file);
-  const response = await fetch(`${apiBase}/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/documents/files`, {
-    method: 'POST', body: form,
+  const params = new URLSearchParams({ workspaceId: input.workspaceId });
+  const response = await fetch(`${apiBase}/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/documents/files?${params}`, {
+    method: 'POST', credentials: 'include', body: form,
   });
   return readResponse<KnowledgeDocument>(response);
 }
 
 export async function retryKnowledgeDocument(documentId: string, workspaceId: string): Promise<KnowledgeDocument> {
   const response = await fetch(`${apiBase}/documents/${encodeURIComponent(documentId)}/retry`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ workspaceId }),
+    method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ workspaceId }),
   });
   return readResponse<KnowledgeDocument>(response);
 }
 
 export async function deleteKnowledgeDocument(documentId: string, workspaceId: string): Promise<void> {
   const params = new URLSearchParams({ workspaceId });
-  const response = await fetch(`${apiBase}/documents/${encodeURIComponent(documentId)}?${params}`, { method: 'DELETE' });
+  const response = await fetch(`${apiBase}/documents/${encodeURIComponent(documentId)}?${params}`, { method: 'DELETE', credentials: 'include' });
   await readResponse<{ id: string }>(response);
 }
 
 export async function listDocumentChunks(knowledgeBaseId: string, documentId: string, workspaceId: string, page: number): Promise<KnowledgeChunkPage> {
   const params = new URLSearchParams({ workspaceId, page: String(page) });
-  const response = await fetch(`${apiBase}/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/documents/${encodeURIComponent(documentId)}/chunks?${params}`);
+  const response = await fetch(`${apiBase}/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/documents/${encodeURIComponent(documentId)}/chunks?${params}`, { credentials: 'include' });
   return readResponse<KnowledgeChunkPage>(response);
 }
 
 export async function previewKnowledgeSearch(knowledgeBaseId: string, workspaceId: string, query: string): Promise<KnowledgeSearchResult> {
   const response = await fetch(`${apiBase}/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/retrieval-preview`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ workspaceId, query }),
+    method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ workspaceId, query }),
   });
   return readResponse<KnowledgeSearchResult>(response);
 }
 
 export async function listKnowledgeBases(workspaceId: string): Promise<KnowledgeBase[]> {
   const params = new URLSearchParams({ workspaceId });
-  const response = await fetch(`${apiBase}/knowledge-bases?${params}`);
+  const response = await fetch(`${apiBase}/knowledge-bases?${params}`, { credentials: 'include' });
   return readResponse<KnowledgeBase[]>(response);
 }
 
@@ -132,6 +143,7 @@ export async function createKnowledgeBase(input: {
 }): Promise<KnowledgeBase> {
   const response = await fetch(`${apiBase}/knowledge-bases`, {
     method: 'POST',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
   });
@@ -140,13 +152,13 @@ export async function createKnowledgeBase(input: {
 
 export async function updateKnowledgeBaseStatus(knowledgeBaseId: string, workspaceId: string, status: 'ACTIVE' | 'DISABLED'): Promise<KnowledgeBase> {
   const response = await fetch(`${apiBase}/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/status`, {
-    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ workspaceId, status }),
+    method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ workspaceId, status }),
   });
   return readResponse<KnowledgeBase>(response);
 }
 
 export async function deleteKnowledgeBase(knowledgeBaseId: string, workspaceId: string): Promise<void> {
   const params = new URLSearchParams({ workspaceId });
-  const response = await fetch(`${apiBase}/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}?${params}`, { method: 'DELETE' });
+  const response = await fetch(`${apiBase}/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}?${params}`, { method: 'DELETE', credentials: 'include' });
   await readResponse<{ id: string }>(response);
 }

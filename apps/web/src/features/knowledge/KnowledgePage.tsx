@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { createKnowledgeBase, createTextDocument, deleteKnowledgeBase, deleteKnowledgeDocument, listDocumentChunks, listKnowledgeBases, listKnowledgeDocuments, previewKnowledgeSearch, retryKnowledgeDocument, updateKnowledgeBaseStatus, uploadDocumentFile, type KnowledgeBase, type KnowledgeChunkPage, type KnowledgeDocument, type KnowledgeSearchResult } from './knowledge.api';
+import { createKnowledgeBase, createTextDocument, getKnowledgeWorkspaceId, deleteKnowledgeBase, deleteKnowledgeDocument, listDocumentChunks, listKnowledgeBases, listKnowledgeDocuments, previewKnowledgeSearch, retryKnowledgeDocument, updateKnowledgeBaseStatus, uploadDocumentFile, type KnowledgeBase, type KnowledgeChunkPage, type KnowledgeDocument, type KnowledgeSearchResult } from './knowledge.api';
 import './knowledge.css';
 
-const demoWorkspaceId = 'ws-local-demo';
+
 
 export function KnowledgePage() {
+  const [workspaceId, setWorkspaceId] = useState('');
   const [items, setItems] = useState<KnowledgeBase[]>([]);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -40,12 +41,21 @@ export function KnowledgePage() {
 
   useEffect(() => {
     let active = true;
-    listKnowledgeBases(demoWorkspaceId)
+    getKnowledgeWorkspaceId()
+      .then((id) => { if (active) setWorkspaceId(id); })
+      .catch((cause: unknown) => { if (active) { setError(getMessage(cause)); setLoading(false); } });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!workspaceId) return;
+    let active = true;
+    listKnowledgeBases(workspaceId)
       .then((result) => { if (active) { setItems(result); setSelectedId(result[0]?.id ?? null); setCreatingBase(result.length === 0); } })
       .catch((cause: unknown) => { if (active) setError(getMessage(cause)); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, []);
+  }, [workspaceId]);
 
   const hasProcessing = documents.some((document) => document.status === 'PROCESSING');
   useEffect(() => {
@@ -60,7 +70,7 @@ export function KnowledgePage() {
   }, [selectedId, selectedBaseStatus]);
 
   useEffect(() => {
-    if (!selectedId || selectedBaseStatus !== 'ACTIVE') {
+    if (!workspaceId || !selectedId || selectedBaseStatus !== 'ACTIVE') {
       setDocuments([]);
       setDocumentLoading(false);
       setDocumentError('');
@@ -69,7 +79,7 @@ export function KnowledgePage() {
     }
     let active = true;
     setDocumentLoading(true);
-    const refresh = () => listKnowledgeDocuments(selectedId, demoWorkspaceId)
+    const refresh = () => listKnowledgeDocuments(selectedId, workspaceId)
       .then((result) => { if (active) {
         setDocuments(result);
         setSelectedDocumentId((current) => current && result.some((document) => document.id === current && document.status === 'READY')
@@ -81,10 +91,10 @@ export function KnowledgePage() {
     void refresh();
     const timer = hasProcessing ? window.setInterval(() => void refresh(), 2000) : undefined;
     return () => { active = false; if (timer !== undefined) window.clearInterval(timer); };
-  }, [selectedId, selectedBaseStatus, hasProcessing]);
+  }, [workspaceId, selectedId, selectedBaseStatus, hasProcessing]);
 
   useEffect(() => {
-    if (!selectedId || selectedBaseStatus !== 'ACTIVE' || !selectedDocumentId) {
+    if (!workspaceId || !selectedId || selectedBaseStatus !== 'ACTIVE' || !selectedDocumentId) {
       setChunks(null);
       setChunkLoading(false);
       setChunkError('');
@@ -93,22 +103,22 @@ export function KnowledgePage() {
     let active = true;
     setChunkLoading(true);
     setChunkError('');
-    listDocumentChunks(selectedId, selectedDocumentId, demoWorkspaceId, chunkPage)
+    listDocumentChunks(selectedId, selectedDocumentId, workspaceId, chunkPage)
       .then((result) => { if (active) setChunks(result); })
       .catch((cause: unknown) => { if (active) { setChunks(null); setChunkError(getMessage(cause)); } })
       .finally(() => { if (active) setChunkLoading(false); });
     return () => { active = false; };
-  }, [selectedId, selectedBaseStatus, selectedDocumentId, chunkPage]);
+  }, [workspaceId, selectedId, selectedBaseStatus, selectedDocumentId, chunkPage]);
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!name.trim() || saving) return;
+    if (!workspaceId || !name.trim() || saving) return;
 
     setSaving(true);
     setError('');
     try {
-      const created = await createKnowledgeBase({ workspaceId: demoWorkspaceId, name: name.trim(), description: description.trim() });
-      setItems(await listKnowledgeBases(demoWorkspaceId));
+      const created = await createKnowledgeBase({ workspaceId: workspaceId, name: name.trim(), description: description.trim() });
+      setItems(await listKnowledgeBases(workspaceId));
       setSelectedId(created.id);
       setName('');
       setDescription('');
@@ -127,12 +137,12 @@ export function KnowledgePage() {
     setDocumentError('');
     try {
       if (sourceMode === 'text') {
-        await createTextDocument(selectedId, { workspaceId: demoWorkspaceId, title: documentTitle.trim(), text: documentText });
+        await createTextDocument(selectedId, { workspaceId: workspaceId, title: documentTitle.trim(), text: documentText });
       } else {
         if (!documentFile) throw new Error('请选择 TXT 或 JSON 文件');
-        await uploadDocumentFile(selectedId, { workspaceId: demoWorkspaceId, title: documentTitle, file: documentFile });
+        await uploadDocumentFile(selectedId, { workspaceId: workspaceId, title: documentTitle, file: documentFile });
       }
-      setDocuments(await listKnowledgeDocuments(selectedId, demoWorkspaceId));
+      setDocuments(await listKnowledgeDocuments(selectedId, workspaceId));
       setDocumentTitle('');
       setDocumentText('');
       setDocumentFile(null);
@@ -147,8 +157,8 @@ export function KnowledgePage() {
   async function handleRetry(documentId: string) {
     setDocumentError('');
     try {
-      await retryKnowledgeDocument(documentId, demoWorkspaceId);
-      if (selectedId) setDocuments(await listKnowledgeDocuments(selectedId, demoWorkspaceId));
+      await retryKnowledgeDocument(documentId, workspaceId);
+      if (selectedId) setDocuments(await listKnowledgeDocuments(selectedId, workspaceId));
     } catch (cause) {
       setDocumentError(getMessage(cause));
     }
@@ -160,7 +170,7 @@ export function KnowledgePage() {
     setUpdatingBaseStatus(true);
     setError('');
     try {
-      const updated = await updateKnowledgeBaseStatus(selectedId, demoWorkspaceId, status);
+      const updated = await updateKnowledgeBaseStatus(selectedId, workspaceId, status);
       setItems((current) => current.map((item) => item.id === updated.id ? updated : item));
     } catch (cause) {
       setError(getMessage(cause));
@@ -177,8 +187,8 @@ export function KnowledgePage() {
     setDeletingBase(true);
     setError('');
     try {
-      await deleteKnowledgeBase(baseId, demoWorkspaceId);
-      const remaining = await listKnowledgeBases(demoWorkspaceId);
+      await deleteKnowledgeBase(baseId, workspaceId);
+      const remaining = await listKnowledgeBases(workspaceId);
       setItems(remaining);
       setSelectedId((current) => current === baseId ? remaining[0]?.id ?? null : current);
       if (remaining.length === 0) setCreatingBase(true);
@@ -195,9 +205,9 @@ export function KnowledgePage() {
     setDeletingDocumentId(document.id);
     setDocumentError('');
     try {
-      await deleteKnowledgeDocument(document.id, demoWorkspaceId);
+      await deleteKnowledgeDocument(document.id, workspaceId);
       if (selectedId === document.knowledgeBaseId) {
-        const remaining = await listKnowledgeDocuments(selectedId, demoWorkspaceId);
+        const remaining = await listKnowledgeDocuments(selectedId, workspaceId);
         setDocuments(remaining);
         setSelectedDocumentId((current) => current === document.id ? remaining.find((item) => item.status === 'READY')?.id ?? null : current);
         setChunkPage(1);
@@ -220,7 +230,7 @@ export function KnowledgePage() {
     setSearchResult(null);
     const generation = ++searchGenerationRef.current;
     try {
-      const result = await previewKnowledgeSearch(selectedId, demoWorkspaceId, query.trim());
+      const result = await previewKnowledgeSearch(selectedId, workspaceId, query.trim());
       if (searchGenerationRef.current === generation) setSearchResult(result);
     } catch (cause) {
       if (searchGenerationRef.current === generation) setSearchError(getMessage(cause));
@@ -242,7 +252,7 @@ export function KnowledgePage() {
             <h1>知识库</h1>
             <p>创建知识库、录入资料，并查看切片与检索结果。</p>
           </div>
-          <span className="knowledge-workspace">本地测试工作空间：{demoWorkspaceId}</span>
+          <span className="knowledge-workspace">{workspaceId === 'ws-local-demo' ? '本地测试工作空间' : '个人工作空间'}：{workspaceId}</span>
         </header>
 
         <div className="knowledge-shell">
