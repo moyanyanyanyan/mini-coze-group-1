@@ -163,6 +163,31 @@ export interface WorkflowRunResult {
   error: WorkflowError | null;
 }
 
+export interface WorkflowRunListQuery {
+  page?: number;
+  /** 1-50, default 10. */
+  size?: number;
+}
+
+/** Item of GET /workflows/:id/runs; RUNNING means unfinished or interrupted. */
+export interface WorkflowRunRecord {
+  runId: string;
+  status: 'RUNNING' | 'SUCCEEDED' | 'FAILED';
+  input: Record<string, unknown>;
+  output: Record<string, unknown> | null;
+  nodeResults: WorkflowNodeResult[];
+  error: WorkflowError | null;
+  startedAt: string;
+  endedAt: string | null;
+}
+
+export interface WorkflowRunListResponse {
+  items: WorkflowRunRecord[];
+  total: number;
+  page: number;
+  size: number;
+}
+
 /** Body of every non-2xx response (global HttpExceptionFilter). */
 export interface ApiErrorResponse {
   statusCode: number;

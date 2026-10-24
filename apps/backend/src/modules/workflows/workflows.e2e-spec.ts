@@ -26,6 +26,23 @@ describe('Workflow HTTP contract', () => {
     list: jest.fn(async () => ({ items: [row], total: 1, page: 1, size: 10 })),
     startRun: jest.fn(async (_data: unknown) => ({ id: 'run' })),
     finishRun: jest.fn(async () => ({})),
+    listRuns: jest.fn(async (_id: string, page: number, size: number) => ({
+      items: [
+        {
+          id: 'run',
+          status: 'RUNNING',
+          input: { query: 'hi' },
+          output: null,
+          nodeResults: null,
+          error: null,
+          startedAt: 'then',
+          endedAt: null,
+        },
+      ],
+      total: 1,
+      page,
+      size,
+    })),
   };
   const agent = { validate: jest.fn(), run: jest.fn() };
   const definition = JSON.parse(
@@ -157,8 +174,32 @@ describe('Workflow HTTP contract', () => {
       expect.objectContaining({ status: 'FAILED' }),
     );
   });
+  it('lists run history with runId and paging', async () => {
+    const result = await request('/wf/runs?page=2&size=5');
+    expect(result.status).toBe(200);
+    expect(repository.listRuns).toHaveBeenCalledWith('wf', 2, 5);
+    expect(result.body).toEqual({
+      items: [
+        {
+          runId: 'run',
+          status: 'RUNNING',
+          input: { query: 'hi' },
+          output: null,
+          nodeResults: [],
+          error: null,
+          startedAt: 'then',
+          endedAt: null,
+        },
+      ],
+      total: 1,
+      page: 2,
+      size: 5,
+    });
+    expect((await request('/wf/runs?size=51')).status).toBe(400);
+  });
   it('archives and hides archived detail', async () => {
     expect((await request('/wf', 'DELETE')).status).toBe(204);
     expect((await request('/wf')).status).toBe(404);
+    expect((await request('/wf/runs')).status).toBe(404);
   });
 });

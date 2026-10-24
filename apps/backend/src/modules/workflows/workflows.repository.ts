@@ -32,4 +32,28 @@ export class WorkflowsRepository {
   finishRun(id: string, data: Prisma.WorkflowRunUpdateInput) {
     return this.prisma.workflowRun.update({ where: { id }, data });
   }
+  async listRuns(workflowId: string, page: number, size: number) {
+    const where = { workflowId };
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.workflowRun.findMany({
+        where,
+        // The definition snapshot is omitted to keep history pages small.
+        select: {
+          id: true,
+          status: true,
+          input: true,
+          output: true,
+          nodeResults: true,
+          error: true,
+          startedAt: true,
+          endedAt: true,
+        },
+        skip: (page - 1) * size,
+        take: size,
+        orderBy: [{ startedAt: 'desc' }, { id: 'asc' }],
+      }),
+      this.prisma.workflowRun.count({ where }),
+    ]);
+    return { items, total, page, size };
+  }
 }
