@@ -106,9 +106,13 @@ class RuntimeService:
                 return RuntimeResult.model_validate(item["data"])
             if item["type"] == "run.failed":
                 data = item["data"]
+                if data["code"].endswith("_TIMEOUT"):
+                    raise ModelError(data["code"], data["message"], 504, data["retryable"])
                 status = {"INVALID_REQUEST": 400, "MODEL_TIMEOUT": 504, "RUN_TIMEOUT": 504,
                           "MODEL_NOT_CONFIGURED": 503, "MODEL_RATE_LIMITED": 503,
                           "MODEL_QUOTA_EXCEEDED": 503,
+                          "KNOWLEDGE_NOT_CONFIGURED": 503, "TOOL_NOT_CONFIGURED": 503,
+                          "KNOWLEDGE_UNAUTHORIZED": 401, "KNOWLEDGE_FORBIDDEN": 403,
                           "KNOWLEDGE_UNAVAILABLE": 503, "TOOL_UNAVAILABLE": 503, "TOOL_NOT_SUPPORTED": 503}.get(data["code"], 502)
                 raise ModelError(data["code"], data["message"], status, data["retryable"])
         raise ModelError("INTERNAL_ERROR", "运行未返回终态", 500)

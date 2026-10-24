@@ -27,3 +27,12 @@ Runtime 本地实现采用 POST /internal/runtime/run 和 /internal/runtime/stre
 ## 遗留问题
 
 余额阻塞真实模型验收；本地INTERNAL_SERVICE_TOKEN尚需部署者配置。个人分支已发布；团队integration分支与其他业务代码尚未接入。模型命名和错误码需调用方确认。这些问题阻塞“团队链路已通过”的结论，不阻塞成员依据明确函数/DTO先完成适配和Mock测试。
+
+
+## 2026-10-24 更新
+
+Runtime分支补充HttpKnowledgeProvider和HttpPluginProvider：按当前NestJS外壳转换、服务身份头和明确失败语义接入应用；仍不启用自动Tool Call。已对照42c6a1e复用每库5条、最多50条候选、来源去重排序和完整片段预算规则。管逸恬集成环境的真实单库run验收不代表本分支已完成多库、stream或浏览器联调。
+
+新增硅基流动模型参数与SSE统计帧兼容，保留工作流调用签名。当前本机GET /models成功，生成返回HTTP402/code30001余额不足，因此本次仍未通过真实生成验收。实际密钥未改动，非敏感地址/模型与代理设置已修正；凭据未进入提交。
+
+本轮验证：根typecheck/test通过，前端3项、后端1项、Python45项。Provider覆盖HIT/NO_HIT、401/403、故障/超时、50条候选、去重和预算、重复插件查询参数与失败结果；均为明确注入HTTP替身，未冒充真实NestJS联调。

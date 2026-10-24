@@ -12,7 +12,7 @@
 
 短期记忆消费 NestJS 提供的已完成历史；只接收 user/assistant 完整问答对，最多 20 条，排除本轮消息 ID。历史状态过滤、contextLimit 选择、数据库存储和会话权限属于聊天模块；Runtime 做最终上下文预算。预算以 UTF-8 字节数加协议余量作保守上界估算，不宣称精确 tokenizer 计数；先丢最旧整对，仍超预算则失败。
 
-知识库和插件仅提供可替换 Protocol 与未配置桩。无绑定时可直接对话；有绑定而 Provider 未接入时明确失败，不伪造检索命中/未命中。知识库 Stub 注入与引用消费已离线验证；真实检索、自动 Tool Call 和完整绑定体验待后续联调。长期记忆不进入本期 MVP，不增加其字段、接口或 UI。
+知识库和插件已提供可替换 Protocol 与 HTTP 适配，在 FastAPI 应用入口注册。知识库调 NestJS 内部检索并映射来源，插件支持工具列表及直接执行适配；缺凭证、依赖失败和非法响应明确失败。自动 Tool Call 尚未启用，真实 NestJS 联调与完整绑定体验仍待验证。长期记忆不进入本期 MVP。
 
 ## 代码说明
 
@@ -22,6 +22,7 @@
 | --- | --- |
 | apps/agent/app/runtime/schemas.py | 请求、结果、历史、知识库与插件契约 |
 | apps/agent/app/runtime/deepseek.py | 单次调用与供应商事件流读取 |
+| apps/agent/app/runtime/http_providers.py | NestJS 检索/插件 HTTP 适配、鉴权外壳与响应转换 |
 | apps/agent/app/runtime/service.py | 上下文、Provider 注入与运行事件 |
 | apps/agent/app/api/runtime.py | 内部鉴权、run/stream、心跳、取消及 HTTP 错误，经 api/router.py 统一注册 |
 | apps/agent/tests/test_runtime.py | 离线契约、流式时序、异常与资源释放测试 |
@@ -46,7 +47,7 @@
   "assistantMessageId": "msg_a_current",
   "agentConfig": {
     "id": "agent_demo", "revision": 0, "name": "助手",
-    "systemPrompt": "简洁回答", "model": "deepseek-flash",
+    "systemPrompt": "简洁回答", "model": "deepseek-ai/DeepSeek-V3.2",
     "temperature": 0.7, "maxTokens": 128,
     "knowledgeBaseIds": [], "pluginIds": []
   },
@@ -81,7 +82,7 @@ from app.runtime import call_model, ModelError
 
 try:
     result = await call_model(
-        model="deepseek-flash",
+        model="deepseek-ai/DeepSeek-V3.2",
         messages=[{"role": "user", "content": "介绍 MiniCoze"}],
         temperature=0.7,
         max_tokens=128,
@@ -94,15 +95,15 @@ except ModelError as error:
 
 签名是 keyword-only；成功返回 ModelResult，`model_dump()` 得到 `{content,finishReason,usage}`。usage 存在时含 promptTokens/completionTokens/totalTokens，缺失为 null，不填假 0。预期供应商失败抛 ModelError（code/message/status/retryable），不返回 `{status:"failed"}`。非法输入抛 Pydantic ValidationError；取消传播 asyncio.CancelledError；程序缺陷不承诺转换为业务失败，由工作流入口统一兜底。
 
-本服务参数范围：temperature 0～2、max_tokens 整数 1～8192；HTTP 字段叫 maxTokens，Python 函数字段叫 max_tokens。工作流 messages 为 system/user/assistant 字符串文本，1～100 条。官方 max_tokens 上限更大，8192 是本项目当前服务限制，不能当成供应商上限。固定 thinking.type=disabled，暂不暴露思考模式参数。
+本服务参数范围：temperature 0～2、max_tokens 整数 1～8192；HTTP 字段叫 maxTokens，Python 函数字段叫 max_tokens。工作流 messages 为 system/user/assistant 字符串文本，1～100 条。官方 max_tokens 上限更大，8192 是本项目当前服务限制，不能当成供应商上限。固定为非思考模式：DeepSeek 官方使用 thinking.type=disabled，硅基流动使用 enable_thinking=false；暂不暴露思考模式参数。
 
-默认模型为 DEEPSEEK_MODEL（示例 deepseek-flash）；额外模型由 DEEPSEEK_ALLOWED_MODELS 逗号列表允许。不会自动把 AgentConfig.model 的旧名称重写为默认值。2026-10-22 当前账号 GET /models 实测可见 deepseek-flash、deepseek-v4-pro；只证明可发现，不证明生成成功。陈弘毅的 deepseek-chat 示例需一起校正。
+默认模型为 DEEPSEEK_MODEL（硅基流动示例 deepseek-ai/DeepSeek-V3.2）；额外模型由 DEEPSEEK_ALLOWED_MODELS 逗号列表允许。不会自动把 AgentConfig.model 的旧名称重写为默认值。2026-10-22 当前账号 GET /models 实测可见 deepseek-flash、deepseek-v4-pro；只证明可发现，不证明生成成功。陈弘毅的 deepseek-chat 示例需一起校正。
 
 ### Provider 替换点
 
 `RuntimeService(settings, knowledge=..., plugins=..., client=...)` 支持注入；FastAPI 可覆盖 get_runtime 依赖。KnowledgeContextProvider.get_context 接收 runId/actorId/agentId/knowledgeBaseIds/query/topK，返回 `{status,chunks:[{citation,content,score}]}`；citation 使用 knowledgeBaseId/documentId/chunkId/title/可选 position，拒绝未绑定知识库引用。禁止 Runtime 直接查询数据库。
 
-PluginToolProvider 提供 list_tools(actorId,agentId,pluginIds) 和 execute(ToolRequest)，成功结果为 toolCallId/toolName/status=succeeded/output，失败为 status=failed/error。此周只有契约和显式未接入桩；即使注入真实插件列表，也不会自动开始工具循环。
+PluginToolProvider 提供 list_tools(actorId,agentId,pluginIds) 和 execute(ToolRequest)，成功结果为 toolCallId/toolName/status=succeeded/output，失败为 status=failed/error。已提供 HttpPluginProvider 的列表与直接执行适配；Runtime 自动工具循环仍未启用，即使拉到真实插件列表也不会自动执行。
 
 ## 运行与验证
 
@@ -140,3 +141,20 @@ $env:PYTHONPATH='apps/agent'
 | 朱晋亨 | Tool定义、结构化output/error能够被契约消费；本周不要求自动Tool Call |
 
 本次交付不修改其他成员模块；联调待真实服务/代码与凭据齐备后记录结果。
+
+
+## 2026-10-24 Provider 与硅基流动更新
+
+已对照管逸恬集成分支 integration/week2-rag-auth-agent 的42c6a1e复用检索选择规则：topK固定5且是每库上限，最多10库/50条候选；按来源三元组去重保留最高分，按score和来源ID确定性排序，只取能放入12,000字符参考文本预算的完整片段。没有完整片段可放入时明确报告预算不足，不把HIT伪装为NO_HIT。KnowledgeResult.chunks上限改为50。
+
+知识库HTTP请求为POST /internal/knowledge/retrieval（无/api前缀），使用INTERNAL_SERVICE_TOKEN；HIT/NO_HIT与hits映射matched/no_match及chunks，documentTitle映射citation.title，position可选。401/403保留鉴权/权限失败，其他HTTP/外壳/超时失败不变成no_match。应用通过BACKEND_SERVICE_URL定位NestJS；默认http://localhost:3000。
+
+插件HTTP查询使用重复pluginIds参数，按{code,message,data}解包；execute保留结构化output或failed/error，不将HTTP200等同业务成功。PLUGINS_SERVICE_TOKEN通过x-plugin-service-token发送，缺失时拒绝调用，不沿用对方本地免凭证模式。PROVIDER_TIMEOUT_SECONDS默认15秒，并受整轮预算限制。JWT/服务鉴权、真实插件端到端和自动调用仍需联调。
+
+模型供应商支持MODEL_PROVIDER=deepseek/siliconflow；硅基流动官方域名会自动识别，沿用现有DEEPSEEK_*配置字段与工作流函数。已将本地非敏感地址/模型修正为https://api.siliconflow.cn/v1、deepseek-ai/DeepSeek-V3.2；密钥未改动。MODEL_TRUST_ENV默认true，本机代理连接失败、直接HTTPS连接成功，因此本地设为false。
+
+真实验证：硅基流动GET /models返回200，列表包含DeepSeek-V3.2；真实生成返回HTTP402、平台code=30001、明确余额不足。未取得真实增量，不宣称模型生成已通过。该结果与管逸恬在其独立集成环境已完成的单库检索与模型回答分开记录。没有复用她本地数据库的资源ID或Token。
+
+官方依据：https://api-docs.siliconflow.cn/docs/userguide/introduction 与其Chat Completions接口文档。
+
+最终离线验证：pnpm typecheck 与 pnpm test 通过，前端3项、后端1项、Python45项；Python侧保留已知Starlette/AnyIO弃用警告。未新增项目依赖，真实硅基流动生成未通过的原因如上。
