@@ -3,3 +3,4 @@ export interface HealthResponse {
   service: 'backend' | 'agent';
 }
 
+export * from './workflow';

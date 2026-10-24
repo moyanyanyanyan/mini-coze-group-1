@@ -8,4 +8,5 @@ api_router = APIRouter()
 def health() -> dict[str, str]:
     return {"status": "ok", "service": "agent"}
 
+
 api_router.include_router(workflow_router)

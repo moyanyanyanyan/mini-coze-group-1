@@ -34,7 +34,7 @@ pnpm --filter @minicoze/backend prisma:generate
 
 ## 接口文档
 
-Base URL：`http://localhost:3000/api`。Content-Type：`application/json`。
+Base URL：`http://localhost:3000/api`。Content-Type：`application/json`。前端请求/响应类型直接从 `@minicoze/shared` 引入（`packages/shared/src/workflow.ts`），与本节一致。
 
 | 方法/路径 | 请求 | 响应 |
 |---|---|---|
@@ -132,6 +132,8 @@ async def complete(*, model: str, system_prompt: str, user_prompt: str,
 ```sh
 pnpm --filter @minicoze/backend prisma:validate
 pnpm --filter @minicoze/backend prisma:generate
+pnpm --filter @minicoze/backend format:check
+pnpm --filter @minicoze/backend lint
 pnpm --filter @minicoze/backend typecheck
 pnpm --filter @minicoze/backend test
 pnpm --filter @minicoze/backend build
@@ -162,3 +164,7 @@ pnpm --filter @minicoze/backend build
 组长：请安排集成分支 migration 执行人，确认内部 token 的统一方案；本轮鉴权暂缓，工作流接口只在显式打开开发开关时提供服务。请审核公共异常过滤器保留 details 的小改动。
 
 周五 23:59 前的协作定稿应包含参与人、最终接口、三方代码提交、真实联调结果和 Week3 遗留项。当前文件为实现交付说明，不能作为已完成三方联调的证明。
+
+## 代码格式与注释
+
+Backend 使用 Prettier（单引号、分号、2 空格缩进、80 列、尾逗号）和 ESLint/TypeScript recommended 规则，eslint-config-prettier 关闭格式冲突规则，条件分支统一使用大括号。运行 `pnpm --filter @minicoze/backend format` 格式化，`lint:fix` 修复可自动处理的 lint 问题。Controller 和 Service 方法使用中文 JSDoc，记录作用、`@param`、`@returns`，关键失败路径补充 `@throws`。

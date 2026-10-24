@@ -1,5 +1,12 @@
 import { plainToInstance, Type } from 'class-transformer';
-import { IsInt, IsString, IsUrl, Max, Min, validateSync } from 'class-validator';
+import {
+  IsInt,
+  IsString,
+  IsUrl,
+  Max,
+  Min,
+  validateSync,
+} from 'class-validator';
 
 class EnvironmentVariables {
   @Type(() => Number)
