@@ -7,11 +7,21 @@ EMBEDDING_DIMENSION = 512
 
 @lru_cache(maxsize=1)
 def load_model():
+    from huggingface_hub import snapshot_download
+    from huggingface_hub.errors import LocalEntryNotFoundError
     from sentence_transformers import SentenceTransformer
 
     settings = get_settings()
+    try:
+        source = snapshot_download(
+            settings.embedding_model,
+            revision=settings.embedding_model_revision,
+            local_files_only=True,
+        )
+    except LocalEntryNotFoundError:
+        source = settings.embedding_model
     model = SentenceTransformer(
-        settings.embedding_model, revision=settings.embedding_model_revision, device="cpu"
+        source, revision=settings.embedding_model_revision, device="cpu"
     )
     if model.get_sentence_embedding_dimension() != EMBEDDING_DIMENSION:
         raise ValueError("Embedding model dimension must be 512")
