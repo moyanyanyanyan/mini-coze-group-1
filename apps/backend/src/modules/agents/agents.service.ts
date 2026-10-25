@@ -39,7 +39,7 @@ export class AgentsService {
         description: dto.description,
         avatarUrl: dto.avatarUrl,
         systemPrompt: dto.systemPrompt ?? '',
-        model: dto.model ?? 'deepseek-chat',
+        model: dto.model ?? process.env.DEEPSEEK_MODEL ?? 'deepseek-chat',
         temperature: dto.temperature ?? 0.7,
         maxTokens: dto.maxTokens ?? 4096,
         contextLimit: dto.contextLimit ?? 20,
