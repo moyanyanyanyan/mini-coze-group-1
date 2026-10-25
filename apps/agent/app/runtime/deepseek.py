@@ -71,7 +71,7 @@ def payload(value: ModelInput, stream: bool, settings: Settings) -> dict:
     body["stream"] = stream
     if settings.effective_model_provider == "siliconflow":
         body["enable_thinking"] = False
-    else:
+    elif settings.effective_model_provider == "deepseek":
         body["thinking"] = {"type": "disabled"}
     if stream and settings.effective_model_provider == "deepseek":
         body["stream_options"] = {"include_usage": True}

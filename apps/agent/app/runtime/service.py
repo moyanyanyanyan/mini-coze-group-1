@@ -71,13 +71,18 @@ class RuntimeService:
                     ))
                     if any(chunk.citation.knowledgeBaseId not in config.knowledgeBaseIds for chunk in knowledge.chunks):
                         raise ModelError("KNOWLEDGE_UNAVAILABLE", "检索返回了未绑定的知识库", 502)
-                    yield event("knowledge.result", knowledge.model_dump(exclude_none=True))
                 if config.pluginIds:
                     await self.plugins.list_tools(request.actor.id, config.id, config.pluginIds)
-                    # Week 2 验证接口定义可替换；不静默丢弃绑定后继续生成假定结果。
-                    raise ModelError("TOOL_NOT_SUPPORTED", "本周只提供插件接口桩，自动调用尚未接入", 503)
+                    # HTTP适配已就绪，但不静默忽略绑定或提前启用自动工具循环。
+                    raise ModelError("TOOL_NOT_SUPPORTED", "插件HTTP适配已接入，自动工具调用尚未启用", 503)
                 value = ModelInput(model=config.model, messages=self.context(request, knowledge),
                                    temperature=config.temperature, max_tokens=config.maxTokens)
+                if config.knowledgeBaseIds:
+                    # 仅公开已纳入模型上下文的来源，正文和score留在Provider内部。
+                    yield event("knowledge.result", {
+                        "status": knowledge.status,
+                        "citations": [chunk.citation.model_dump(exclude_none=True) for chunk in knowledge.chunks],
+                    })
                 result = None
                 async with aclosing(stream_model(value, settings=self.settings, client=self.client)) as model_stream:
                     async for item in model_stream:

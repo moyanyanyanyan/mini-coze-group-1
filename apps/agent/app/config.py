@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     deepseek_base_url: str = Field(default="https://api.deepseek.com", validation_alias="DEEPSEEK_BASE_URL")
     deepseek_model: str = Field(default="deepseek-flash", validation_alias="DEEPSEEK_MODEL")
     deepseek_allowed_models: str = Field(default="", validation_alias="DEEPSEEK_ALLOWED_MODELS")
-    model_provider: Literal["deepseek", "siliconflow"] | None = Field(default=None, validation_alias="MODEL_PROVIDER")
+    model_provider: Literal["deepseek", "siliconflow", "openai_compatible"] | None = Field(default=None, validation_alias="MODEL_PROVIDER")
     model_trust_env: bool = Field(default=True, validation_alias="MODEL_TRUST_ENV")
     backend_service_url: str = Field(default="http://localhost:3000", validation_alias="BACKEND_SERVICE_URL")
     plugins_service_token: SecretStr = Field(default="", validation_alias="PLUGINS_SERVICE_TOKEN")
@@ -35,7 +35,11 @@ class Settings(BaseSettings):
         if self.model_provider:
             return self.model_provider
         host = urlsplit(self.deepseek_base_url).hostname
-        return "siliconflow" if host in {"api.siliconflow.cn", "api.siliconflow.com"} else "deepseek"
+        if host in {"api.siliconflow.cn", "api.siliconflow.com"}:
+            return "siliconflow"
+        if host == "api.deepseek.com":
+            return "deepseek"
+        return "openai_compatible"
 
 
 @lru_cache
