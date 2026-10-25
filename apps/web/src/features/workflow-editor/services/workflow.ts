@@ -6,8 +6,9 @@ import type {
   WorkflowRunResult,
 } from '../types/workflow';
 
-const USE_MOCK = true; // 联调时改 false
-const BASE = '/api';
+const USE_MOCK = false;
+const env = (import.meta as unknown as { env?: Record<string, string> }).env ?? {};
+const BASE = env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 
 // ---------- Mock 数据 ----------
 const mockWorkflows: Workflow[] = [
@@ -85,7 +86,16 @@ async function http<T>(url: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.message || `请求失败: ${res.status}`);
+    // 优先用 details[0].message，再退 message
+    const detailMsg =
+      Array.isArray(err.details) && err.details[0]?.message
+        ? err.details[0].message
+        : null;
+    const msg =
+      detailMsg ||
+      (Array.isArray(err.message) ? err.message[0] : err.message) ||
+      `请求失败: ${res.status}`;
+    throw new Error(msg);
   }
   if (res.status === 204) return undefined as T;
   return res.json();
@@ -113,14 +123,14 @@ export async function listWorkflows(params?: {
 
 // ---------- 创建 ----------
 export async function createWorkflow(body: {
-  workspaceId: string;
+  workspaceId?: string;
   name: string;
   description?: string;
 }): Promise<Workflow> {
   if (USE_MOCK) {
     const wf: Workflow = {
       id: `wf_mock_${Date.now()}`,
-      workspaceId: body.workspaceId,
+      workspaceId: body.workspaceId || 'ws_mock',
       creatorId: 'user_mock',
       name: body.name,
       description: body.description,

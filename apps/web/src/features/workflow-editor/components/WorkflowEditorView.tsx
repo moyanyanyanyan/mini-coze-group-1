@@ -282,6 +282,8 @@ function WorkflowEditorInner({ workflowId }: Props) {
       alert('请先添加 Start 节点');
       return;
     }
+  
+    // 1. 先保存
     if (dirty) {
       setSaving(true);
       try {
@@ -296,6 +298,32 @@ function WorkflowEditorInner({ workflowId }: Props) {
         setSaving(false);
       }
     }
+  
+    // 2. 再校验
+    const feErrors = frontendValidate(nodes, edges);
+    if (feErrors.length > 0) {
+      setValidationResult({ valid: false, errors: feErrors });
+      setValidationOpen(true);
+      return;
+    }
+    try {
+      const def = canvasToDefinition(nodes, edges);
+      const res = await validateWorkflow(workflowId, def);
+      if (!res.valid) {
+        setValidationResult(res);
+        setValidationOpen(true);
+        return;
+      }
+    } catch (e: any) {
+      setValidationResult({
+        valid: false,
+        errors: [{ code: 'VALIDATE_FAILED', message: e.message || '校验失败' }],
+      });
+      setValidationOpen(true);
+      return;
+    }
+  
+    // 3. 通过才弹表单
     setShowRunDialog(true);
   };
 

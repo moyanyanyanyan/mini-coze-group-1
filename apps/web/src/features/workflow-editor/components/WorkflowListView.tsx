@@ -48,7 +48,6 @@ export function WorkflowListView() {
     setSubmitting(true);
     try {
       const wf = await createWorkflow({
-        workspaceId: 'ws_default',
         name: form.name.trim(),
         description: form.description.trim() || undefined,
       });
