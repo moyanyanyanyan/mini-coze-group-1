@@ -1,14 +1,12 @@
-// MiniCoze Agent 域 Prisma Schema
-// 协作定稿字段：Agent.creatorId → ownerId、加 maxTokens、AgentPluginBinding.enabled Boolean、AgentWorkflow.sortOrder
-// push 后数据库将从旧表结构对齐到协作定稿结构（只改本 5 张表，不影响其他 26 张表）
-
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
 }
 
 enum AgentStatus {
@@ -17,29 +15,32 @@ enum AgentStatus {
   ARCHIVED
 }
 
-/// Agent：协作定稿字段
+/// Agent：协作定稿字段 creatorId→ownerId、AgentPluginBinding.enabled Boolean
 model Agent {
-  id               String      @id @default(cuid())
-  workspaceId      String?     // 待裁决 A
-  ownerId          String      // 归属 CurrentUser.id（裁决后 creatorId → ownerId）
-  name             String
-  description      String?
-  avatarUrl        String?
-  systemPrompt     String
-  model            String      @default("deepseek-chat")
-  temperature      Float       @default(0.7)
-  maxTokens        Int         @default(4096)
-  contextLimit     Int         @default(20)
-  openingMessage   String?
-  status           AgentStatus @default(DRAFT)
-  currentVersionId String?
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
+  id                     String      @id @default(cuid())
+  workspaceId            String?
+  ownerId                String
+  name                   String
+  description            String?
+  avatarUrl              String?
+  systemPrompt           String
+  model                  String      @default("deepseek-chat")
+  temperature            Float       @default(0.7)
+  maxTokens              Int         @default(4096)
+  contextLimit           Int         @default(20)
+  openingMessage         String?
+  status                 AgentStatus @default(DRAFT)
+  currentVersionId       String?
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
 
-  versions              AgentVersion[] @relation("AgentVersions")
+  versions              AgentVersion[]               @relation("AgentVersions")
   pluginBindings        AgentPluginBinding[]
   knowledgeBaseBindings KnowledgeBaseAgentBinding[]
   workflowBindings      AgentWorkflow[]
+
+  @@index([workspaceId])
+  @@index([status])
 }
 
 model AgentVersion {
@@ -56,7 +57,7 @@ model AgentVersion {
   @@index([agentId])
 }
 
-/// AgentPluginBinding：协作定稿 enabled Boolean，替代旧表 status 枚举
+/// AgentPluginBinding：enabled Boolean，替代旧表 status 枚举
 model AgentPluginBinding {
   id         String  @id @default(cuid())
   agentId    String
@@ -84,7 +85,6 @@ model KnowledgeBaseAgentBinding {
   @@unique([agentId, knowledgeBaseId])
 }
 
-/// AgentWorkflow：协作定稿加 sortOrder
 model AgentWorkflow {
   id         String  @id @default(cuid())
   agentId    String
