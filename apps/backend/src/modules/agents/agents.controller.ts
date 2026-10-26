@@ -56,6 +56,15 @@ export class AgentsController {
     return this.agentsService.findOne(agentId, this.resolveUser(userId, headers));
   }
 
+  @Get(':agentId/config')
+  getConfig(
+    @Param('agentId') agentId: string,
+    @Query('userId') userId?: string,
+    @Headers() headers?: Record<string, string | string[] | undefined>,
+  ) {
+    return this.agentsService.getAgentConfig(agentId, this.resolveUser(userId, headers).id);
+  }
+
   @Patch(':agentId')
   update(
     @Param('agentId') agentId: string,

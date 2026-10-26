@@ -8,7 +8,7 @@ import {
 import { PrismaService } from '../../database/prisma.service';
 import { Prisma } from '@prisma/client';
 import { AgentStatus } from './types';
-import { toAgentDetail } from './agent-config.mapper';
+import { toAgentDetail, buildAgentConfig } from './agent-config.mapper';
 import { CreateAgentDto } from './dto/create-agent.dto';
 import { UpdateAgentDto } from './dto/update-agent.dto';
 import { ListAgentsQueryDto } from './dto/list-agents.query.dto';
@@ -96,6 +96,20 @@ export class AgentsService {
     if (agent.status === 'ARCHIVED') throw new NotFoundException('Agent 已归档');
     if (agent.ownerId !== user.id) throw new ForbiddenException('无权访问此 Agent');
     return toAgentDetail(agent);
+  }
+
+  async getAgentConfig(agentId: string, userId: string) {
+    const agent = await this.prisma.agent.findUnique({
+      where: { id: agentId },
+      include: {
+        pluginBindings: true,
+        knowledgeBaseBindings: true,
+        workflowBindings: true,
+      },
+    });
+    if (!agent) throw new NotFoundException('Agent 不存在');
+    if (agent.ownerId !== userId) throw new ForbiddenException('无权访问此 Agent');
+    return buildAgentConfig(toAgentDetail(agent));
   }
 
   async update(agentId: string, dto: UpdateAgentDto, user: CurrentUserPayload) {
