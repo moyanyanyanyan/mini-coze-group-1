@@ -1,5 +1,7 @@
 # 知识库本地索引验证
 
+> 本文记录早期 `ws-local-demo` 开发自测流程，后文关于 Auth/Agent 尚未接入的描述是当时状态。当前需要真实用户、Agent 绑定和实际资源 ID 的联调数据，请使用 [RAG 联调数据准备](rag-integration-fixture.md)。
+
 本地处理链路：NestJS 解码 TXT/JSON 或文本 → 按字符固定切片（基础片段最多 500 字符，后续片段加前片约 50 字符重叠）→ FastAPI 使用 `BAAI/bge-small-zh-v1.5` 生成 512 维向量 → NestJS 在同一数据库事务中保存片段、向量并将文档置为 `READY`。解析、模型或数据库失败时置为 `FAILED`，不留下已提交的半套索引。
 
 ## 首次准备
