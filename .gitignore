@@ -16,3 +16,5 @@ __pycache__/
 *.tsbuildinfo
 .idea/
 .vscode/
+docker-compose.override.yml
+.workbuddy/

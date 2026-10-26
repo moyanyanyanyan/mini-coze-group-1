@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { resolve } from 'node:path';
 import { validateEnvironment } from './config/env.validation';
-import { DatabaseModule } from './database/database.module';
+import { PrismaModule } from './prisma/prisma.module';
 import { HealthModule } from './health/health.module';
 import { AgentsModule } from './modules/agents/agents.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -20,7 +20,7 @@ import { WorkflowsModule } from './modules/workflows/workflows.module';
       envFilePath: resolve(__dirname, '../../../.env'),
       validate: validateEnvironment,
     }),
-    DatabaseModule,
+    PrismaModule,
     HealthModule,
     AuthModule,
     UsersModule,
@@ -33,4 +33,3 @@ import { WorkflowsModule } from './modules/workflows/workflows.module';
   ],
 })
 export class AppModule {}
-

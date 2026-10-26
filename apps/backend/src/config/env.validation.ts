@@ -1,5 +1,13 @@
 import { plainToInstance, Type } from 'class-transformer';
-import { IsInt, IsString, IsUrl, Max, Min, validateSync } from 'class-validator';
+import { 
+  IsInt, 
+  IsString, 
+  IsUrl, 
+  Max, 
+  Min, 
+  validateSync,
+  MinLength 
+} from 'class-validator';
 
 class EnvironmentVariables {
   @Type(() => Number)
@@ -16,6 +24,14 @@ class EnvironmentVariables {
 
   @IsString()
   DATABASE_URL!: string;
+
+  // JWT 配置
+  @IsString()
+  @MinLength(32, { message: 'JWT_SECRET 至少 32 个字符，别拿短字符串糊弄' })
+  JWT_SECRET!: string;
+
+  @IsString()
+  JWT_EXPIRES_IN = '7d';
 }
 
 export function validateEnvironment(config: Record<string, unknown>) {

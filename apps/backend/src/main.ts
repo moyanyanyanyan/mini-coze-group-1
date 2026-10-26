@@ -1,19 +1,19 @@
 import { RequestMethod, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/http-exception.filter';
-import { ResponseInterceptor } from './common/response.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
 
   app.setGlobalPrefix('api', { exclude: [{ path: 'internal/knowledge/retrieval', method: RequestMethod.POST }] });
-  app.enableCors({ origin: config.getOrThrow<string>('WEB_ORIGIN') });
+  app.enableCors({ origin: config.getOrThrow<string>('WEB_ORIGIN'), credentials: true });
+  app.use(cookieParser());
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
   app.useGlobalFilters(new HttpExceptionFilter());
-  app.useGlobalInterceptors(new ResponseInterceptor());
 
   await app.listen(config.getOrThrow<number>('PORT'));
 }

@@ -4,37 +4,45 @@
   "private": true,
   "scripts": {
     "build": "nest build",
-    "prisma:generate": "prisma generate --schema prisma",
-    "prisma:validate": "prisma validate --schema prisma",
-    "prisma:migrate": "prisma migrate dev --schema prisma",
-    "prisma:seed": "prisma db seed --schema prisma",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main.js",
     "typecheck": "tsc --noEmit",
-    "test": "jest --runInBand"
+    "test": "jest --runInBand",
+    "prisma": "node --env-file=../../.env ./node_modules/prisma/build/index.js",
+    "db:generate": "pnpm prisma generate",
+    "db:migrate": "pnpm prisma migrate dev",
+    "db:studio": "pnpm prisma studio"
   },
   "dependencies": {
     "@minicoze/shared": "workspace:*",
     "@nestjs/common": "^11.1.6",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.6",
+    "@nestjs/jwt": "^12.0.3",
+    "@nestjs/passport": "^12.0.0",
     "@nestjs/platform-express": "^11.1.6",
-    "@prisma/client": "6.19.0",
+    "@prisma/client": "6.19.3",
+    "bcryptjs": "^3.0.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
+    "cookie-parser": "1.4.7",
+    "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.10",
     "@nestjs/testing": "^11.1.6",
+    "@types/bcryptjs": "^3.0.0",
+    "@types/cookie-parser": "1.4.10",
     "@types/express": "^5.0.3",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.7.2",
+    "@types/passport-jwt": "^4.0.1",
     "@types/supertest": "^6.0.3",
     "jest": "^30.2.0",
-    "prisma": "6.19.0",
+    "prisma": "6.19.3",
     "source-map-support": "^0.5.21",
     "supertest": "^7.1.4",
     "ts-jest": "^29.4.5",
@@ -43,12 +51,39 @@
     "typescript": "^5.9.3"
   },
   "jest": {
-    "moduleFileExtensions": ["js", "json", "ts"],
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
     "rootDir": ".",
     "testRegex": ".*\\.(e2e-)?spec\\.ts$",
     "transform": {
-      "^.+\\.ts$": ["ts-jest", { "tsconfig": "tsconfig.json" }]
+      "^.+\\.ts$": [
+        "ts-jest",
+        {
+          "tsconfig": "tsconfig.json"
+        }
+      ],
+      "^.+\\.js$": [
+        "ts-jest",
+        {
+          "tsconfig": {
+            "allowJs": true,
+            "module": "commonjs",
+            "target": "es2022",
+            "esModuleInterop": true,
+            "skipLibCheck": true,
+            "strict": false
+          },
+          "diagnostics": false,
+          "isolatedModules": true
+        }
+      ]
     },
+    "transformIgnorePatterns": [
+      "/node_modules/(?!.*@nestjs)"
+    ],
     "testEnvironment": "node"
   }
 }
