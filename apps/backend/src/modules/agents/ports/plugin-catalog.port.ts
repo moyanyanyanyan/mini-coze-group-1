@@ -1,7 +1,7 @@
 export interface PluginCatalogPort {
   findByIds(
     ids: string[],
-  ): Promise<Array<{ id: string; name: string; description?: string; status: 'ACTIVE' | 'DISABLED' | 'ARCHIVED' }>>;
+  ): Promise<Array<{ pluginId: string; title: string; content: string }>>;
 }
 
 export const PLUGIN_CATALOG_PORT = Symbol('PLUGIN_CATALOG_PORT');

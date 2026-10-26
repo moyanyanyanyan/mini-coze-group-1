@@ -151,7 +151,7 @@ export class AgentsService {
     if (dto.bindings.length > 0) {
       const pluginIds = dto.bindings.map((b) => b.pluginId);
       const catalogs = await this.pluginCatalog.findByIds(pluginIds);
-      const catalogIds = new Set(catalogs.map((c) => c.id));
+      const catalogIds = new Set(catalogs.map((c) => c.pluginId));
       const missing = pluginIds.filter((id) => !catalogIds.has(id));
       if (missing.length > 0) throw new BadRequestException(`以下插件不存在：[${missing.join(', ')}]`);
     }
