@@ -28,10 +28,12 @@ export class ToolsController {
   @Get()
   listTools(
     @Query('pluginIds') pluginIds: string | string[] | undefined,
+    @Req() req: Request,
     @Res() res: Response,
   ): void {
+    const serviceToken = (req.headers['x-plugin-service-token'] as string | undefined) ?? null;
     const body: ApiResponse<PluginToolDefinition[]> =
-      this.pluginsService.listTools(pluginIds);
+      this.pluginsService.listTools(pluginIds, serviceToken ?? undefined);
     res.status(body.code).json(body);
   }
 
