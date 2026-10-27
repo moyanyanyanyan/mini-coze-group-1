@@ -42,24 +42,36 @@ export function AgentBuilderPage() {
 
   useEffect(() => {
     (async () => {
-      try {
-        await refreshAgents();
+      const results = await Promise.allSettled([
+        refreshAgents(),
+        listKnowledgeBases(),
+        listPlugins(),
+      ]);
+
+      const [agentsRes, kbRes, pluginsRes] = results;
+
+      if (agentsRes.status === 'fulfilled') {
         setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : '加载 Agent 列表失败');
+      } else {
+        setError(
+          agentsRes.reason instanceof Error
+            ? agentsRes.reason.message
+            : '加载 Agent 列表失败',
+        );
       }
-      try {
-        setKnowledgeBases(await listKnowledgeBases());
-      } catch {
+
+      if (kbRes.status === 'fulfilled') {
+        setKnowledgeBases(kbRes.value);
+      } else {
         setKnowledgeError(true);
-        // TODO: 知识库目录需 KnowledgeWorkspaceGuard 放行
       }
-      try {
-        setPlugins(await listPlugins());
-      } catch {
+
+      if (pluginsRes.status === 'fulfilled') {
+        setPlugins(pluginsRes.value);
+      } else {
         setPluginError(true);
-        // TODO: 插件目录需插件模块推送
       }
+
       setLoading(false);
     })();
   }, [refreshAgents]);
@@ -137,10 +149,15 @@ export function AgentBuilderPage() {
 
   const handleUpdateKnowledgeBindings = async (
     agentId: string,
-    knowledgeBaseIds: string[],
+    bindings: Array<{ knowledgeBaseId: string; enabled: boolean }>,
   ) => {
     try {
-      await replaceKnowledgeBindings(agentId, { knowledgeBaseIds });
+      await replaceKnowledgeBindings(agentId, {
+        bindings: bindings.map((b) => ({
+          knowledgeBaseId: b.knowledgeBaseId,
+          enabled: b.enabled,
+        })),
+      });
       await refreshAgents();
       setError(null);
     } catch (err) {
@@ -148,9 +165,17 @@ export function AgentBuilderPage() {
     }
   };
 
-  const handleUpdatePluginBindings = async (agentId: string, pluginIds: string[]) => {
+  const handleUpdatePluginBindings = async (
+    agentId: string,
+    bindings: Array<{ pluginId: string; enabled: boolean }>,
+  ) => {
     try {
-      await replacePluginBindings(agentId, { pluginIds });
+      await replacePluginBindings(agentId, {
+        bindings: bindings.map((b) => ({
+          pluginId: b.pluginId,
+          enabled: b.enabled,
+        })),
+      });
       await refreshAgents();
       setError(null);
     } catch (err) {
