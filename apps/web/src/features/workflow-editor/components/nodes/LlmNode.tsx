@@ -38,7 +38,7 @@ export function LlmNode({ data }: NodeProps) {
         </span>
         <div>
           <div className="wf-node-title">{d.label || 'LLM'}</div>
-          <div className="wf-node-sub">{d.model || 'deepseek-chat'}</div>
+          <div className="wf-node-sub">{d.model || 'deepseek-flash'}</div>
         </div>
       </div>
       <div className="wf-node-body">
