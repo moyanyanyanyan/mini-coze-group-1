@@ -43,13 +43,33 @@ export class PluginRegistry implements OnModuleInit {
   constructor(private readonly prisma: PrismaService) {}
 
   async onModuleInit(): Promise<void> {
-    // 1. 把内置插件目录 + 工具定义 upsert 进 DB，保证 DB 是唯一事实来源
-    await this.seedBuiltinPlugins();
-    // 2. 从 DB 加载所有 enabled 插件到内存
-    await this.reload();
-    // 3. 注册内置代码执行器
+    // 注册内置代码执行器（不依赖 DB）
     this.registerBuiltinExecutor(new EchoExecutor());
     this.registerBuiltinExecutor(new TimeExecutor());
+
+    try {
+      // 1. 把内置插件目录 + 工具定义 upsert 进 DB，保证 DB 是唯一事实来源
+      await this.seedBuiltinPlugins();
+      // 2. 从 DB 加载所有 enabled 插件到内存
+      await this.reload();
+    } catch (err) {
+      // 本地开发无 DB 时回退到内存内置插件，保证后端能启动看页面
+      this.logger.warn(`数据库不可用，回退到内存内置插件：${(err as Error).message}`);
+      for (const meta of BUILTIN_PLUGIN_CATALOG) {
+        const tool = meta.pluginId === 'plugin_echo'
+          ? new EchoExecutor().definition
+          : new TimeExecutor().definition;
+        this.catalog.set(meta.pluginId, {
+          pluginId: meta.pluginId,
+          title: meta.title,
+          content: meta.content,
+          icon: meta.icon ?? undefined,
+          tags: Array.isArray(meta.tags) ? meta.tags : [],
+          configSchema: {},
+          tools: [tool],
+        });
+      }
+    }
   }
 
   /** 启动时把内置插件写入 DB（已存在则按元数据更新，不覆盖 enabled）。 */
