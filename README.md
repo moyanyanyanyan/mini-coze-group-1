@@ -72,3 +72,13 @@ docker compose config --quiet
 启动前配置本地 `.env` 的模型凭据与内部凭证。执行 `python -m pytest apps/agent/tests -q` 可离线自测；显式执行 `python apps/agent/scripts/smoke_runtime.py --live` 会产生最多三次真实模型调用，启动临时本机服务并在结束后清理。该脚本会生成仅本次验收使用的内部凭证，不修改 `.env`。
 
 接口样例、依赖桩边界及实际验收记录见 [第二周 Runtime 工作文档](docs/week2-agent-runtime-wang-yiheng.md)。
+
+模型支持 DeepSeek 官方与硅基流动：继续使用 `DEEPSEEK_API_KEY`、`DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL` 配置凭据、基础地址和完整模型 ID。硅基流动示例为 `https://api.siliconflow.cn/v1`、`deepseek-ai/DeepSeek-V3.2`；可设置 `MODEL_PROVIDER=siliconflow`（其官方域名也会自动识别）。硅基流动使用 `enable_thinking=false`，DeepSeek 官方使用 `thinking.type=disabled`。现有 `app.runtime.call_model` 导入与参数不变。
+
+通用 OpenAI 兼容网关使用 `MODEL_PROVIDER=openai_compatible`，不发送上述供应商专有参数；未显式设置供应商时，非上述官方域名默认按通用网关处理。该模式需使用自己获授权的网关地址和凭据，不自动更换当前模型配置，也不自动重试。
+
+`knowledge.result.data` 统一为 `{status,citations}`；`chunks`、片段正文和 `score` 仅用于 Runtime 内部模型上下文，不进入事件。上下文预算校验通过后才发送来源事件。
+
+默认沿用环境中的代理；若本机代理无法访问模型服务、而直连正常，可在本地设置 `MODEL_TRUST_ENV=false`，只对模型 HTTP 客户端禁用环境代理，证书验证仍开启。
+
+HTTP Knowledge/Plugin Provider 已接入应用入口：`BACKEND_SERVICE_URL` 指向 NestJS 根地址（不要带 `/api`），知识库使用 `INTERNAL_SERVICE_TOKEN`，插件使用独立 `PLUGINS_SERVICE_TOKEN`；缺凭证时明确拒绝调用。知识检索每库5条，最多50条候选，经去重、排序和完整片段预算选择；插件仅支持直接适配，自动 Tool Call 尚未启用。当前协议和待联调范围见第二周文档。

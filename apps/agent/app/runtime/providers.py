@@ -2,6 +2,7 @@ from typing import Protocol
 
 from app.runtime.errors import ModelError
 from app.runtime.schemas import KnowledgeRequest, KnowledgeResult, ToolDefinition, ToolRequest, ToolSuccess, ToolFailure
+from app.runtime.http_providers import HttpKnowledgeProvider
 
 
 class KnowledgeContextProvider(Protocol):

@@ -71,13 +71,18 @@ class RuntimeService:
                     ))
                     if any(chunk.citation.knowledgeBaseId not in config.knowledgeBaseIds for chunk in knowledge.chunks):
                         raise ModelError("KNOWLEDGE_UNAVAILABLE", "检索返回了未绑定的知识库", 502)
-                    yield event("knowledge.result", knowledge.model_dump(exclude_none=True))
                 if config.pluginIds:
                     await self.plugins.list_tools(request.actor.id, config.id, config.pluginIds)
-                    # Week 2 验证接口定义可替换；不静默丢弃绑定后继续生成假定结果。
-                    raise ModelError("TOOL_NOT_SUPPORTED", "本周只提供插件接口桩，自动调用尚未接入", 503)
+                    # HTTP适配已就绪，但不静默忽略绑定或提前启用自动工具循环。
+                    raise ModelError("TOOL_NOT_SUPPORTED", "插件HTTP适配已接入，自动工具调用尚未启用", 503)
                 value = ModelInput(model=config.model, messages=self.context(request, knowledge),
                                    temperature=config.temperature, max_tokens=config.maxTokens)
+                if config.knowledgeBaseIds:
+                    # 仅公开已纳入模型上下文的来源，正文和score留在Provider内部。
+                    yield event("knowledge.result", {
+                        "status": knowledge.status,
+                        "citations": [chunk.citation.model_dump(exclude_none=True) for chunk in knowledge.chunks],
+                    })
                 result = None
                 async with aclosing(stream_model(value, settings=self.settings, client=self.client)) as model_stream:
                     async for item in model_stream:
@@ -106,9 +111,13 @@ class RuntimeService:
                 return RuntimeResult.model_validate(item["data"])
             if item["type"] == "run.failed":
                 data = item["data"]
+                if data["code"].endswith("_TIMEOUT"):
+                    raise ModelError(data["code"], data["message"], 504, data["retryable"])
                 status = {"INVALID_REQUEST": 400, "MODEL_TIMEOUT": 504, "RUN_TIMEOUT": 504,
                           "MODEL_NOT_CONFIGURED": 503, "MODEL_RATE_LIMITED": 503,
                           "MODEL_QUOTA_EXCEEDED": 503,
+                          "KNOWLEDGE_NOT_CONFIGURED": 503, "TOOL_NOT_CONFIGURED": 503,
+                          "KNOWLEDGE_UNAUTHORIZED": 401, "KNOWLEDGE_FORBIDDEN": 403,
                           "KNOWLEDGE_UNAVAILABLE": 503, "TOOL_UNAVAILABLE": 503, "TOOL_NOT_SUPPORTED": 503}.get(data["code"], 502)
                 raise ModelError(data["code"], data["message"], status, data["retryable"])
         raise ModelError("INTERNAL_ERROR", "运行未返回终态", 500)

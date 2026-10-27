@@ -97,7 +97,7 @@ class KnowledgeRequest(DTO):
     agentId: Identifier
     knowledgeBaseIds: list[Identifier]
     query: str
-    topK: int = Field(default=5, ge=1, le=10)
+    topK: Literal[5] = 5
 
 
 class KnowledgeChunk(DTO):
@@ -108,7 +108,7 @@ class KnowledgeChunk(DTO):
 
 class KnowledgeResult(DTO):
     status: Literal["matched", "no_match"]
-    chunks: list[KnowledgeChunk] = Field(max_length=10)
+    chunks: list[KnowledgeChunk] = Field(max_length=50)
 
     @model_validator(mode="after")
     def consistent(self) -> Self:

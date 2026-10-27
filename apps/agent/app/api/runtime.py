@@ -12,10 +12,13 @@ from app.config import get_settings
 from app.runtime.errors import ModelError
 from app.runtime.schemas import RuntimeRequest
 from app.runtime.service import RuntimeService
+from app.runtime.providers import HttpKnowledgeProvider
+from app.runtime.http_providers import HttpPluginProvider
 
 
 def get_runtime() -> RuntimeService:
-    return RuntimeService(get_settings())
+    settings = get_settings()
+    return RuntimeService(settings, knowledge=HttpKnowledgeProvider(settings), plugins=HttpPluginProvider(settings))
 
 
 def internal_auth(request: Request) -> None:

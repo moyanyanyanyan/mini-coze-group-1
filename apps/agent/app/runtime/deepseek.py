@@ -29,11 +29,11 @@ def check_budget(messages: list[ChatMessage], max_tokens: int, settings: Setting
 
 
 @asynccontextmanager
-async def model_client(client: httpx.AsyncClient | None):
+async def model_client(client: httpx.AsyncClient | None, *, trust_env: bool = True):
     if client is not None:
         yield client
     else:
-        async with httpx.AsyncClient(follow_redirects=False) as owned:
+        async with httpx.AsyncClient(follow_redirects=False, trust_env=trust_env) as owned:
             yield owned
 
 
@@ -64,12 +64,16 @@ def check_finish(reason: str) -> None:
         raise ModelError("MODEL_UNAVAILABLE", "模型未正常完成；本周不支持自动工具调用", 502)
 
 
-def payload(value: ModelInput, stream: bool) -> dict:
+def payload(value: ModelInput, stream: bool, settings: Settings) -> dict:
     body = value.model_dump()
     body["messages"] = [m.model_dump() for m in value.messages]
     # 本周固定为非思考文本模式，temperature 生效且不暴露 reasoning_content。
-    body.update(stream=stream, thinking={"type": "disabled"})
-    if stream:
+    body["stream"] = stream
+    if settings.effective_model_provider == "siliconflow":
+        body["enable_thinking"] = False
+    elif settings.effective_model_provider == "deepseek":
+        body["thinking"] = {"type": "disabled"}
+    if stream and settings.effective_model_provider == "deepseek":
         body["stream_options"] = {"include_usage": True}
     return body
 
@@ -83,11 +87,11 @@ async def stream_model(value: ModelInput, *, settings: Settings, client: httpx.A
     done = False
     try:
         async with asyncio.timeout(settings.model_timeout):
-            async with model_client(client) as connection:
+            async with model_client(client, trust_env=settings.model_trust_env) as connection:
                 async with connection.stream(
                     "POST", settings.deepseek_base_url.rstrip("/") + "/chat/completions",
                     headers={"Authorization": "Bearer " + settings.deepseek_api_key.get_secret_value()},
-                    json=payload(value, True), timeout=settings.model_timeout,
+                    json=payload(value, True, settings), timeout=settings.model_timeout,
                 ) as response:
                     check_status(response)
                     if "text/event-stream" not in response.headers.get("content-type", ""):
@@ -124,11 +128,14 @@ async def stream_model(value: ModelInput, *, settings: Settings, client: httpx.A
                         choice = choices[0]
                         if not isinstance(choice, dict):
                             raise ValueError("invalid choice")
-                        if reason is not None:
-                            raise ModelError("MODEL_PROTOCOL_ERROR", "模型结束后仍返回内容", 502)
                         delta = choice["delta"]
                         if not isinstance(delta, dict):
                             raise ValueError("invalid delta")
+                        # 允许结束后的独立统计帧，但不接受新的文字或工具调用。
+                        if reason is not None:
+                            if delta.get("content") or delta.get("tool_calls") or choice.get("finish_reason") not in (None, reason):
+                                raise ModelError("MODEL_PROTOCOL_ERROR", "模型结束后仍返回内容", 502)
+                            continue
                         if delta.get("tool_calls"):
                             raise ModelError("TOOL_NOT_SUPPORTED", "自动工具调用将在后续周接入", 502)
                         text = delta.get("content")
@@ -161,11 +168,11 @@ async def call_model(*, model: str, messages: list[dict[str, str]], temperature:
     check_budget(value.messages, value.max_tokens, active)
     try:
         async with asyncio.timeout(active.model_timeout):
-            async with model_client(client) as connection:
+            async with model_client(client, trust_env=active.model_trust_env) as connection:
                 response = await connection.post(
                     active.deepseek_base_url.rstrip("/") + "/chat/completions",
                     headers={"Authorization": "Bearer " + active.deepseek_api_key.get_secret_value()},
-                    json=payload(value, False), timeout=active.model_timeout,
+                    json=payload(value, False, active), timeout=active.model_timeout,
                 )
                 check_status(response)
                 data = response.json()
