@@ -12,6 +12,8 @@ import { PluginsModule } from './modules/plugins/plugins.module';
 import { PublishingModule } from './modules/publishing/publishing.module';
 import { UsersModule } from './modules/users/users.module';
 import { WorkflowsModule } from './modules/workflows/workflows.module';
+import { ChatModule } from './chat/chat.module';
+
 
 @Module({
   imports: [
@@ -26,6 +28,8 @@ import { WorkflowsModule } from './modules/workflows/workflows.module';
     UsersModule,
     AgentsModule,
     ConversationsModule,
+    KnowledgeModule,
+    ChatModule,
     KnowledgeModule,
     PluginsModule,
     WorkflowsModule,

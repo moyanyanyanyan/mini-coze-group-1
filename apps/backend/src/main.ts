@@ -9,6 +9,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
 
+  // 设置全局前缀
   app.setGlobalPrefix('api');
   app.enableCors({ origin: config.getOrThrow<string>('WEB_ORIGIN'), credentials: true });
   app.use(cookieParser());
