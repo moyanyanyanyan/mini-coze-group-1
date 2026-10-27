@@ -660,3 +660,77 @@ select.ab-input {
   .ab-list-controls { flex-direction: column; align-items: stretch; }
   .ab-search { width: 100%; }
 }
+
+/* ========== Save button feedback ========== */
+.ab-btn .ab-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-top-color: #fff;
+  border-radius: 50%;
+  margin-right: 6px;
+  animation: ab-spin 0.7s linear infinite;
+}
+
+@keyframes ab-spin {
+  to { transform: rotate(360deg); }
+}
+
+.ab-save-feedback {
+  margin-left: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  padding: 4px 10px;
+  border-radius: 999px;
+  animation: ab-fadein 180ms ease;
+}
+
+@keyframes ab-fadein {
+  from { opacity: 0; transform: translateY(-2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ab-save-feedback--saving {
+  color: var(--ink-600);
+  background: var(--violet-50);
+}
+
+.ab-save-feedback--saved {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.ab-save-feedback--error {
+  color: #b91c1c;
+  background: #fee2e2;
+}
+
+/* ========== Detail actions ========== */
+.ab-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.ab-btn-success {
+  color: #fff;
+  background: #16a34a;
+}
+
+.ab-btn-success:hover:not(:disabled) {
+  background: #15803d;
+}
+
+.ab-btn-danger-ghost {
+  color: #b91c1c;
+  border-color: #fecaca;
+  background: rgba(239, 68, 68, 0.06);
+}
+
+.ab-btn-danger-ghost:hover:not(:disabled) {
+  color: #991b1b;
+  border-color: #fca5a5;
+  background: rgba(239, 68, 68, 0.12);
+}

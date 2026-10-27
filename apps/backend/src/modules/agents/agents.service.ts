@@ -56,9 +56,13 @@ export class AgentsService {
   }
 
   async list(query: ListAgentsQueryDto, user: CurrentUserPayload) {
-    const where: { ownerId: string; status?: AgentStatus } = { ownerId: user.id };
-    if (query.status && query.status !== 'ARCHIVED') {
+    const where: { ownerId: string; status?: { not: AgentStatus } | AgentStatus } = { ownerId: user.id };
+    if (query.status === 'ARCHIVED') {
+      where.status = 'ARCHIVED';
+    } else if (query.status) {
       where.status = query.status;
+    } else {
+      where.status = { not: 'ARCHIVED' };
     }
 
     const [items, total] = await Promise.all([
@@ -118,6 +122,7 @@ export class AgentsService {
     const agent = await this.prisma.agent.update({
       where: { id: agentId },
       data: {
+        status: dto.status,
         name: dto.name,
         description: dto.description,
         avatarUrl: dto.avatarUrl,
@@ -263,7 +268,6 @@ export class AgentsService {
   private async assertAgentWritable(agentId: string, userId: string): Promise<{ ownerId: string; status: AgentStatus }> {
     const agent = await this.prisma.agent.findUnique({ where: { id: agentId } });
     if (!agent) throw new NotFoundException('Agent 不存在');
-    if (agent.status === 'ARCHIVED') throw new NotFoundException('Agent 已归档');
     if (agent.ownerId !== userId) throw new ForbiddenException('无权操作此 Agent');
     return agent;
   }

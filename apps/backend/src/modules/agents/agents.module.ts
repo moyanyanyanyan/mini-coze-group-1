@@ -23,5 +23,6 @@ import { MockPluginCatalog } from './adapters/mock/mock-plugin-catalog';
       useClass: MockPluginCatalog as new () => PluginCatalogPort,
     },
   ],
+  exports: [AgentsService],
 })
 export class AgentsModule {}

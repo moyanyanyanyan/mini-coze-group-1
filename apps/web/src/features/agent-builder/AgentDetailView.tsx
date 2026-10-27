@@ -1,29 +1,36 @@
 import { useState } from 'react';
-import type { MockAgent, MockKnowledgeBase, MockPlugin } from './mockData';
-import { modelOptions, contextLimitOptions } from './mockData';
+import { modelOptions, contextLimitOptions, type Agent, type AgentStatus, type KnowledgeBaseSummary, type PluginSummary, type UpdateAgentInput } from './agent.api';
+
+type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 interface Props {
-  agent: MockAgent;
-  knowledgeBases: MockKnowledgeBase[];
-  plugins: MockPlugin[];
+  agent: Agent;
+  knowledgeBases: KnowledgeBaseSummary[];
+  plugins: PluginSummary[];
+  saveState: SaveState;
+  saveMessage: string;
   onBack: () => void;
-  onSave: (updates: Partial<MockAgent>) => void;
-  onUpdateKnowledgeBindings: (bindings: MockAgent['knowledgeBaseBindings']) => void;
-  onUpdatePluginBindings: (bindings: MockAgent['pluginBindings']) => void;
+  onSave: (updates: UpdateAgentInput) => void;
+  onStatusTransition: (nextStatus: AgentStatus) => void;
+  onUpdateKnowledgeBindings: (knowledgeBaseIds: string[]) => void;
+  onUpdatePluginBindings: (pluginIds: string[]) => void;
 }
 
 export function AgentDetailView({
   agent,
   knowledgeBases,
   plugins,
+  saveState,
+  saveMessage,
   onBack,
   onSave,
+  onStatusTransition,
   onUpdateKnowledgeBindings,
   onUpdatePluginBindings,
 }: Props) {
   const [form, setForm] = useState({
     name: agent.name,
-    description: agent.description,
+    description: agent.description ?? '',
     systemPrompt: agent.systemPrompt,
     model: agent.model,
     temperature: agent.temperature,
@@ -50,27 +57,21 @@ export function AgentDetailView({
   };
 
   const toggleKb = (kbId: string) => {
-    const next = agent.knowledgeBaseBindings.map((b) =>
-      b.knowledgeBaseId === kbId ? { ...b, enabled: !b.enabled } : b,
-    );
+    const all = agent.knowledgeBaseBindings;
+    const wasEnabled = all.find((b) => b.knowledgeBaseId === kbId)?.enabled ?? false;
+    const prev = all.filter((b) => b.enabled).map((b) => b.knowledgeBaseId);
+    const next = wasEnabled ? prev.filter((id) => id !== kbId) : [...prev, kbId];
     onUpdateKnowledgeBindings(next);
   };
 
   const togglePlugin = (pluginId: string) => {
-    const next = agent.pluginBindings.map((b) =>
-      b.pluginId === pluginId ? { ...b, enabled: !b.enabled } : b,
-    );
+    const wasEnabled = agent.pluginBindings.find((b) => b.pluginId === pluginId)?.enabled ?? false;
+    const prev = agent.pluginBindings.filter((b) => b.enabled).map((b) => b.pluginId);
+    const next = wasEnabled ? prev.filter((id) => id !== pluginId) : [...prev, pluginId];
     onUpdatePluginBindings(next);
   };
 
-  const togglePluginAutoInvoke = (pluginId: string) => {
-    const next = agent.pluginBindings.map((b) =>
-      b.pluginId === pluginId ? { ...b, autoInvoke: !b.autoInvoke } : b,
-    );
-    onUpdatePluginBindings(next);
-  };
-
-  const statusLabel: Record<MockAgent['status'], string> = {
+  const statusLabel: Record<Agent['status'], string> = {
     DRAFT: '草稿',
     ACTIVE: '已发布',
     ARCHIVED: '已归档',
@@ -82,6 +83,8 @@ export function AgentDetailView({
   const enabledKbCount = agent.knowledgeBaseBindings.filter((b) => b.enabled).length;
   const enabledPluginCount = agent.pluginBindings.filter((b) => b.enabled).length;
 
+  const busy = saveState === 'saving';
+
   return (
     <div className="ab-detail">
       <header className="ab-detail-header">
@@ -90,7 +93,37 @@ export function AgentDetailView({
           <h2 className="ab-detail-title">{form.name || '未命名 Agent'}</h2>
           <span className={`ab-status-badge status-${agent.status.toLowerCase()}`}>{statusLabel[agent.status]}</span>
         </div>
-        <button className="ab-btn ab-btn-primary" onClick={commit}>保存</button>
+        <div className="ab-detail-actions">
+          {agent.status === 'DRAFT' && (
+            <button
+              className="ab-btn ab-btn-success"
+              onClick={() => onStatusTransition('ACTIVE')}
+              disabled={busy}
+            >
+              发布
+            </button>
+          )}
+          {agent.status === 'ACTIVE' && (
+            <button
+              className="ab-btn ab-btn-ghost"
+              onClick={() => onStatusTransition('DRAFT')}
+              disabled={busy}
+            >
+              撤回
+            </button>
+          )}
+          <button
+            className="ab-btn ab-btn-primary"
+            onClick={commit}
+            disabled={busy}
+          >
+            {busy && <span className="ab-spinner" aria-hidden />}
+            {busy && saveMessage ? saveMessage : '保存'}
+          </button>
+          {saveState !== 'idle' && saveMessage && (
+            <span className={`ab-save-feedback ab-save-feedback--${saveState}`}>{saveMessage}</span>
+          )}
+        </div>
       </header>
 
       <div className="ab-detail-body">
@@ -239,14 +272,6 @@ export function AgentDetailView({
                       <div className="ab-binding-info">
                         <div className="ab-binding-name">{p?.title ?? b.pluginId}</div>
                         <div className="ab-binding-desc">{p?.content ?? ''}</div>
-                        <label className="ab-checkbox-inline">
-                          <input
-                            type="checkbox"
-                            checked={b.autoInvoke}
-                            onChange={() => togglePluginAutoInvoke(b.pluginId)}
-                          />
-                          <span>自动调用</span>
-                        </label>
                       </div>
                       <label className="ab-switch">
                         <input

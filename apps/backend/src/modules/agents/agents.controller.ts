@@ -53,14 +53,6 @@ export class AgentsController {
     return this.agentsService.findOne(agentId, user);
   }
 
-  @Get(':agentId/config')
-  getConfig(
-    @Param('agentId') agentId: string,
-    @CurrentUser() user: CurrentUserPayload,
-  ) {
-    return this.agentsService.getAgentConfig(agentId, user.id);
-  }
-
   @Patch(':agentId')
   update(
     @Param('agentId') agentId: string,

@@ -1,27 +1,26 @@
 import { useMemo, useState } from 'react';
-import type { MockAgent } from './mockData';
+import type { Agent, AgentStatus } from './agent.api';
 
 interface Props {
-  agents: MockAgent[];
+  agents: Agent[];
   onSelect: (agentId: string) => void;
   onCreate: () => void;
   onDelete: (agentId: string) => void;
 }
 
-const statusFilters: Array<{ value: 'ALL' | MockAgent['status']; label: string }> = [
+const statusFilters: Array<{ value: 'ALL' | AgentStatus; label: string }> = [
   { value: 'ALL', label: '全部' },
   { value: 'DRAFT', label: '草稿' },
   { value: 'ACTIVE', label: '已发布' },
-  { value: 'ARCHIVED', label: '已归档' },
 ];
 
-const statusLabel: Record<MockAgent['status'], string> = {
+const statusLabel: Record<AgentStatus, string> = {
   DRAFT: '草稿',
   ACTIVE: '已发布',
   ARCHIVED: '已归档',
 };
 
-const statusClass: Record<MockAgent['status'], string> = {
+const statusClass: Record<AgentStatus, string> = {
   DRAFT: 'status-draft',
   ACTIVE: 'status-active',
   ARCHIVED: 'status-archived',
@@ -34,8 +33,8 @@ export function AgentListView({ agents, onSelect, onCreate, onDelete }: Props) {
   const filtered = useMemo(() => {
     return agents.filter((a) => {
       if (statusFilter !== 'ALL' && a.status !== statusFilter) return false;
-      if (keyword && !a.name.toLowerCase().includes(keyword.toLowerCase()) && !a.description.toLowerCase().includes(keyword.toLowerCase()))
-        return false;
+      const hay = `${a.name} ${a.description ?? ''}`.toLowerCase();
+      if (keyword && !hay.includes(keyword.toLowerCase())) return false;
       return true;
     });
   }, [agents, keyword, statusFilter]);

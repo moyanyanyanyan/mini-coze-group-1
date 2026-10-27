@@ -1,6 +1,16 @@
-import { IsOptional, IsString, MaxLength, IsNumber, Min, Max } from 'class-validator';
+import { IsEnum, IsOptional, IsString, MaxLength, IsNumber, Min, Max } from 'class-validator';
+
+enum AgentStatus {
+  DRAFT = 'DRAFT',
+  ACTIVE = 'ACTIVE',
+  ARCHIVED = 'ARCHIVED',
+}
 
 export class UpdateAgentDto {
+  @IsOptional()
+  @IsEnum(AgentStatus)
+  status?: AgentStatus;
+
   @IsOptional()
   @IsString()
   @MaxLength(50)
