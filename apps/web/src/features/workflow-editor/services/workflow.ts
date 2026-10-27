@@ -47,7 +47,7 @@ const mockDefinition: WorkflowDefinition = {
       position: { x: 360, y: 160 },
       data: {
         label: 'LLM',
-        model: 'deepseek-chat',
+        model: 'deepseek-flash',
         temperature: 0.7,
         maxTokens: 2048,
         systemPrompt: '你是一个助手',

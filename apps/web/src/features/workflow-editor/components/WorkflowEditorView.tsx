@@ -78,7 +78,7 @@ function defaultDataFor(type: NodeType): NodeData {
   if (type === 'llm') {
     return {
       label: 'LLM',
-      model: 'deepseek-chat',
+      model: 'deepseek-flash',
       temperature: 0.7,
       maxTokens: 2048,
       systemPrompt: '',

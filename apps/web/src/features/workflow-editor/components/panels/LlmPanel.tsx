@@ -28,7 +28,7 @@ export function LlmPanel({ data, onChange }: Props) {
           className="wf-input"
           value={data.model || ''}
           onChange={(e) => update({ model: e.target.value })}
-          placeholder="deepseek-chat"
+          placeholder="deepseek-flash"
         />
       </label>
 
