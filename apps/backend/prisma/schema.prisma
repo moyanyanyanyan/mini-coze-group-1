@@ -134,3 +134,34 @@ model Message {
 
   @@index([conversationId, seq])
 }
+
+/// 插件目录表。
+///
+/// - 内置插件（plugin_echo / plugin_time）由代码在启动时 upsert 进表，
+///   目录元数据以此处为准；执行器仍走代码里的 EchoExecutor / TimeExecutor。
+/// - 用户自定义插件（kind = http）由 POST /api/plugins 写入，
+///   执行时由 HttpExecutor 按 endpoint 转发请求。
+model Plugin {
+  id           Int      @id @default(autoincrement())
+  /// 全局唯一插件 ID，形如 plugin_echo / plugin_weather
+  pluginId     String   @unique
+  title        String
+  content      String   @default("")
+  icon         String?
+  /// string[]
+  tags         Json     @default("[]")
+  /// 插件级配置 Schema（JSON Schema）
+  configSchema Json     @default("{}")
+  /// PluginToolDefinition[]，与目录同源
+  tools        Json
+  /// builtin | http
+  kind         String   @default("builtin")
+  /// kind = http 时必填，工具执行时 POST 到该地址
+  endpoint     String?
+  /// 运行时是否可用；false 时不进入目录与允许列表
+  enabled      Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("plugins")
+}
