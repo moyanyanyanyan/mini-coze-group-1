@@ -87,9 +87,9 @@ export class PluginsService {
           title: req.title,
           content: req.content ?? '',
           icon: req.icon ?? null,
-          tags: (req.tags ?? []) as Prisma.InputJsonValue,
-          configSchema: {} as Prisma.InputJsonValue,
-          tools: tools as unknown as Prisma.InputJsonValue,
+          tags: (req.tags ?? []) as object,
+          configSchema: {} as object,
+          tools: tools as object,
           kind: 'http',
           endpoint: req.endpoint,
           enabled: true,
@@ -173,7 +173,12 @@ export class PluginsService {
   // ---------- 接口②：GET /api/tools?pluginIds=... ----------
   listTools(
     rawPluginIds: string | string[] | undefined,
+    serviceToken: string | undefined,
   ): ApiResponse<PluginToolDefinition[]> {
+    // 0. 服务凭证校验
+    const authError = this.checkServiceToken(serviceToken);
+    if (authError) return authError;
+
     if (rawPluginIds === undefined || rawPluginIds === null) {
       return {
         code: 400,
@@ -216,16 +221,8 @@ export class PluginsService {
     serviceToken: string | undefined,
   ): Promise<ApiResponse<PluginToolResult>> {
     // 0. 服务凭证校验
-    const expectedToken = this.config.get<string>('PLUGINS_SERVICE_TOKEN');
-    if (expectedToken && expectedToken.length > 0) {
-      if (!serviceToken) {
-        return { code: 401, message: '缺少服务凭证', data: null };
-      }
-      if (serviceToken !== expectedToken) {
-        return { code: 401, message: '服务凭证无效', data: null };
-      }
-    }
-    // week2：未配置 PLUGINS_SERVICE_TOKEN 时视为本地开发模式，跳过凭证校验。
+    const authError = this.checkServiceToken(serviceToken);
+    if (authError) return authError;
 
     // 1. 请求结构校验
     const badRequest = this.validateExecuteRequest(body);
@@ -289,6 +286,31 @@ export class PluginsService {
   }
 
   // ---------- 内部工具 ----------
+
+  /**
+   * 服务间凭证校验：
+   * - 未配置 PLUGINS_SERVICE_TOKEN → 503（部署环境配置缺失，不裸奔）
+   * - 已配置但请求头缺失 → 401
+   * - 已配置但 token 不匹配 → 401
+   * - 通过 → null
+   */
+  private checkServiceToken(serviceToken: string | undefined): ApiResponse<never> | null {
+    const expected = this.config.get<string>('PLUGINS_SERVICE_TOKEN');
+    if (!expected || expected.length === 0) {
+      return {
+        code: 503,
+        message: '服务间凭证未配置（PLUGINS_SERVICE_TOKEN 为空），拒绝服务间调用',
+        data: null,
+      };
+    }
+    if (!serviceToken) {
+      return { code: 401, message: '缺少服务凭证（x-plugin-service-token）', data: null };
+    }
+    if (serviceToken !== expected) {
+      return { code: 401, message: '服务凭证无效', data: null };
+    }
+    return null;
+  }
 
   private validateExecuteRequest(body: unknown): string | null {
     if (typeof body !== 'object' || body === null || Array.isArray(body)) {
