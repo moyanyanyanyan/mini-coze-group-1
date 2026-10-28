@@ -26,9 +26,13 @@ export const ErrorCode = {
   // ---- 通用兜底（任何模块都可能用到）----
   VALIDATION_FAILED: 'VALIDATION_FAILED',
   NOT_FOUND: 'NOT_FOUND',
-  CONFLICT: 'CONFLICT',
+    CONFLICT: 'CONFLICT',
   INTERNAL_ERROR: 'INTERNAL_ERROR',
+  // ---- 聊天 ----
+  /** 同一会话正在生成中，又来了一条新消息 */
+  CONVERSATION_BUSY: 'CONVERSATION_BUSY',
 } as const;
+
 
 /** 错误码的类型。写法：把上面对象所有的值取出来组成联合类型 */
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

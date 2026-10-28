@@ -39,7 +39,7 @@ export class AgentsService {
         description: dto.description,
         avatarUrl: dto.avatarUrl,
         systemPrompt: dto.systemPrompt ?? '',
-        model: dto.model ?? process.env.DEEPSEEK_MODEL ?? 'deepseek-chat',
+        model: dto.model ?? process.env.DEEPSEEK_MODEL ?? 'deepseek-ai/DeepSeek-V4.1-Flash',
         temperature: dto.temperature ?? 0.7,
         maxTokens: dto.maxTokens ?? 4096,
         contextLimit: dto.contextLimit ?? 20,
@@ -113,6 +113,7 @@ export class AgentsService {
       },
     });
     if (!agent) throw new NotFoundException('Agent 不存在');
+    if (agent.status === 'ARCHIVED') throw new NotFoundException('Agent 已归档');
     if (agent.ownerId !== userId) throw new ForbiddenException('无权访问此 Agent');
     return buildAgentConfig(toAgentDetail(agent));
   }

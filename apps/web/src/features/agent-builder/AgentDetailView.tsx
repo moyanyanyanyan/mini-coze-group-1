@@ -77,7 +77,7 @@ export function AgentDetailView({
     ARCHIVED: '已归档',
   };
 
-  const kbById = new Map(knowledgeBases.map((kb) => [kb.id, kb]));
+  const availableKnowledgeBases = knowledgeBases.filter((kb) => kb.status === 'ACTIVE');
   const pluginById = new Map(plugins.map((p) => [p.pluginId, p]));
 
   const enabledKbCount = agent.knowledgeBaseBindings.filter((b) => b.enabled).length;
@@ -230,23 +230,23 @@ export function AgentDetailView({
             <h3 className="ab-section-title">
               知识库绑定 <span className="ab-section-count">{enabledKbCount}/{agent.knowledgeBaseBindings.length} 启用</span>
             </h3>
-            {agent.knowledgeBaseBindings.length === 0 ? (
-              <div className="ab-empty-inline">未绑定知识库</div>
+            {availableKnowledgeBases.length === 0 ? (
+              <div className="ab-empty-inline">暂无可绑定知识库</div>
             ) : (
               <ul className="ab-binding-list">
-                {agent.knowledgeBaseBindings.map((b) => {
-                  const kb = kbById.get(b.knowledgeBaseId);
+                {availableKnowledgeBases.map((kb) => {
+                  const binding = agent.knowledgeBaseBindings.find((b) => b.knowledgeBaseId === kb.id);
                   return (
-                    <li key={b.id} className={`ab-binding-item${!b.enabled ? ' is-disabled' : ''}`}>
+                    <li key={kb.id} className={`ab-binding-item${!binding?.enabled ? ' is-disabled' : ''}`}>
                       <div className="ab-binding-info">
-                        <div className="ab-binding-name">{kb?.name ?? b.knowledgeBaseId}</div>
+                        <div className="ab-binding-name">{kb.name}</div>
                         {kb?.description && <div className="ab-binding-desc">{kb.description}</div>}
                       </div>
                       <label className="ab-switch">
                         <input
                           type="checkbox"
-                          checked={b.enabled}
-                          onChange={() => toggleKb(b.knowledgeBaseId)}
+                          checked={binding?.enabled ?? false}
+                          onChange={() => toggleKb(kb.id)}
                         />
                         <span className="ab-switch-slider" />
                       </label>
