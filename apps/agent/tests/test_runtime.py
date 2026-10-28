@@ -167,17 +167,46 @@ def test_provider_is_replaceable_and_scope_checked(settings, body):
 
     body["agentConfig"]["knowledgeBaseIds"] = ["kb1"]
     async def verify():
-        async with httpx.AsyncClient(transport=transport()) as client:
+        def handler(request):
+            assert any("参考正文" in m["content"] for m in json.loads(request.content)["messages"])
+            return httpx.Response(200, content=stream_bytes(), headers={"content-type": "text/event-stream"})
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
             service = RuntimeService(settings, knowledge=KnowledgeStub(), client=client)
             events = await collect(service, body)
             assert events[1]["type"] == "knowledge.result"
-            assert "chunks" not in events[1]["data"]
-            assert events[1]["data"]["citations"][0]["chunkId"] == "c1"
+            assert events[1]["data"] == {"status": "matched", "citations": [{
+                "knowledgeBaseId": "kb1", "documentId": "d1", "chunkId": "c1", "title": "标题"}]}
+            assert "参考正文" not in json.dumps(events[1], ensure_ascii=False)
             assert events[-1]["data"]["citations"][0]["chunkId"] == "c1"
             body["agentConfig"]["knowledgeBaseIds"] = ["kb_other"]
             events = await collect(service, body)
             assert events[-1]["data"]["code"] == "KNOWLEDGE_UNAVAILABLE"
     asyncio.run(verify())
+
+
+def test_no_match_event_has_empty_citations(settings, body):
+    class EmptyKnowledge:
+        async def get_context(self, request):
+            return KnowledgeResult(status="no_match", chunks=[])
+    body["agentConfig"]["knowledgeBaseIds"] = ["kb1"]
+    async def verify():
+        async with httpx.AsyncClient(transport=transport()) as client:
+            events = await collect(RuntimeService(settings, knowledge=EmptyKnowledge(), client=client), body)
+        assert events[1]["data"] == {"status": "no_match", "citations": []}
+        assert events[-1]["type"] == "run.completed"
+    asyncio.run(verify())
+
+
+def test_context_rejected_does_not_announce_unused_citations(settings, body):
+    class LargeKnowledge:
+        async def get_context(self, request):
+            return KnowledgeResult.model_validate({"status": "matched", "chunks": [{
+                "citation": {"knowledgeBaseId": "kb1", "documentId": "d1", "chunkId": "c1", "title": "标题"},
+                "content": "参考文本" * 500, "score": 0.8}]})
+    settings.context_token_limit = 1024
+    body["agentConfig"]["knowledgeBaseIds"] = ["kb1"]
+    events = asyncio.run(collect(RuntimeService(settings, knowledge=LargeKnowledge()), body))
+    assert [e["type"] for e in events] == ["run.started", "run.failed"]
 
 
 @pytest.mark.parametrize("field,code", [("knowledgeBaseIds", "KNOWLEDGE_UNAVAILABLE"), ("pluginIds", "TOOL_UNAVAILABLE")])
