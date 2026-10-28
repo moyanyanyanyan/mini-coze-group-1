@@ -280,3 +280,22 @@ export async function deleteWorkflow(id: string): Promise<void> {
   }
   return http(`/workflows/${id}`, { method: 'DELETE' });
 }
+
+export async function updateWorkflow(
+  id: string,
+  body: { name?: string; description?: string },
+): Promise<{ id: string; updatedAt: string }> {
+  if (USE_MOCK) {
+    const wf = mockWorkflows.find((x) => x.id === id);
+    if (wf) {
+      if (body.name !== undefined) wf.name = body.name;
+      if (body.description !== undefined) wf.description = body.description;
+      wf.updatedAt = new Date().toISOString();
+    }
+    return { id, updatedAt: new Date().toISOString() };
+  }
+  return http(`/workflows/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
