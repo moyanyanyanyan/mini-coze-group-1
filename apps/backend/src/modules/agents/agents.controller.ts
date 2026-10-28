@@ -120,21 +120,4 @@ export class AgentsController {
   ) {
     return this.agentsService.replaceWorkflowBindings(agentId, dto, user);
   }
-
-  @Get(':agentId/versions')
-  getVersions(
-    @Param('agentId') agentId: string,
-    @CurrentUser() user: CurrentUserPayload,
-  ) {
-    return this.agentsService.getVersions(agentId, user);
-  }
-
-  @Get(':agentId/versions/:versionId')
-  getVersion(
-    @Param('agentId') agentId: string,
-    @Param('versionId') versionId: string,
-    @CurrentUser() user: CurrentUserPayload,
-  ) {
-    return this.agentsService.getVersion(agentId, versionId, user);
-  }
 }

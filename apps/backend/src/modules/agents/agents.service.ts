@@ -119,24 +119,7 @@ export class AgentsService {
   }
 
   async update(agentId: string, dto: UpdateAgentDto, user: CurrentUserPayload) {
-    const existing = await this.assertAgentWritable(agentId, user.id);
-
-    const prevStatus = existing.status;
-    const prevWasActive = prevStatus === 'ACTIVE';
-    const becomingActive = dto.status === 'ACTIVE' && prevStatus !== 'ACTIVE';
-    const stayingActiveWithChanges = prevWasActive && (
-      dto.status !== undefined ||
-      dto.name !== undefined ||
-      dto.systemPrompt !== undefined ||
-      dto.model !== undefined ||
-      dto.temperature !== undefined ||
-      dto.maxTokens !== undefined ||
-      dto.contextLimit !== undefined ||
-      dto.openingMessage !== undefined ||
-      dto.description !== undefined ||
-      dto.avatarUrl !== undefined
-    );
-
+    await this.assertAgentWritable(agentId, user.id);
     const agent = await this.prisma.agent.update({
       where: { id: agentId },
       data: {
@@ -157,11 +140,6 @@ export class AgentsService {
         workflowBindings: true,
       },
     });
-
-    if (becomingActive || stayingActiveWithChanges) {
-      await this.takeSnapshot(agentId);
-    }
-
     return toAgentDetail(agent);
   }
 
@@ -183,7 +161,7 @@ export class AgentsService {
   }
 
   async replacePluginBindings(agentId: string, dto: ReplacePluginBindingsDto, user: CurrentUserPayload) {
-    const agent = await this.assertAgentWritable(agentId, user.id);
+    await this.assertAgentWritable(agentId, user.id);
 
     const seen = new Set<string>();
     for (const b of dto.bindings) {
@@ -213,8 +191,6 @@ export class AgentsService {
       }),
     ]);
 
-    if (agent.status === 'ACTIVE') await this.takeSnapshot(agentId);
-
     return this.getPluginBindings(agentId, user);
   }
 
@@ -228,7 +204,7 @@ export class AgentsService {
   }
 
   async replaceKnowledgeBindings(agentId: string, dto: ReplaceKnowledgeBindingsDto, user: CurrentUserPayload) {
-    const agent = await this.assertAgentWritable(agentId, user.id);
+    await this.assertAgentWritable(agentId, user.id);
 
     const seen = new Set<string>();
     for (const b of dto.bindings) {
@@ -260,8 +236,6 @@ export class AgentsService {
       }),
     ]);
 
-    if (agent.status === 'ACTIVE') await this.takeSnapshot(agentId);
-
     return this.getKnowledgeBindings(agentId, user);
   }
 
@@ -275,7 +249,7 @@ export class AgentsService {
   }
 
   async replaceWorkflowBindings(agentId: string, dto: ReplaceWorkflowBindingsDto, user: CurrentUserPayload) {
-    const agent = await this.assertAgentWritable(agentId, user.id);
+    await this.assertAgentWritable(agentId, user.id);
 
     await this.prisma.$transaction([
       this.prisma.agentWorkflow.deleteMany({ where: { agentId } }),
@@ -289,8 +263,6 @@ export class AgentsService {
       }),
     ]);
 
-    if (agent.status === 'ACTIVE') await this.takeSnapshot(agentId);
-
     return this.getWorkflowBindings(agentId, user);
   }
 
@@ -299,65 +271,5 @@ export class AgentsService {
     if (!agent) throw new NotFoundException('Agent 不存在');
     if (agent.ownerId !== userId) throw new ForbiddenException('无权操作此 Agent');
     return agent;
-  }
-
-  private async takeSnapshot(agentId: string): Promise<{ version: number; versionId: string }> {
-    const agent = await this.prisma.agent.findUnique({
-      where: { id: agentId },
-      include: {
-        pluginBindings: true,
-        knowledgeBaseBindings: true,
-        workflowBindings: true,
-      },
-    });
-    if (!agent) throw new NotFoundException('Agent 不存在');
-    if (agent.status !== 'ACTIVE') return { version: 0, versionId: agent.currentVersionId ?? '' };
-
-    const maxVersionRow = await this.prisma.agentVersion.aggregate({
-      where: { agentId },
-      _max: { version: true },
-    });
-    const nextVersion = (maxVersionRow._max.version ?? 0) + 1;
-
-    const detail = toAgentDetail(agent);
-    const snapshot = buildAgentConfig(detail, nextVersion);
-
-    const version = await this.prisma.agentVersion.create({
-      data: {
-        agentId,
-        version: nextVersion,
-        snapshot: snapshot as unknown as Prisma.InputJsonValue,
-      },
-    });
-
-    await this.prisma.agent.update({
-      where: { id: agentId },
-      data: { currentVersionId: version.id },
-    });
-
-    return { version: nextVersion, versionId: version.id };
-  }
-
-  async getVersions(agentId: string, user: CurrentUserPayload) {
-    await this.assertAgentWritable(agentId, user.id);
-    return this.prisma.agentVersion.findMany({
-      where: { agentId },
-      orderBy: { version: 'desc' },
-      select: {
-        id: true,
-        version: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
-  }
-
-  async getVersion(agentId: string, versionId: string, user: CurrentUserPayload) {
-    await this.assertAgentWritable(agentId, user.id);
-    const version = await this.prisma.agentVersion.findUnique({
-      where: { id: versionId },
-    });
-    if (!version || version.agentId !== agentId) throw new NotFoundException('版本不存在');
-    return version;
   }
 }

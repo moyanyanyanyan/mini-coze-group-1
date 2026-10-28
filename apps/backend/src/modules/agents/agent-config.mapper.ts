@@ -6,10 +6,10 @@ import type {
   WorkflowBindingView,
 } from './types';
 
-export function buildAgentConfig(agent: AgentDetail, revision = 0): RuntimeAgentConfig {
+export function buildAgentConfig(agent: AgentDetail): RuntimeAgentConfig {
   return {
     id: agent.id,
-    revision,
+    revision: 0,
     name: agent.name,
     systemPrompt: agent.systemPrompt,
     model: agent.model,

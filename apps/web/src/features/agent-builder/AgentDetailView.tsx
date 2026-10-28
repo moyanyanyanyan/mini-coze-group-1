@@ -1,20 +1,7 @@
-import { useMemo, useState } from 'react';
-import {
-  BindingPickerModal,
-  type PickerItem,
-} from './BindingPickerModal';
-import {
-  modelOptions,
-  contextLimitOptions,
-  type Agent,
-  type AgentStatus,
-  type KnowledgeBaseSummary,
-  type PluginSummary,
-  type UpdateAgentInput,
-} from './agent.api';
+import { useState } from 'react';
+import { modelOptions, contextLimitOptions, type Agent, type AgentStatus, type KnowledgeBaseSummary, type PluginSummary, type UpdateAgentInput } from './agent.api';
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
-type PickerKind = 'plugin' | 'knowledge';
 
 interface Props {
   agent: Agent;
@@ -25,12 +12,8 @@ interface Props {
   onBack: () => void;
   onSave: (updates: UpdateAgentInput) => void;
   onStatusTransition: (nextStatus: AgentStatus) => void;
-  onUpdateKnowledgeBindings: (
-    bindings: Array<{ knowledgeBaseId: string; enabled: boolean }>,
-  ) => void;
-  onUpdatePluginBindings: (
-    bindings: Array<{ pluginId: string; enabled: boolean }>,
-  ) => void;
+  onUpdateKnowledgeBindings: (knowledgeBaseIds: string[]) => void;
+  onUpdatePluginBindings: (pluginIds: string[]) => void;
 }
 
 export function AgentDetailView({
@@ -45,32 +28,6 @@ export function AgentDetailView({
   onUpdateKnowledgeBindings,
   onUpdatePluginBindings,
 }: Props) {
-  const [pickerOpen, setPickerOpen] = useState<PickerKind | null>(null);
-
-  const pluginPickerItems: PickerItem[] = useMemo(
-    () => plugins.map((p) => ({ id: p.pluginId, title: p.title, description: p.content })),
-    [plugins],
-  );
-
-  const knowledgePickerItems: PickerItem[] = useMemo(
-    () =>
-      knowledgeBases.map((kb) => ({
-        id: kb.id,
-        title: kb.name,
-        description: kb.description,
-      })),
-    [knowledgeBases],
-  );
-
-  const boundPluginIds = useMemo(
-    () => agent.pluginBindings.map((b) => b.pluginId),
-    [agent.pluginBindings],
-  );
-  const boundKnowledgeIds = useMemo(
-    () => agent.knowledgeBaseBindings.map((b) => b.knowledgeBaseId),
-    [agent.knowledgeBaseBindings],
-  );
-
   const [form, setForm] = useState({
     name: agent.name,
     description: agent.description ?? '',
@@ -100,19 +57,18 @@ export function AgentDetailView({
   };
 
   const toggleKb = (kbId: string) => {
-    const bindings = agent.knowledgeBaseBindings.map((b) => ({
-      knowledgeBaseId: b.knowledgeBaseId,
-      enabled: b.knowledgeBaseId === kbId ? !b.enabled : b.enabled,
-    }));
-    onUpdateKnowledgeBindings(bindings);
+    const all = agent.knowledgeBaseBindings;
+    const wasEnabled = all.find((b) => b.knowledgeBaseId === kbId)?.enabled ?? false;
+    const prev = all.filter((b) => b.enabled).map((b) => b.knowledgeBaseId);
+    const next = wasEnabled ? prev.filter((id) => id !== kbId) : [...prev, kbId];
+    onUpdateKnowledgeBindings(next);
   };
 
   const togglePlugin = (pluginId: string) => {
-    const bindings = agent.pluginBindings.map((b) => ({
-      pluginId: b.pluginId,
-      enabled: b.pluginId === pluginId ? !b.enabled : b.enabled,
-    }));
-    onUpdatePluginBindings(bindings);
+    const wasEnabled = agent.pluginBindings.find((b) => b.pluginId === pluginId)?.enabled ?? false;
+    const prev = agent.pluginBindings.filter((b) => b.enabled).map((b) => b.pluginId);
+    const next = wasEnabled ? prev.filter((id) => id !== pluginId) : [...prev, pluginId];
+    onUpdatePluginBindings(next);
   };
 
   const statusLabel: Record<Agent['status'], string> = {
@@ -271,32 +227,11 @@ export function AgentDetailView({
           </div>
 
           <div className="ab-section">
-            <div className="ab-section-title-row">
-              <h3 className="ab-section-title">
-                知识库绑定 <span className="ab-section-count">{enabledKbCount}/{agent.knowledgeBaseBindings.length} 启用</span>
-              </h3>
-              <button
-                type="button"
-                className="ab-btn ab-btn-ghost ab-btn-mini"
-                onClick={() => setPickerOpen('knowledge')}
-                disabled={knowledgeBases.length === 0}
-                title={knowledgeBases.length === 0 ? '知识库目录暂无可用项' : '从目录中添加或移除'}
-              >
-                + 添加
-              </button>
-            </div>
-            {agent.knowledgeBaseBindings.length === 0 ? (
-              <div className="ab-empty-inline">
-                未绑定知识库
-                <button
-                  type="button"
-                  className="ab-btn ab-btn-ghost ab-btn-mini"
-                  onClick={() => setPickerOpen('knowledge')}
-                  disabled={knowledgeBases.length === 0}
-                >
-                  选择知识库
-                </button>
-              </div>
+            <h3 className="ab-section-title">
+              知识库绑定 <span className="ab-section-count">{enabledKbCount}/{agent.knowledgeBaseBindings.length} 启用</span>
+            </h3>
+            {availableKnowledgeBases.length === 0 ? (
+              <div className="ab-empty-inline">暂无可绑定知识库</div>
             ) : (
               <ul className="ab-binding-list">
                 {availableKnowledgeBases.map((kb) => {
@@ -323,32 +258,11 @@ export function AgentDetailView({
           </div>
 
           <div className="ab-section">
-            <div className="ab-section-title-row">
-              <h3 className="ab-section-title">
-                插件绑定 <span className="ab-section-count">{enabledPluginCount}/{agent.pluginBindings.length} 启用</span>
-              </h3>
-              <button
-                type="button"
-                className="ab-btn ab-btn-ghost ab-btn-mini"
-                onClick={() => setPickerOpen('plugin')}
-                disabled={plugins.length === 0}
-                title={plugins.length === 0 ? '插件目录暂无可用项' : '从目录中添加或移除'}
-              >
-                + 添加
-              </button>
-            </div>
+            <h3 className="ab-section-title">
+              插件绑定 <span className="ab-section-count">{enabledPluginCount}/{agent.pluginBindings.length} 启用</span>
+            </h3>
             {agent.pluginBindings.length === 0 ? (
-              <div className="ab-empty-inline">
-                未绑定插件
-                <button
-                  type="button"
-                  className="ab-btn ab-btn-ghost ab-btn-mini"
-                  onClick={() => setPickerOpen('plugin')}
-                  disabled={plugins.length === 0}
-                >
-                  选择插件
-                </button>
-              </div>
+              <div className="ab-empty-inline">未绑定插件</div>
             ) : (
               <ul className="ab-binding-list">
                 {agent.pluginBindings.map((b) => {
@@ -402,36 +316,6 @@ export function AgentDetailView({
           </div>
         </aside>
       </div>
-
-      {pickerOpen === 'plugin' && (
-        <BindingPickerModal
-          title="添加插件"
-          subtitle="选择要绑定到此 Agent 的插件"
-          items={pluginPickerItems}
-          selectedIds={boundPluginIds}
-          onConfirm={(ids) => {
-            onUpdatePluginBindings(ids.map((pluginId) => ({ pluginId, enabled: true })));
-            setPickerOpen(null);
-          }}
-          onClose={() => setPickerOpen(null)}
-        />
-      )}
-
-      {pickerOpen === 'knowledge' && (
-        <BindingPickerModal
-          title="添加知识库"
-          subtitle="选择要绑定到此 Agent 的知识库"
-          items={knowledgePickerItems}
-          selectedIds={boundKnowledgeIds}
-          onConfirm={(ids) => {
-            onUpdateKnowledgeBindings(
-              ids.map((knowledgeBaseId) => ({ knowledgeBaseId, enabled: true })),
-            );
-            setPickerOpen(null);
-          }}
-          onClose={() => setPickerOpen(null)}
-        />
-      )}
     </div>
   );
 }
