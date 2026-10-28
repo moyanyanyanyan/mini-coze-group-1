@@ -8,6 +8,17 @@ export class DocumentContentError extends Error {
   }
 }
 
+export function decodeUploadFilename(filename: string): string {
+  // Multipart parsers may interpret UTF-8 filename bytes as Latin-1.
+  // Leave already decoded Unicode and genuine Latin-1 names unchanged.
+  if (/[^\u0000-\u00ff]/u.test(filename)) return filename;
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(Buffer.from(filename, 'latin1'));
+  } catch {
+    return filename;
+  }
+}
+
 export function sourceTypeFromFilename(filename: string): 'TXT' | 'JSON' {
   const extension = extname(filename).toLowerCase();
   if (extension === '.txt') return 'TXT';

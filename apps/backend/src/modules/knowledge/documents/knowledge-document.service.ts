@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { basename, extname } from 'node:path';
 import { PrismaService } from '../../../database/prisma.service';
 import { EmbeddingClient, EMBEDDING_DIMENSION, EmbeddingUnavailableError } from '../../../integrations/embedding.client';
-import { DocumentContentError, extractDocumentText, MAX_DOCUMENT_BYTES, sourceTypeFromFilename } from './document-content';
+import { decodeUploadFilename, DocumentContentError, extractDocumentText, MAX_DOCUMENT_BYTES, sourceTypeFromFilename } from './document-content';
 import { chunkDocument } from './chunk-document';
 import { CreateTextDocumentDto } from '../dto/create-text-document.dto';
 
@@ -44,18 +44,19 @@ export class KnowledgeDocumentService implements OnModuleInit {
   async createFile(knowledgeBaseId: string, workspaceId: string, title: string | undefined, file: UploadedDocumentFile | undefined) {
     await this.assertKnowledgeBase(knowledgeBaseId, workspaceId);
     if (!file) throw new BadRequestException('请选择 TXT 或 JSON 文件');
+    const filename = decodeUploadFilename(file.originalname);
     let sourceType: 'TXT' | 'JSON';
     try {
-      sourceType = sourceTypeFromFilename(file.originalname);
+      sourceType = sourceTypeFromFilename(filename);
     } catch (error) {
       throw new BadRequestException(error instanceof Error ? error.message : '文件类型不支持');
     }
     if (file.size > MAX_DOCUMENT_BYTES) throw new BadRequestException('文件不能超过 1 MB');
-    const documentTitle = (title?.trim() || basename(file.originalname, extname(file.originalname))).trim();
+    const documentTitle = (title?.trim() || basename(filename, extname(filename))).trim();
     if (!documentTitle || documentTitle.length > 100) throw new BadRequestException('文档标题长度必须为 1～100 字符');
 
     const document = await this.prisma.knowledgeDocument.create({
-      data: { knowledgeBaseId, title: documentTitle, sourceType, originalFileName: file.originalname, sourceBytes: new Uint8Array(file.buffer) },
+      data: { knowledgeBaseId, title: documentTitle, sourceType, originalFileName: filename, sourceBytes: new Uint8Array(file.buffer) },
     });
     this.schedule(document.id);
     return this.publicDocument(document);

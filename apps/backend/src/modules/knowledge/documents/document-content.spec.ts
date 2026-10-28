@@ -1,4 +1,4 @@
-import { DocumentContentError, extractDocumentText, sourceTypeFromFilename } from './document-content';
+import { decodeUploadFilename, DocumentContentError, extractDocumentText, sourceTypeFromFilename } from './document-content';
 
 describe('document content extraction', () => {
   it('keeps nested JSON field paths and array order', () => {
@@ -21,5 +21,13 @@ describe('document content extraction', () => {
   it('accepts supported extensions without trusting unrelated file types', () => {
     expect(sourceTypeFromFilename('rules.JSON')).toBe('JSON');
     expect(() => sourceTypeFromFilename('rules.pdf')).toThrow(DocumentContentError);
+  });
+
+  it('recovers a UTF-8 Chinese upload filename read as Latin-1', () => {
+    const filename = '阿蕾奇诺小助手.txt';
+    expect(decodeUploadFilename(Buffer.from(filename, 'utf8').toString('latin1'))).toBe(filename);
+    expect(decodeUploadFilename(filename)).toBe(filename);
+    expect(decodeUploadFilename('resume.txt')).toBe('resume.txt');
+    expect(decodeUploadFilename('café.txt')).toBe('café.txt');
   });
 });
