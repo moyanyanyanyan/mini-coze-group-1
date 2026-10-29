@@ -1,0 +1,163 @@
+/* ========== 首屏整体 ========== */
+.landing {
+  min-height:100vh;
+  /* 顶部一圈柔光（靛蓝调）+ 底色 */
+  background: radial-gradient(circle at 50% 0%, #e0e7ff 0%, transparent 55%), var(--bg);
+}
+
+/* ========== 导航栏 ========== */
+.navBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.logo {
+  font-size: 25px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.navActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ========== 按钮：公共 + 两个变体 ========== */
+/* .btn 只管"骨架"（尺寸/圆角/手感），颜色这种"皮肤"交给变体去涂 */
+.btn {
+  padding: 13px 30px;
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: var(--radiusPill);
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+.btnPrimary {
+  composes: btn;                      /* 继承 .btn 的全部样式，下面只写差异 */
+  background: var(--primary);
+  color: #fff;
+}
+.btnPrimary:hover {
+  background: var(--primary-hover);
+  transform: translateY(-2px);        /* 上浮 2px */
+  box-shadow: 0 10px 22px rgba(79, 70, 229, 0.3);
+}
+.btnGhost {
+  composes: btn;
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.btnGhost:hover {
+  transform: translateY(-2px); /* 上浮 2px */
+  box-shadow: 0 10px 22px rgba(79, 70, 229, 0.3);
+}
+.btnArrow {
+  margin-left: 6px;
+}
+/* ========== Hero ========== */
+.hero {
+  /* 屏幕高减去导航栏高，正好铺满"剩下的那一屏" */
+  min-height: calc(100vh - var(--navHeight));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 80px 24px 120px;
+}
+
+.heroTitle {
+  /* clamp(最小值, 弹性值, 最大值)：小屏不至于挤，大屏不至于无限膨胀 */
+  font-size: clamp(40px, 6vw, 64px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin: 0;
+}
+
+.heroSubtitle {
+  font-size: 17px;
+  line-height: 1.8;
+  max-width: 620px;                   /* 限制行长，一行铺满全屏会读得累 */
+  margin: 24px 0 36px;
+}
+
+.heroActions {
+  display: flex;
+  justify-content: center;
+}
+.scrollHint {
+  font-size: 13px;
+  margin-top: 56px;
+}
+
+/* ========== 核心能力展示区 ========== */
+.features {
+    margin: 0 auto;
+    padding: 40px 32px 30px;
+}
+.featuresEyebrow { 
+    font-size: 32px;
+    text-align: center;
+    padding: 30px 20px 10px;
+}
+.featuresSubtitle {
+    font-size: 16px;
+    text-align: center;
+    padding: 10 30 30 30px;
+
+}
+.featuresGrid {
+    /* 网格二维布局用grid */
+    display:grid;
+    /* 定义列：3列，每一列宽度均分容器空间 */
+    grid-template-columns:repeat(3,1fr);
+    /* 子元素间间隔 */
+    gap:20px
+}
+.featureCard {
+    background-color: #f7faff;
+    border:1px solid var(--line);
+    border-radius: 16px;
+    text-align: center;
+    padding: 50px 32px;
+    /* 阴影效果 */
+    transition: all 0.2s ease;
+}
+/* 卡片浮动效果 */
+.featureCard:hover {
+    transform:translateY(-4px);
+    box-shadow: 0 12px 28px rgba(79, 70, 229, 0.2);
+}
+.featureIcon {
+width: 56px;
+height: 30px;
+display: flex;
+margin: 0 auto;
+justify-content: center;
+align-items: center;
+font-size: 26px;
+}
+.featureName {
+font-size: 20px;
+margin: 0 0 15px;
+}
+.featureDesc {
+font-size: 14px;
+margin: 0;
+}
+.ctal {
+font-size: 30px;
+text-align: center;
+margin-bottom: 40px;
+}

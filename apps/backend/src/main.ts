@@ -1,6 +1,7 @@
-import { ValidationPipe } from '@nestjs/common';
+import { RequestMethod, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/http-exception.filter';
 
@@ -8,8 +9,9 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
 
-  app.setGlobalPrefix('api');
-  app.enableCors({ origin: config.getOrThrow<string>('WEB_ORIGIN') });
+  app.setGlobalPrefix('api', { exclude: [{ path: 'internal/knowledge/retrieval', method: RequestMethod.POST }] });
+  app.enableCors({ origin: config.getOrThrow<string>('WEB_ORIGIN'), credentials: true });
+  app.use(cookieParser());
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
   app.useGlobalFilters(new HttpExceptionFilter());
 
@@ -17,4 +19,3 @@ async function bootstrap() {
 }
 
 void bootstrap();
-

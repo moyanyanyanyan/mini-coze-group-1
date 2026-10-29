@@ -1,0 +1,136 @@
+.page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--surface);
+}
+
+.card {
+  width: 100%;
+  max-width: 380px;
+  padding: 32px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+}
+
+
+.brandMark {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: 7px;
+  color: #fff;
+  background: var(--violet-600);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.description {
+  margin: 6px 0 24px;
+  color: var(--ink-500);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.form {
+  display: grid;
+  gap: 14px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.label {
+  color: var(--ink-700);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.input {
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  color: var(--ink-900);
+  font-size: 14px;
+  background: #fff;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--violet-400);
+  box-shadow: 0 0 0 3px rgba(111, 86, 217, 0.14);
+}
+
+.fieldError {
+  color: #b4372a;
+  font-size: 12px;
+}
+
+.alert {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #f0c9c4;
+  border-radius: 9px;
+  color: #b4372a;
+  background: #fdf3f2;
+  font-size: 13px;
+}
+
+.submit {
+  height: 44px;
+  margin-top: 4px;
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--violet-600);
+  font-size: 14px;
+  font-weight: 620;
+  cursor: pointer;
+  transition: background-color 180ms ease;
+}
+
+.submit:hover:not(:disabled) {
+  background: var(--violet-700);
+}
+
+.submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.footer {
+  margin: 20px 0 0;
+  color: var(--ink-500);
+  font-size: 13px;
+  text-align: center;
+}
+
+.footerLink {
+  color: var(--violet-700);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.footerLink:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 480px) {
+  .card {
+    padding: 24px 20px;
+  }
+}

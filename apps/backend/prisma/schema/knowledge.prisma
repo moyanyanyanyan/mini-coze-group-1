@@ -1,0 +1,87 @@
+enum KnowledgeBaseStatus {
+  ACTIVE
+  DISABLED
+}
+
+model KnowledgeBase {
+  id          String              @id @default(uuid())
+  workspaceId String
+  name        String
+  description String              @default("")
+  status      KnowledgeBaseStatus @default(ACTIVE)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  documents   KnowledgeDocument[]
+  chunks      KnowledgeChunk[]
+
+  @@index([workspaceId, createdAt])
+}
+
+enum KnowledgeDocumentSourceType {
+  TEXT
+  TXT
+  JSON
+}
+
+enum KnowledgeDocumentStatus {
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum KnowledgeDocumentStage {
+  VALIDATING
+  EXTRACTING
+  CHUNKING
+  EMBEDDING
+  PERSISTING
+  COMPLETED
+  FAILED
+}
+
+model KnowledgeDocument {
+  id               String                      @id @default(uuid())
+  knowledgeBaseId  String
+  knowledgeBase    KnowledgeBase               @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  title            String
+  sourceType       KnowledgeDocumentSourceType
+  originalFileName String?
+  sourceBytes      Bytes?
+  rawText          String?
+  status           KnowledgeDocumentStatus     @default(PROCESSING)
+  stage            KnowledgeDocumentStage      @default(VALIDATING)
+  errorCode        String?
+  errorMessage     String?
+  chunkCount       Int                         @default(0)
+  chunks           KnowledgeChunk[]
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+
+  @@index([knowledgeBaseId, createdAt])
+}
+
+model KnowledgeChunk {
+  id              String                @id @default(uuid())
+  documentId      String
+  document        KnowledgeDocument     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  knowledgeBaseId String
+  knowledgeBase   KnowledgeBase         @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  position        Int
+  content         String
+  startOffset     Int
+  endOffset       Int
+  enabled         Boolean               @default(true)
+  vector          KnowledgeChunkVector?
+
+  @@unique([documentId, position])
+  @@index([knowledgeBaseId, enabled])
+}
+
+model KnowledgeChunkVector {
+  chunkId   String             @id
+  chunk     KnowledgeChunk     @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+  model     String
+  dimension Int
+  embedding Unsupported("vector(512)")
+  updatedAt DateTime           @updatedAt
+}
