@@ -133,6 +133,18 @@ class ToolRequest(DTO):
     arguments: dict[str, JsonValue]
 
 
+class ModelToolCall(DTO):
+    id: Identifier
+    name: Identifier
+    arguments: str = Field(max_length=16000)
+
+
+class ToolCallBatch(DTO):
+    content: str
+    calls: list[ModelToolCall] = Field(min_length=1, max_length=8)
+    usage: Usage | None = None
+
+
 class ToolSuccess(DTO):
     toolCallId: Identifier
     toolName: Identifier
