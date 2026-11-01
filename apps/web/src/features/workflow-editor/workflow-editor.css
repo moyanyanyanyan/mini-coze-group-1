@@ -851,3 +851,119 @@
   margin-top: 4px;
   font-family: monospace;
 }
+
+/* ---------- 上游变量下拉 ---------- */
+.wf-var-select {
+  position: relative;
+  width: 100%;
+}
+.wf-var-select-input {
+  position: relative;
+  display: flex;
+}
+.wf-var-select-input .wf-input {
+  padding-right: 30px;
+}
+.wf-var-select-toggle {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: #86909c;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.wf-var-select-toggle:hover {
+  background: #f2f3f5;
+  color: #4d53e8;
+}
+
+.wf-var-select-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #d9dce3;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  z-index: 100;
+  padding: 4px;
+}
+.wf-var-select-empty {
+  padding: 12px;
+  text-align: center;
+  font-size: 12px;
+  color: #86909c;
+}
+.wf-var-select-group-title {
+  padding: 6px 8px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #86909c;
+}
+.wf-var-select-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+.wf-var-select-item:hover,
+.wf-var-select-item.is-active {
+  background: #eef0fe;
+}
+.wf-var-select-name {
+  font-size: 12px;
+  color: #1d2129;
+  font-family: monospace;
+}
+.wf-var-select-type {
+  font-size: 11px;
+  color: #86909c;
+}
+
+/* ---------- LLM 可用输入变量 chip ---------- */
+.wf-var-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.wf-var-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  background: #eef0fe;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.12s, background 0.12s;
+}
+.wf-var-chip:hover {
+  border-color: #4d53e8;
+  background: #e3e6fd;
+}
+.wf-var-chip-name {
+  font-size: 12px;
+  color: #4d53e8;
+  font-family: monospace;
+  font-weight: 500;
+}
+.wf-var-chip-node {
+  font-size: 11px;
+  color: #86909c;
+}

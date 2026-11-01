@@ -1,24 +1,34 @@
 // src/features/workflow-editor/components/PropertyPanel.tsx
 import React from 'react';
-import type { Node } from '@xyflow/react';
-import type { NodeData } from '../types/workflow';
+import type { Node, Edge } from '@xyflow/react';
+import type { NodeData, EndNodeData } from '../types/workflow';
 import { StartPanel } from './panels/StartPanel';
 import { LlmPanel } from './panels/LlmPanel';
 import { EndPanel } from './panels/EndPanel';
 
 interface Props {
   node: Node | null;
+  nodes: Node[];
+  edges: Edge[];
   onChange: (nodeId: string, data: NodeData) => void;
   onDelete: (nodeId: string) => void;
 }
 
-export function PropertyPanel({ node, onChange, onDelete }: Props) {
+export function PropertyPanel({
+  node,
+  nodes,
+  edges,
+  onChange,
+  onDelete,
+}: Props) {
   if (!node) {
     return (
       <aside className="wf-prop-panel">
         <div className="wf-prop-empty">
           <p>点击画布中的节点</p>
-          <p style={{ fontSize: 12, color: '#86909c' }}>在此查看和编辑配置</p>
+          <p style={{ fontSize: 12, color: '#86909c' }}>
+            在此查看和编辑配置
+          </p>
         </div>
       </aside>
     );
@@ -51,14 +61,20 @@ export function PropertyPanel({ node, onChange, onDelete }: Props) {
           />
         )}
         {node.type === 'llm' && (
-          <LlmPanel
-            data={data as Parameters<typeof LlmPanel>[0]['data']}
-            onChange={handleChange}
-          />
-        )}
+  <LlmPanel
+    data={data as Parameters<typeof LlmPanel>[0]['data']}
+    nodeId={node.id}
+    nodes={nodes}
+    edges={edges}
+    onChange={handleChange}
+  />
+)}
         {node.type === 'end' && (
           <EndPanel
-            data={data as Parameters<typeof EndPanel>[0]['data']}
+            data={data as EndNodeData}
+            nodeId={node.id}
+            nodes={nodes}
+            edges={edges}
             onChange={handleChange}
           />
         )}
