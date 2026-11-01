@@ -1,18 +1,28 @@
 // src/features/workflow-editor/components/panels/EndPanel.tsx
 import React from 'react';
+import type { Node } from '@xyflow/react';
+import type { Edge } from '@xyflow/react';
 import type { EndNodeData, EndOutput } from '../../types/workflow';
+import { VariableSelect } from '../VariableSelect';
+import { getUpstreamFields } from '../../utils/upstream';
 
 interface Props {
   data: EndNodeData;
+  nodeId: string;
+  nodes: Node[];
+  edges: Edge[];
   onChange: (data: EndNodeData) => void;
 }
 
-export function EndPanel({ data, onChange }: Props) {
+export function EndPanel({ data, nodeId, nodes, edges, onChange }: Props) {
   const outputs = data.outputs || [];
-
+  const upstream = getUpstreamFields(nodes, edges, nodeId);
+  
   const updateOutput = (idx: number, patch: Partial<EndOutput>) => {
-    const next = outputs.map((it, i) => (i === idx ? { ...it, ...patch } : it));
-    onChange({ ...data, outputs: next });
+    onChange({
+      ...data,
+      outputs: outputs.map((it, i) => (i === idx ? { ...it, ...patch } : it)),
+    });
   };
 
   const addOutput = () => {
@@ -31,14 +41,7 @@ export function EndPanel({ data, onChange }: Props) {
 
   return (
     <div className="wf-form">
-      <label className="wf-form-field">
-        <span>节点名称</span>
-        <input
-          className="wf-input"
-          value={data.label || ''}
-          onChange={(e) => onChange({ ...data, label: e.target.value })}
-        />
-      </label>
+      {/* 节点名称不变 */}
 
       <div className="wf-form-field">
         <div className="wf-form-label-row">
@@ -47,9 +50,6 @@ export function EndPanel({ data, onChange }: Props) {
             + 添加
           </button>
         </div>
-        {outputs.length === 0 && (
-          <div className="wf-form-empty">至少需要 1 个输出参数</div>
-        )}
         {outputs.map((it, idx) => (
           <div className="wf-output-row" key={idx}>
             <input
@@ -58,11 +58,11 @@ export function EndPanel({ data, onChange }: Props) {
               onChange={(e) => updateOutput(idx, { name: e.target.value })}
               placeholder="输出名"
             />
-            <input
-              className="wf-input"
+            <VariableSelect
               value={it.valueFrom}
-              onChange={(e) => updateOutput(idx, { valueFrom: e.target.value })}
-              placeholder="node-llm-1.text"
+              options={upstream}
+              placeholder="选择上游字段"
+              onChange={(v) => updateOutput(idx, { valueFrom: v })}
             />
             <button
               className="wf-icon-btn wf-btn-danger"
@@ -75,7 +75,7 @@ export function EndPanel({ data, onChange }: Props) {
           </div>
         ))}
         <small className="wf-form-help">
-          valueFrom 格式：{'节点ID.字段名'}，不带花括号
+          值来源格式：节点ID.字段名，不带花括号
         </small>
       </div>
     </div>

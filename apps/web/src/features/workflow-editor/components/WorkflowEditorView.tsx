@@ -282,7 +282,7 @@ function WorkflowEditorInner({ workflowId }: Props) {
       alert('请先添加 Start 节点');
       return;
     }
-  
+
     // 1. 先保存
     if (dirty) {
       setSaving(true);
@@ -298,7 +298,7 @@ function WorkflowEditorInner({ workflowId }: Props) {
         setSaving(false);
       }
     }
-  
+
     // 2. 再校验
     const feErrors = frontendValidate(nodes, edges);
     if (feErrors.length > 0) {
@@ -322,7 +322,7 @@ function WorkflowEditorInner({ workflowId }: Props) {
       setValidationOpen(true);
       return;
     }
-  
+
     // 3. 通过才弹表单
     setShowRunDialog(true);
   };
@@ -465,6 +465,8 @@ function WorkflowEditorInner({ workflowId }: Props) {
 
         <PropertyPanel
           node={selectedNode}
+          nodes={nodes}
+          edges={edges}
           onChange={handleNodeChange}
           onDelete={handleNodeDelete}
         />

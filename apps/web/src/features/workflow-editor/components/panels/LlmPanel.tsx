@@ -1,15 +1,32 @@
 // src/features/workflow-editor/components/panels/LlmPanel.tsx
 import React from 'react';
+import type { Node, Edge } from '@xyflow/react';
 import type { LlmNodeData } from '../../types/workflow';
+import { PromptTextarea } from '../PromptTextarea';
+import { getUpstreamFields } from '../../utils/upstream';
 
 interface Props {
   data: LlmNodeData;
+  nodeId: string;
+  nodes: Node[];
+  edges: Edge[];
   onChange: (data: LlmNodeData) => void;
 }
 
-export function LlmPanel({ data, onChange }: Props) {
+export function LlmPanel({ data, nodeId, nodes, edges, onChange }: Props) {
   const update = (patch: Partial<LlmNodeData>) =>
     onChange({ ...data, ...patch });
+
+  const upstream = getUpstreamFields(nodes, edges, nodeId);
+
+  const insertToPrompt = (ref: string) => {
+    const cur = data.userPromptTemplate || '';
+    const needSpace = cur && !cur.endsWith(' ') && !cur.endsWith('\n');
+    const insert = `{{${ref}}}`;
+    update({
+      userPromptTemplate: cur + (needSpace ? ' ' : '') + insert,
+    });
+  };
 
   return (
     <div className="wf-form">
@@ -28,7 +45,7 @@ export function LlmPanel({ data, onChange }: Props) {
           className="wf-input"
           value={data.model || ''}
           onChange={(e) => update({ model: e.target.value })}
-          placeholder="deepseek-chat"
+          placeholder="deepseek-flash"
         />
       </label>
 
@@ -69,19 +86,44 @@ export function LlmPanel({ data, onChange }: Props) {
         />
       </label>
 
-      <label className="wf-form-field">
-        <span>User Prompt 模板 <em>*</em></span>
-        <textarea
-          className="wf-textarea"
-          rows={4}
-          value={data.userPromptTemplate || ''}
-          onChange={(e) => update({ userPromptTemplate: e.target.value })}
-          placeholder="{{node-start-1.query}}"
-        />
+      {/* 输入变量：只读展示上游变量，可点击插入到 Prompt */}
+      <div className="wf-form-field">
+        <span>可用输入变量</span>
+        {upstream.length === 0 ? (
+          <div className="wf-form-empty">
+            暂无上游变量（连接 Start 节点后自动出现）
+          </div>
+        ) : (
+          <div className="wf-var-chip-list">
+            {upstream.map((f) => (
+              <button
+                key={f.ref}
+                type="button"
+                className="wf-var-chip"
+                title={`引用：{{${f.ref}}}`}
+                onClick={() => insertToPrompt(f.ref)}
+              >
+                <span className="wf-var-chip-name">{f.field}</span>
+                <span className="wf-var-chip-node">{f.nodeLabel}</span>
+              </button>
+            ))}
+          </div>
+        )}
         <small className="wf-form-help">
-          用 {'{{节点ID.字段名}}'} 引用上游变量，如 {'{{node-start-1.query}}'}
+          点击变量插入到 Prompt 末尾；也可在 Prompt 中输入 {'{'} 触发选择
         </small>
-      </label>
+      </div>
+
+      <div className="wf-form-field">
+        <span>User Prompt 模板 <em>*</em></span>
+        <PromptTextarea
+          value={data.userPromptTemplate || ''}
+          options={upstream}
+          rows={5}
+          placeholder="输入 { 可插入上游变量，如 {{node-start-1.query}}"
+          onChange={(v) => update({ userPromptTemplate: v })}
+        />
+      </div>
     </div>
   );
 }
