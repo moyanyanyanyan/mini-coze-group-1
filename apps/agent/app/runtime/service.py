@@ -8,6 +8,7 @@ import httpx
 
 from app.config import Settings
 from app.runtime.deepseek import check_budget, stream_model, validate_model
+from app.runtime.tool_loop import check_tool_budget, stream_tool_loop
 from app.runtime.errors import ModelError
 from app.runtime.providers import KnowledgeContextProvider, PluginToolProvider, UnconfiguredKnowledgeProvider, UnconfiguredPluginProvider
 from app.runtime.schemas import ChatMessage, KnowledgeRequest, KnowledgeResult, ModelInput, RuntimeRequest, RuntimeResult
@@ -71,12 +72,15 @@ class RuntimeService:
                     ))
                     if any(chunk.citation.knowledgeBaseId not in config.knowledgeBaseIds for chunk in knowledge.chunks):
                         raise ModelError("KNOWLEDGE_UNAVAILABLE", "检索返回了未绑定的知识库", 502)
+                tools = []
                 if config.pluginIds:
-                    await self.plugins.list_tools(request.actor.id, config.id, config.pluginIds)
-                    # Week 2 验证接口定义可替换；不静默丢弃绑定后继续生成假定结果。
-                    raise ModelError("TOOL_NOT_SUPPORTED", "本周只提供插件接口桩，自动调用尚未接入", 503)
+                    tools = await self.plugins.list_tools(request.actor.id, config.id, config.pluginIds)
+                    if not tools or len(tools) > 128 or any(t.pluginId not in config.pluginIds for t in tools) or len({t.name for t in tools}) != len(tools):
+                        raise ModelError("TOOL_PROTOCOL_ERROR", "插件定义为空、重复或不属于本轮绑定", 502)
                 value = ModelInput(model=config.model, messages=self.context(request, knowledge),
                                    temperature=config.temperature, max_tokens=config.maxTokens)
+                if tools:
+                    check_tool_budget(value, tools, [m.model_dump() for m in value.messages], self.settings)
                 if config.knowledgeBaseIds:
                     # 上下文校验成功后再公告来源，避免失败请求提前暴露未使用的引用。
                     yield event("knowledge.result", {
@@ -84,10 +88,14 @@ class RuntimeService:
                         "citations": [chunk.citation.model_dump(exclude_none=True) for chunk in knowledge.chunks],
                     })
                 result = None
-                async with aclosing(stream_model(value, settings=self.settings, client=self.client)) as model_stream:
+                source = (stream_tool_loop(value, tools, request, self.settings, self.plugins, self.client)
+                          if tools else stream_model(value, settings=self.settings, client=self.client))
+                async with aclosing(source) as model_stream:
                     async for item in model_stream:
                         if isinstance(item, str):
                             yield event("message.delta", {"content": item})
+                        elif isinstance(item, tuple):
+                            yield event(item[0], item[1])
                         else:
                             result = RuntimeResult(**item.model_dump(), runId=request.runId,
                                                    conversationId=request.conversationId,
