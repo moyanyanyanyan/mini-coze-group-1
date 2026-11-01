@@ -8,7 +8,7 @@ from pydantic import ValidationError
 
 from app.config import Settings, get_settings
 from app.runtime.errors import ModelError
-from app.runtime.schemas import ChatMessage, ModelInput, ModelResult, Usage
+from app.runtime.schemas import ChatMessage, ModelInput, ModelResult, Usage, ModelToolCall, ToolCallBatch, ToolDefinition
 
 
 def validate_model(value: ModelInput, settings: Settings) -> None:
@@ -78,20 +78,30 @@ def payload(value: ModelInput, stream: bool, settings: Settings) -> dict:
     return body
 
 
-async def stream_model(value: ModelInput, *, settings: Settings, client: httpx.AsyncClient | None = None) -> AsyncIterator[str | ModelResult]:
+async def stream_model(value: ModelInput, *, settings: Settings, client: httpx.AsyncClient | None = None,
+                       tools: list[ToolDefinition] | None = None, messages: list[dict] | None = None) -> AsyncIterator[str | ModelResult | ToolCallBatch]:
     validate_model(value, settings)
     check_budget(value.messages, value.max_tokens, settings)
     content: list[str] = []
     reason = None
     usage = None
     done = False
+    calls: dict[int, dict] = {}
+    body = payload(value, True, settings)
+    if tools:
+        body["tools"] = [{"type": "function", "function": {
+            "name": tool.name, "description": tool.description, "parameters": tool.parameters,
+        }} for tool in tools]
+        body["tool_choice"] = "auto"
+    if messages is not None:
+        body["messages"] = messages
     try:
         async with asyncio.timeout(settings.model_timeout):
             async with model_client(client, trust_env=settings.model_trust_env) as connection:
                 async with connection.stream(
                     "POST", settings.deepseek_base_url.rstrip("/") + "/chat/completions",
                     headers={"Authorization": "Bearer " + settings.deepseek_api_key.get_secret_value()},
-                    json=payload(value, True, settings), timeout=settings.model_timeout,
+                    json=body, timeout=settings.model_timeout,
                 ) as response:
                     check_status(response)
                     if "text/event-stream" not in response.headers.get("content-type", ""):
@@ -137,7 +147,27 @@ async def stream_model(value: ModelInput, *, settings: Settings, client: httpx.A
                                 raise ModelError("MODEL_PROTOCOL_ERROR", "模型结束后仍返回内容", 502)
                             continue
                         if delta.get("tool_calls"):
-                            raise ModelError("TOOL_NOT_SUPPORTED", "自动工具调用将在后续周接入", 502)
+                            if not tools:
+                                raise ModelError("TOOL_NOT_SUPPORTED", "未授权模型调用工具", 502)
+                            for part in delta["tool_calls"]:
+                                index = part["index"]
+                                if type(index) is not int or not 0 <= index < 8:
+                                    raise ValueError("invalid tool index")
+                                call = calls.setdefault(index, {"id": "", "name": "", "arguments": ""})
+                                if part.get("type") not in (None, "function"):
+                                    raise ValueError("invalid tool type")
+                                if part.get("id"):
+                                    if call["id"] and call["id"] != part["id"]:
+                                        raise ValueError("changed tool id")
+                                    call["id"] = part["id"]
+                                function = part.get("function") or {}
+                                for key in ("name", "arguments"):
+                                    fragment = function.get(key, "")
+                                    if not isinstance(fragment, str):
+                                        raise ValueError("invalid tool fragment")
+                                    call[key] += fragment
+                                if len(call["arguments"]) > 16000 or len(call["name"]) > 200:
+                                    raise ValueError("tool call too large")
                         text = delta.get("content")
                         if text is not None and not isinstance(text, str):
                             raise ValueError("invalid content")
@@ -146,15 +176,23 @@ async def stream_model(value: ModelInput, *, settings: Settings, client: httpx.A
                             yield text
                         if choice.get("finish_reason") is not None:
                             reason = choice["finish_reason"]
-                            check_finish(reason)
+                            if reason != "tool_calls" or not tools:
+                                check_finish(reason)
         if not done or reason is None:
             raise ModelError("MODEL_STREAM_INTERRUPTED", "模型连接中断，未收到完整结束标记", 502, True)
-        yield ModelResult(content="".join(content), finishReason=reason, usage=usage)
+        if reason == "tool_calls":
+            if sorted(calls) != list(range(len(calls))):
+                raise ValueError("non-contiguous tool indices")
+            yield ToolCallBatch(content="".join(content), calls=[ModelToolCall.model_validate(call) for _, call in sorted(calls.items())], usage=usage)
+        else:
+            if calls:
+                raise ValueError("tool calls without tool finish")
+            yield ModelResult(content="".join(content), finishReason=reason, usage=usage)
     except (TimeoutError, httpx.TimeoutException) as exc:
         raise ModelError("MODEL_TIMEOUT", "模型生成超时", 504, True) from exc
     except httpx.HTTPError as exc:
         raise ModelError("MODEL_UNAVAILABLE", "模型连接失败", 502, True) from exc
-    except (ValueError, KeyError, IndexError, TypeError, ValidationError) as exc:
+    except (ValueError, KeyError, IndexError, TypeError, AttributeError, ValidationError) as exc:
         raise ModelError("MODEL_PROTOCOL_ERROR", "模型返回格式不合法", 502) from exc
 
 
@@ -189,5 +227,5 @@ async def call_model(*, model: str, messages: list[dict[str, str]], temperature:
         raise ModelError("MODEL_TIMEOUT", "模型生成超时", 504, True) from exc
     except httpx.HTTPError as exc:
         raise ModelError("MODEL_UNAVAILABLE", "模型连接失败", 502, True) from exc
-    except (ValueError, KeyError, IndexError, TypeError, ValidationError) as exc:
+    except (ValueError, KeyError, IndexError, TypeError, AttributeError, ValidationError) as exc:
         raise ModelError("MODEL_PROTOCOL_ERROR", "模型返回格式不合法", 502) from exc
