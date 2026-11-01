@@ -99,12 +99,26 @@ export interface UpdateAgentInput {
   openingMessage?: string;
 }
 
+export interface KnowledgeBindingItemInput {
+  knowledgeBaseId: string;
+  enabled?: boolean;
+  config?: { topK?: number; minScore?: number } | null;
+}
+
+export interface PluginBindingItemInput {
+  pluginId: string;
+  enabled?: boolean;
+  autoInvoke?: boolean;
+  sortOrder?: number;
+  config?: Record<string, unknown> | null;
+}
+
 export interface ReplaceKnowledgeBindingsInput {
-  knowledgeBaseIds: string[];
+  bindings: KnowledgeBindingItemInput[];
 }
 
 export interface ReplacePluginBindingsInput {
-  pluginIds: string[];
+  bindings: PluginBindingItemInput[];
 }
 
 interface ApiEnvelope<T> {
@@ -121,7 +135,6 @@ async function getCurrentUserId(): Promise<string> {
     const user = await response.json() as { id: string };
     return user.id;
   }
-  if (import.meta.env.DEV && response.status === 401) return 'ws-local-demo';
   throw new Error('请先登录');
 }
 
@@ -200,7 +213,6 @@ export async function listKnowledgeBases(): Promise<KnowledgeBaseSummary[]> {
   return readResponse<KnowledgeBaseSummary[]>(response);
 }
 
-// TODO: 插件目录真实接口（需插件模块推送 findByIds 或 listCatalog 端点）
 export async function listPlugins(): Promise<PluginSummary[]> {
   const response = await fetch(`${API_BASE}/api/plugins`, { credentials: 'include' });
   return readResponse<PluginSummary[]>(response);

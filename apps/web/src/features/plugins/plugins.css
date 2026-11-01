@@ -1,0 +1,510 @@
+/* ============================================================
+   插件市场页 —— 浅色主题，与 workspace 导航栏（violet 系）一致。
+   卡片白底、主色 --violet-600、边框 --line，背景透出工作台网格。
+   ============================================================ */
+
+.plugins-page {
+  min-height: 100%;
+  color: var(--ink-900);
+  padding-bottom: 48px;
+}
+
+/* ---------- Header（顶部条，样式对齐 landing/workspace 头） ---------- */
+
+.pm-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  border-bottom: 1px solid var(--line);
+  background: rgb(253 252 255 / 0.92);
+  backdrop-filter: blur(8px);
+}
+
+.pm-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: 56px;
+  padding: 0 28px;
+}
+
+.pm-header-brand {
+  border-radius: 8px;
+  padding: 6px 12px;
+  color: var(--violet-600);
+  background: var(--violet-50);
+  font-size: 14px;
+  font-weight: 620;
+}
+
+.pm-header-actions {
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+
+/* ---------- 主体 ---------- */
+
+.pm-main {
+  padding: 0 28px;
+}
+
+.pm-status {
+  margin: 24px 0 0;
+  color: var(--ink-500);
+  font-size: 13px;
+}
+
+.pm-status-error {
+  color: #b3261e;
+}
+
+.pm-section {
+  margin-top: 28px;
+}
+
+.pm-section h2 {
+  margin: 0 0 10px;
+  color: var(--ink-900);
+  font-size: 17px;
+  font-weight: 620;
+}
+
+.pm-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+/* ---------- 插件卡片 ---------- */
+
+.pm-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  padding: 16px;
+  box-shadow: 0 1px 2px rgb(37 34 50 / 0.04);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.pm-card:hover {
+  border-color: var(--violet-300);
+  box-shadow: 0 4px 16px rgb(111 86 217 / 0.08);
+}
+
+.pm-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.pm-card-icon {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--violet-600);
+  background: var(--violet-50);
+}
+
+.pm-card-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.pm-card-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.pm-card-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.pm-card-name {
+  margin: 0;
+  overflow: hidden;
+  color: var(--ink-900);
+  font-size: 15px;
+  font-weight: 620;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pm-tag-warning {
+  border-radius: 3px;
+  padding: 0 6px;
+  color: #a05a00;
+  background: #fef3c7;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.pm-tag-info {
+  border: 1px solid rgb(29 78 216 / 0.35);
+  border-radius: 3px;
+  padding: 0 6px;
+  color: #1d4ed8;
+  background: rgb(219 234 254 / 0.6);
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.pm-card-desc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  margin: 6px 0 0;
+  color: var(--ink-500);
+  font-size: 13px;
+  line-height: 1.625;
+}
+
+.pm-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 14px;
+  border-top: 1px solid var(--line-soft);
+  padding-top: 12px;
+}
+
+.pm-cap-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pm-cap {
+  border-radius: 4px;
+  padding: 2px 8px;
+  color: var(--ink-600);
+  background: var(--violet-50);
+  font-size: 12px;
+}
+
+.pm-cap b {
+  color: var(--ink-800);
+  font-weight: 620;
+}
+
+.pm-installed {
+  flex: none;
+  cursor: default;
+  border: 1px solid var(--violet-500);
+  border-radius: 6px;
+  padding: 0 12px;
+  color: var(--violet-600);
+  font-size: 12px;
+  font-weight: 540;
+  line-height: 28px;
+}
+
+/* ---------- 卡片内工具列表（直接测试入口） ---------- */
+
+.pm-card-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  border-top: 1px solid var(--line-soft);
+  padding-top: 10px;
+}
+
+.pm-tool-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.pm-tool-name {
+  color: var(--violet-700);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.pm-tool-desc {
+  overflow: hidden;
+  color: var(--ink-500);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- 按钮 ---------- */
+
+.pm-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.pm-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pm-button-primary {
+  color: #fff;
+  background: var(--violet-600);
+}
+
+.pm-button-primary:hover {
+  background: var(--violet-700);
+}
+
+.pm-button-ghost {
+  color: var(--ink-700);
+  border-color: var(--line-strong);
+  background: transparent;
+}
+
+.pm-button-ghost:hover {
+  color: var(--violet-700);
+  border-color: var(--violet-300);
+  background: var(--violet-50);
+}
+
+.pm-button-small {
+  flex: none;
+  height: 26px;
+  padding: 0 11px;
+  font-size: 13px;
+}
+
+.pm-button-tiny {
+  height: 24px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.pm-button-header {
+  height: 34px;
+  padding: 0 15px;
+  font-size: 14px;
+}
+
+/* ---------- Toast ---------- */
+
+.pm-toast {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 100;
+  max-width: 320px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 14px;
+  color: var(--ink-800);
+  background: #fff;
+  box-shadow: 0 8px 24px rgb(37 34 50 / 0.12);
+  font-size: 13px;
+}
+
+/* ---------- Modal ---------- */
+
+.pm-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(37 34 50 / 0.35);
+}
+
+.pm-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(520px, 100%);
+  max-height: 86vh;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+  background: #fff;
+  box-shadow: 0 16px 48px rgb(37 34 50 / 0.16);
+}
+
+.pm-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pm-modal-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--ink-900);
+  font-size: 15px;
+  font-weight: 620;
+}
+
+.pm-modal-header code {
+  color: var(--violet-700);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+}
+
+.pm-icon-button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--ink-500);
+  background: transparent;
+}
+
+.pm-icon-button:hover {
+  color: var(--ink-800);
+  background: var(--violet-50);
+}
+
+.pm-modal-desc {
+  margin: 0;
+  color: var(--ink-500);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.pm-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* ---------- 工具测试表单 ---------- */
+
+.pm-tool-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pm-tool-hint {
+  margin: 0;
+  color: var(--ink-500);
+  font-size: 13px;
+}
+
+.pm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.pm-field-label {
+  color: var(--ink-800);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.pm-req {
+  margin-left: 2px;
+  color: #b3261e;
+  font-style: normal;
+}
+
+.pm-field-type {
+  margin-left: 6px;
+  color: var(--ink-400);
+  font-family: inherit;
+  font-size: 10px;
+}
+
+.pm-field-desc {
+  color: var(--ink-500);
+  font-size: 11px;
+}
+
+.pm-field input {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 8px;
+  color: var(--ink-800);
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+}
+
+.pm-field input:focus {
+  outline: none;
+  border-color: var(--violet-400);
+  box-shadow: 0 0 0 3px rgb(111 86 217 / 0.14);
+}
+
+.pm-result {
+  overflow-x: auto;
+  max-height: 40vh;
+  margin: 0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--ink-700);
+  background: var(--violet-50);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.55;
+  white-space: pre;
+}
+
+.pm-result.is-succeeded {
+  color: #1a7f37;
+}
+
+.pm-result.is-failed,
+.pm-result.is-error {
+  color: #b3261e;
+}
+
+/* ---------- 响应式 ---------- */
+
+@media (max-width: 900px) {
+  .pm-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .pm-header-inner,
+  .pm-main {
+    padding-right: 20px;
+    padding-left: 20px;
+  }
+
+  .pm-button-header {
+    padding: 0 11px;
+    font-size: 13px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pm-card,
+  .pm-button {
+    transition: none;
+  }
+}
