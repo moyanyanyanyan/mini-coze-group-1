@@ -1,10 +1,10 @@
 # Week3 Agent Runtime：受控工具循环与实际联调
 
-日期：2026-11-01。负责人：王一恒。
+首次记录：2026-11-01；更新：2026-11-02。负责人：王一恒。
 
 ## 分支与范围
 
-联调分支为 `codex/integration/week3-runtime-tools`，从 `integration/week3-rag-auth-plugin-agent@c96866a` 建立，包含 Agent、聊天、RAG 和插件代码。另行带入引用事件修复 `056462a`（本分支对应提交 `ce63c3b`）。没有直接合并 main 的插件撤销提交，也没有改写原有 Week2/Week3 分支。
+联调分支为 `codex/integration/week3-runtime-tools`，从 `integration/week3-rag-auth-plugin-agent@c96866a` 建立，包含 Agent、聊天、RAG 和插件代码。另行带入引用事件修复 `056462a`（本分支对应提交 `ce63c3b`）。11月1日没有直接合并main的插件撤销提交；11月2日核对main@5d0dae9已包含工具循环、与本分支仅差一处前端类型修复后，正常合并该主分支。没有改写原有Week2/Week3分支。
 
 Week2 聊天异常验收仍按 `main@df80ac9` 单独进行。新分支用于工具循环联调，不代表聊天、数据库和工作流全部场景已验收。
 
@@ -69,6 +69,14 @@ Runtime 保持现有 run/stream 请求结构及九字段 AgentConfig。没有插
 真实验收会调用模型和两个内置工具，仅在专用测试环境显式执行。HTTP模式使用真实 FastAPI 应用路由与 ASGI传输，不代表反向代理/TCP连接和浏览器端到端通过。
 
 ## 待协作与未验收
+
+### 11月2日回复确认与本地回归
+
+管逸恬提交 `integration/week2-rag-auth-agent@d76051c` 的隔离环境验收记录：`tools/week2-exception/acceptance-2026-11-02.md`。Embedding故障注入导致检索503，Runtime产生KNOWLEDGE_UNAVAILABLE；运行中移除绑定后检索403，Runtime产生KNOWLEDGE_FORBIDDEN。两种路径均为run.started→run.failed，没有knowledge.result、run.completed或模型调用；公开聊天对外将内部代码映射为MODEL_ERROR，助手消息保存failed。内部代码及顺序符合Runtime契约；公开错误码投影由聊天模块确认。此处引用她的本机验收，未声称我方重跑真实数据库或浏览器。
+
+新增本地HTTP/SSE回归 `test_knowledge_runtime_http.py`：用HTTP检索替身分别返回503和403，验证真实FastAPI应用run的状态码及X-Runtime-Error-Code、stream的事件顺序和seq，并断言没有模型请求。完整Python测试现为76项通过。这两项是本机自动回归，不代替上面的真实服务验收。
+
+陈弘毅确认buildAgentConfig仅投影enabled=true的绑定；草稿revision=0。已核对现有代码：getAgentConfig默认revision=0，发布快照通过buildAgentConfig(detail,nextVersion)生成版本。Runtime把revision视为请求快照元数据，不自行改写，也不能把草稿revision=0解读成实时权限凭据。取消/断流、停用后的浏览器链路和运行中插件实时失效仍待各模块联合验收。
 
 - 陈弘毅：AgentConfig revision快照、绑定禁用/停用及真实测试Agent；已通过飞书询问，按实际回复冻结最终契约。
 - 朱晋亨：工具错误码、超时/取消/副作用约定、正式migration、部署时数据库降级策略；外部会话CLI此前发送受限，不能声称已收到对方确认。
