@@ -190,7 +190,7 @@ export async function replaceKnowledgeBindings(agentId: string, input: ReplaceKn
     method: 'PUT',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ bindings: input.knowledgeBaseIds.map((knowledgeBaseId) => ({ knowledgeBaseId, enabled: true })) }),
+    body: JSON.stringify(input),
   });
   return readResponse<AgentKnowledgeBinding[]>(response);
 }
