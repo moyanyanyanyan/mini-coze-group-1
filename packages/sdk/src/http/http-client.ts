@@ -44,6 +44,14 @@ function optionalString(value: unknown) {
   return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 
+function optionalErrorCode(value: unknown) {
+  const stringCode = optionalString(value);
+  if (stringCode) return stringCode;
+  return typeof value === 'number' && Number.isFinite(value)
+    ? String(value)
+    : undefined;
+}
+
 function extractErrorDetails(payload: unknown): ErrorPayloadDetails {
   // The server error schema is not final; expose common fields only when present.
   if (!isRecord(payload)) {
@@ -53,9 +61,9 @@ function extractErrorDetails(payload: unknown): ErrorPayloadDetails {
   const nestedError = isRecord(payload.error) ? payload.error : undefined;
 
   return {
-    code: optionalString(nestedError?.code)
-      ?? optionalString(payload.code)
-      ?? optionalString(payload.errorCode),
+    code: optionalErrorCode(nestedError?.code)
+      ?? optionalErrorCode(payload.code)
+      ?? optionalErrorCode(payload.errorCode),
     message: optionalString(nestedError?.message)
       ?? optionalString(payload.message),
   };

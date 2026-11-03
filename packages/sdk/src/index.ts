@@ -18,4 +18,10 @@ export type {
   ParseSSEStreamOptions,
   SSEEvent,
 } from './stream/sse-parser.js';
-export type { MiniCozeClientOptions } from './types.js';
+export type {
+  MiniCozeClientOptions,
+  RunOptions,
+  RunParams,
+  RunResult,
+  RunUsage,
+} from './types.js';
