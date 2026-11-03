@@ -22,6 +22,52 @@ export function buildAgentConfig(agent: AgentDetail, revision = 0): RuntimeAgent
   };
 }
 
+export function parseRuntimeAgentConfigSnapshot(
+  snapshot: Prisma.JsonValue,
+  expectedAgentId: string,
+  expectedRevision: number,
+): RuntimeAgentConfig | null {
+  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
+    return null;
+  }
+
+  const value = snapshot as Record<string, unknown>;
+  const isStringArray = (input: unknown): input is string[] => (
+    Array.isArray(input) && input.every((item) => typeof item === 'string')
+  );
+
+  if (
+    value.id !== expectedAgentId
+    || value.revision !== expectedRevision
+    || typeof value.name !== 'string'
+    || !value.name
+    || typeof value.systemPrompt !== 'string'
+    || typeof value.model !== 'string'
+    || !value.model
+    || typeof value.temperature !== 'number'
+    || !Number.isFinite(value.temperature)
+    || typeof value.maxTokens !== 'number'
+    || !Number.isInteger(value.maxTokens)
+    || value.maxTokens <= 0
+    || !isStringArray(value.knowledgeBaseIds)
+    || !isStringArray(value.pluginIds)
+  ) {
+    return null;
+  }
+
+  return {
+    id: value.id,
+    revision: value.revision,
+    name: value.name,
+    systemPrompt: value.systemPrompt,
+    model: value.model,
+    temperature: value.temperature,
+    maxTokens: value.maxTokens,
+    knowledgeBaseIds: value.knowledgeBaseIds,
+    pluginIds: value.pluginIds,
+  };
+}
+
 export function toAgentDetail(
   agent: Prisma.AgentGetPayload<{
     include: {
