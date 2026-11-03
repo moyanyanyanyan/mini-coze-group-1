@@ -61,5 +61,15 @@ export const landingModules = workspaceFeatures.filter(
 );
 
 export function getWorkspaceFeature(pathname: string) {
-  return workspaceFeatures.find((feature) => feature.route === pathname);
+  const exact = workspaceFeatures.find((feature) => feature.route === pathname);
+  if (exact) {
+    return exact;
+  }
+
+  return [...workspaceFeatures]
+    .filter((feature) => (
+      feature.route !== workspaceManifest.route
+      && pathname.startsWith(`${feature.route}/`)
+    ))
+    .sort((left, right) => right.route.length - left.route.length)[0];
 }

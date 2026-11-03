@@ -27,4 +27,8 @@ describe('feature registry', () => {
   it('returns undefined for an unknown workspace route', () => {
     expect(getWorkspaceFeature('/workspace/not-found')).toBeUndefined();
   });
+
+  it('resolves nested publish routes to the publish module', () => {
+    expect(getWorkspaceFeature('/workspace/publish/docs')?.id).toBe('publish-sdk');
+  });
 });
