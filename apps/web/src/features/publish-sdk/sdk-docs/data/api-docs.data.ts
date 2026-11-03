@@ -1,4 +1,4 @@
-/** Static content used by the SDK documentation prototype. */
+/** Static content used by the SDK documentation page. */
 export interface DocSection {
   id: string;
   label: string;
@@ -51,31 +51,27 @@ export const API_DOC_SECTIONS: readonly DocSection[] = [
 ];
 
 const curlRunCode = [
-  'curl -X POST "${BASE_URL}/${RUN_PATH}" \\',
+  'curl -X POST "${BASE_URL}/api/v1/run" \\',
   '  -H "Authorization: Bearer ${API_KEY}" \\',
   '  -H "Content-Type: application/json" \\',
-  '  -H "X-Trace-Id: ${TRACE_ID}" \\',
   `  -d '{`,
-  '    "agentId": "YOUR_AGENT_ID",',
-  '    "input": {',
-  '      "query": "Hello"',
-  '    }',
+  '    "message": "你好"',
   `  }'`,
 ].join('\n');
 
-const typescriptRunCode = `// Mock 示例：导入路径、字段和参数待正式契约确认
-import { MiniCozeClient } from '@minicoze/sdk';
+const typescriptRunCode = `import { MiniCozeClient } from '@minicoze/sdk';
 
 const client = new MiniCozeClient({
+  baseURL: 'http://127.0.0.1:3100',
   apiKey: process.env.MINICOZE_API_KEY ?? '',
 });
 
 const result = await client.run({
-  agentId: 'YOUR_AGENT_ID',
-  input: { query: 'Hello' },
+  message: '你好',
 });
 
-console.log(result);`;
+console.log(result.content);
+console.log(result.conversationId);`;
 
 export const QUICK_START_SAMPLES: readonly CodeSample[] = [
   {
@@ -104,14 +100,22 @@ export const RUN_RESPONSE_SAMPLE: CodeSample = {
   label: 'Run 成功响应示例',
   language: 'json',
   code: `{
-  "runId": "run_mock_example",
-  "status": "succeeded",
-  "output": {
-    "text": "Hello from MiniCoze"
-  },
-  "usage": {
-    "inputTokens": 12,
-    "outputTokens": 18
+  "code": 200,
+  "message": "ok",
+  "data": {
+    "runId": "run_example",
+    "conversationId": "conversation_example",
+    "assistantMessageId": "assistant_message_example",
+    "status": "completed",
+    "content": "你好！有什么可以帮你？",
+    "finishReason": "stop",
+    "usage": {
+      "promptTokens": 12,
+      "completionTokens": 18,
+      "totalTokens": 30
+    },
+    "citations": [],
+    "toolResults": []
   }
 }`,
 };
@@ -121,69 +125,44 @@ export const RUN_ERROR_SAMPLE: CodeSample = {
   label: 'Run 错误响应示例',
   language: 'json',
   code: `{
-  "error": {
-    "code": "MOCK_ERROR",
-    "message": "Mock error message"
-  }
+  "code": 503,
+  "message": "Runtime unavailable",
+  "data": null
 }`,
 };
 
 export const STREAM_REQUEST_SAMPLE: CodeSample = {
   id: 'stream-request',
-  label: 'Stream 调试示例',
+  label: 'Stream 接口占位',
   language: 'bash',
-  code: [
-    'curl -N -X POST "${BASE_URL}/${STREAM_PATH}" \\',
-    '  -H "Authorization: Bearer ${API_KEY}" \\',
-    '  -H "Content-Type: application/json" \\',
-    '  -H "Accept: text/event-stream" \\',
-    '  -H "X-Trace-Id: ${TRACE_ID}" \\',
-    `  -d '{`,
-    '    "agentId": "YOUR_AGENT_ID",',
-    '    "input": {',
-    '      "query": "Hello"',
-    '    }',
-    `  }'`,
-  ].join('\n'),
+  code: `# Stream API 尚未实现
+# 公开路径、请求字段、结束标识和 SSE 事件均待正式契约确认`,
 };
 
 export const STREAM_SDK_SAMPLE: CodeSample = {
   id: 'stream-sdk',
-  label: 'TypeScript SDK 流式示例',
+  label: 'TypeScript SDK 流式接口',
   language: 'typescript',
-  code: `// Mock 示例：事件字段和调用参数待正式契约确认
-const stream = client.stream({
-  agentId: 'YOUR_AGENT_ID',
-  input: { query: 'Hello' },
-});
-
-for await (const event of stream) {
-  if (event.type === 'token') {
-    process.stdout.write(event.data.text ?? '');
-  }
-
-  if (event.type === 'done') {
-    break;
-  }
-}`,
+  code: `// 当前 SDK 仅实现非流式 run()
+// client.stream() 尚待公开 Stream API 与事件契约确认`,
 };
 
 export const SDK_INSTALL_SAMPLE: CodeSample = {
   id: 'sdk-install',
-  label: 'SDK 安装占位',
+  label: 'SDK 安装说明',
   language: 'bash',
-  code: `# Mock 占位：安装包名称与发布渠道待 SDK 方案确认
-# 当前示例不能直接运行`,
+  code: `# @minicoze/sdk 当前是仓库内 private package
+# npm 包发布与安装方式待确认`,
 };
 
 export const SDK_INIT_SAMPLE: CodeSample = {
   id: 'sdk-init',
   label: '客户端初始化',
   language: 'typescript',
-  code: `// Mock 示例：导入路径与配置字段待正式契约确认
-import { MiniCozeClient } from '@minicoze/sdk';
+  code: `import { MiniCozeClient } from '@minicoze/sdk';
 
 const client = new MiniCozeClient({
+  baseURL: 'http://127.0.0.1:3100',
   apiKey: process.env.MINICOZE_API_KEY ?? '',
 });`,
 };
@@ -192,57 +171,53 @@ export const SDK_ERROR_SAMPLE: CodeSample = {
   id: 'sdk-error',
   label: '基本错误处理',
   language: 'typescript',
-  code: `// Mock 示例：错误类型和字段待正式契约确认
-try {
-  const result = await client.run({
-    agentId: 'YOUR_AGENT_ID',
-    input: { query: 'Hello' },
-  });
+  code: `import { MiniCozeHTTPError } from '@minicoze/sdk';
 
-  console.log(result);
+try {
+  const result = await client.run({ message: '你好' });
+  console.log(result.content);
 } catch (error) {
-  console.error('MiniCoze request failed', error);
+  if (error instanceof MiniCozeHTTPError) {
+    console.error(error.httpStatus, error.message);
+  }
 }`,
 };
 
 export const REQUEST_PARAMETERS: readonly ParameterRow[] = [
   {
-    name: 'agentId',
+    name: 'message',
     type: 'string',
-    description: '已发布 Agent 的标识。',
+    description: '必填。发送给 Agent 的非空文本消息。',
   },
   {
-    name: 'input',
-    type: 'object',
-    description: '本次调用的输入参数；具体字段待契约确认。',
+    name: 'conversationId',
+    type: 'string?',
+    description: '可选。提供时继续已有会话；省略时创建新会话。',
   },
 ];
 
-export const SSE_EVENTS: readonly EventRow[] = [
-  { name: 'start', description: '表示本次调用开始' },
-  { name: 'token', description: '表示收到文本增量' },
-  { name: 'tool_call', description: '表示工具调用信息' },
-  { name: 'tool_result', description: '表示工具执行结果' },
-  { name: 'reference', description: '表示引用信息' },
-  { name: 'done', description: '表示本次调用结束' },
-  { name: 'error', description: '表示流式调用发生错误' },
-];
+export const SSE_EVENTS: readonly EventRow[] = [];
 
 export const SDK_TYPES: readonly ParameterRow[] = [
   {
+    name: 'MiniCozeClientOptions',
+    type: 'object',
+    description: '包含必填 baseURL、apiKey 和可选 timeoutMs。',
+  },
+  {
     name: 'RunParams',
     type: 'object',
-    description: '同步调用参数；最终字段待契约确认。',
+    description: '包含必填 message 和可选 conversationId。',
+  },
+  {
+    name: 'RunOptions',
+    type: 'object',
+    description: '包含可选 signal 和单次 timeoutMs。',
   },
   {
     name: 'RunResult',
     type: 'object',
-    description: '同步调用结果；最终字段待契约确认。',
-  },
-  {
-    name: 'StreamEvent',
-    type: 'event',
-    description: '流式调用事件；事件数据类型待契约确认。',
+    description: '非流式 Run 的结构化结果。',
   },
 ];
 
@@ -250,44 +225,48 @@ export const ENDPOINTS: readonly EndpointRow[] = [
   {
     name: 'Run',
     method: 'POST',
-    path: '${BASE_URL}/${RUN_PATH}',
-    description: '发起一次请求并返回完整结果。',
+    path: '/api/v1/run',
+    description: '发起一次非流式请求并返回完整结果。',
   },
   {
     name: 'Stream',
-    method: 'POST',
-    path: '${BASE_URL}/${STREAM_PATH}',
-    description: '建立 SSE 连接并逐步接收执行事件。',
+    method: '待确认',
+    path: '待确认',
+    description: '公开流式接口尚未实现。',
   },
 ];
 
 export const HTTP_STATUSES: readonly StatusRow[] = [
-  { status: '200', meaning: '请求成功', note: '成功响应字段仍待确认。' },
-  { status: '401', meaning: '身份验证失败', note: '检查 API Key 与鉴权请求头。' },
-  { status: '404', meaning: '资源不存在', note: '检查 Agent 标识与请求路径。' },
-  { status: '429', meaning: '请求受限', note: '具体限流规则待确认。' },
-  { status: '500', meaning: '服务异常', note: '错误结构待正式契约确认。' },
+  { status: '200', meaning: 'Run 成功', note: '响应 code 为数字 200。' },
+  { status: '400', meaning: '请求参数或 Runtime 输入无效', note: '响应 code 为数字 400。' },
+  { status: '401', meaning: '鉴权失败', note: '正式 API Key 鉴权接入后确认具体语义。' },
+  { status: '403', meaning: 'Agent 或会话不允许公开调用', note: '响应 code 为数字 403。' },
+  { status: '404', meaning: '会话或发布资源不存在', note: '响应 code 为数字 404。' },
+  { status: '500', meaning: '消息持久化或服务内部错误', note: '响应 code 为数字 500。' },
+  { status: '502', meaning: 'Runtime HTTP 或响应协议异常', note: '响应 code 为数字 502。' },
+  { status: '503', meaning: '测试 Agent、Runtime 配置或网络不可用', note: '响应 code 为数字 503。' },
+  { status: '504', meaning: 'Runtime 执行超时', note: '响应 code 为数字 504。' },
 ];
 
 export const FAQ_ITEMS: readonly FaqItem[] = [
   {
-    question: 'API Key 鉴权失败怎么办？',
-    answer: '检查 Authorization 请求头是否使用 Bearer 格式，并确认 API Key 仍然有效。不要在前端代码或公开仓库中硬编码真实密钥。',
+    question: '调用时需要传 agentId 吗？',
+    answer: '不需要。目标 Agent 由 API Key 的绑定关系确定；正式鉴权接入前，开发环境使用临时测试 Agent 配置。',
   },
   {
-    question: 'Agent 标识或请求参数错误怎么办？',
-    answer: '核对 agentId 是否为已发布 Agent 的标识，并按照待确认的接口契约检查 input 参数。当前文档不提供 Agent ID 查询入口。',
+    question: '如何继续已有会话？',
+    answer: '在请求体或 SDK RunParams 中提供 conversationId。会话必须属于该 Agent 的 owner。',
   },
   {
-    question: '请求触发限流怎么办？',
-    answer: '暂停高频重试，记录 Trace ID，并根据后续确认的限流规则调整请求频率。',
+    question: 'SDK 的 Run 超时是多少？',
+    answer: 'run() 默认超时为 190000ms，可通过单次调用 options.timeoutMs 覆盖，并支持 AbortSignal。',
   },
   {
-    question: '请求超时怎么办？',
-    answer: '先保留 Trace ID 以便排查，再检查网络和服务状态。真实超时阈值与重试策略待接口契约确认。',
+    question: '为什么 API Key 鉴权还不能正式使用？',
+    answer: '管理端 CRUD 已完成，但公开接口的 API Key Guard 与正式错误契约尚未接入。当前开发入口不代表正式鉴权方案。',
   },
   {
-    question: 'SSE 连接意外中断怎么办？',
-    answer: '将中断视为未完成调用并展示可恢复状态。是否需要重连、断点续传或重新发起调用，需要以后端流式契约为准。',
+    question: 'Stream 和 SSE 事件是否已经可用？',
+    answer: '尚未实现。公开 Stream 路径、事件、结束标识和错误语义仍需等待正式契约。',
   },
 ];

@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   API_DOC_SECTIONS,
+  ENDPOINTS,
   FAQ_ITEMS,
   QUICK_START_SAMPLES,
+  REQUEST_PARAMETERS,
+  RUN_ERROR_SAMPLE,
+  RUN_REQUEST_SAMPLE,
+  RUN_RESPONSE_SAMPLE,
+  SDK_TYPES,
   SSE_EVENTS,
 } from './api-docs.data';
 
@@ -18,15 +24,32 @@ describe('API docs mock content', () => {
     ]);
   });
 
-  it('includes every required SSE event and FAQ entry', () => {
-    expect(SSE_EVENTS.map((event) => event.name)).toEqual([
-      'start',
-      'token',
-      'tool_call',
-      'tool_result',
-      'reference',
-      'done',
-      'error',
+  it('matches the implemented non-stream Run contract', () => {
+    expect(ENDPOINTS[0]).toMatchObject({
+      method: 'POST',
+      path: '/api/v1/run',
+    });
+    expect(REQUEST_PARAMETERS.map((row) => row.name)).toEqual([
+      'message',
+      'conversationId',
+    ]);
+    expect(RUN_REQUEST_SAMPLE.code).toContain('/api/v1/run');
+    expect(RUN_REQUEST_SAMPLE.code).toContain('"message": "你好"');
+    expect(RUN_REQUEST_SAMPLE.code).not.toContain('agentId');
+    expect(RUN_RESPONSE_SAMPLE.code).toContain('"assistantMessageId"');
+    expect(RUN_RESPONSE_SAMPLE.code).toContain('"finishReason": "stop"');
+    expect(RUN_RESPONSE_SAMPLE.code).toContain('"promptTokens": 12');
+    expect(RUN_ERROR_SAMPLE.code).toContain('"code": 503');
+    expect(RUN_ERROR_SAMPLE.code).toContain('"data": null');
+  });
+
+  it('keeps the unimplemented Stream contract explicitly pending', () => {
+    expect(SSE_EVENTS).toEqual([]);
+    expect(SDK_TYPES.map((row) => row.name)).toEqual([
+      'MiniCozeClientOptions',
+      'RunParams',
+      'RunOptions',
+      'RunResult',
     ]);
     expect(FAQ_ITEMS).toHaveLength(5);
   });

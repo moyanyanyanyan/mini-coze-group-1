@@ -45,31 +45,31 @@ export function SdkDocsPage() {
             <p className="api-doc-eyebrow">Develop / API / Documentation</p>
             <div className="api-doc-title-row">
               <h1 id="api-docs-title">API 文档</h1>
-              <span>Mock 版</span>
+              <span>非流式 MVP</span>
             </div>
             <p>
-              通过 MiniCoze 公开 API 调用已发布的 Agent。本文档介绍 API Key
-              的使用方式、同步调用、流式调用及 TypeScript SDK 的基本用法。
+              通过 MiniCoze 公开 API 调用 API Key 绑定的已发布 Agent。
+              当前已完成非流式 Run 与 TypeScript SDK 客户端，鉴权和流式接口仍在接入中。
             </p>
           </header>
 
           <DocSection section={API_DOC_SECTIONS[0]}>
             <p>
-              准备好 API Key 和已发布 Agent 的标识后，可以使用 curl 或
-              TypeScript SDK 发起首次请求。示例契约尚未最终确认。
+              使用 curl 或 TypeScript SDK 调用非流式 Run。请求不需要传
+              agentId，目标 Agent 将由未来正式接入的 API Key 绑定关系确定。
             </p>
             <ol className="api-doc-steps">
               <li>
                 <span>01</span>
-                准备 API Key，并仅通过安全的服务端配置提供。
+                准备 baseURL 和 API Key，并仅在服务端安全配置中使用。
               </li>
               <li>
                 <span>02</span>
-                确认已发布 Agent 的标识。本期文档不提供 Agent ID 查询入口。
+                确认目标 Agent 已经发布。API Key 正式鉴权仍在接入中。
               </li>
               <li>
                 <span>03</span>
-                选择 curl 或 TypeScript SDK 示例，查看首次 Run 调用。
+                选择 curl 或 TypeScript SDK 示例，发起首次非流式 Run。
               </li>
             </ol>
 
@@ -100,15 +100,16 @@ export function SdkDocsPage() {
               />
             </div>
             <Callout>
-              TypeScript 示例仅用于展示客户端初始化和 <code>client.run()</code>
-              的基本形态；导入路径、字段和参数尚未作为正式 SDK 契约发布。
+              TypeScript 示例对应当前 <code>@minicoze/sdk</code> 的
+              <code>client.run()</code>；该包仍为仓库内 private package。
             </Callout>
           </DocSection>
 
           <DocSection section={API_DOC_SECTIONS[1]}>
             <p>
-              API Key 用于公开 API 的身份验证。请求时通过
+              正式鉴权计划通过
               <code>Authorization: Bearer ${'{API_KEY}'}</code> 传递密钥。
+              当前公开 Run 仍使用开发/测试环境临时 Agent 配置，尚未启用 API Key Guard。
             </p>
             <ul className="api-doc-list">
               <li>不要将真实 API Key 硬编码在公开前端代码、仓库或客户端可访问的环境中。</li>
@@ -116,7 +117,8 @@ export function SdkDocsPage() {
               <li>如果密钥泄露或不再使用，应及时在 API Keys 管理页面删除。</li>
             </ul>
             <Callout tone="warning">
-              API Key 属于敏感凭据。文档、示例与日志中只应使用占位变量，不要记录真实值。
+              API Key 属于敏感凭据。文档、示例与日志中只应使用占位变量。
+              正式鉴权错误语义和撤销 Key 行为待鉴权模块确认。
             </Callout>
             <AppLink className="api-doc-text-link" to={API_MANAGEMENT_ROUTE}>
               前往 API Keys 管理页面
@@ -128,10 +130,10 @@ export function SdkDocsPage() {
             <p>Run 用于发起一次请求并获取完整结果。</p>
             <div className="api-doc-endpoint">
               <span>POST</span>
-              <code>{'${BASE_URL}/${RUN_PATH}'}</code>
+              <code>/api/v1/run</code>
             </div>
             <Callout>
-              以下路径、请求字段、响应字段和错误结构均为 Mock 示例，不能视为已确认契约。
+              当前非流式 Run 已实现。请求体仅包含 message 和可选 conversationId。
             </Callout>
 
             <h3>请求头</h3>
@@ -146,15 +148,11 @@ export function SdkDocsPage() {
                 <tbody>
                   <tr>
                     <td><code>Authorization</code></td>
-                    <td><code>Bearer {'${API_KEY}'}</code></td>
+                    <td><code>Bearer {'${API_KEY}'}</code>；正式鉴权待接入</td>
                   </tr>
                   <tr>
                     <td><code>Content-Type</code></td>
                     <td><code>application/json</code></td>
-                  </tr>
-                  <tr>
-                    <td><code>X-Trace-Id</code></td>
-                    <td>用于请求追踪；具体要求待契约确认。</td>
                   </tr>
                 </tbody>
               </table>
@@ -169,11 +167,15 @@ export function SdkDocsPage() {
             <h3>常见错误响应示例</h3>
             <CodeBlock sample={RUN_ERROR_SAMPLE} onNotice={handleNotice} />
             <Callout>
-              响应字段、状态值与错误分类均为 Mock。联调前请等待正式接口契约。
+              成功响应使用 <code>{'{ code, message, data }'}</code> 信封，
+              错误响应的数字 code 与 HTTP 状态码一致。
             </Callout>
           </DocSection>
 
           <DocSection section={API_DOC_SECTIONS[3]}>
+            <Callout tone="warning">
+              Stream API 尚未实现。以下仅保留章节结构，不代表已有公开契约。
+            </Callout>
             <p>
               Stream 用于通过 SSE 建立长连接，逐步获取 Agent 的执行过程和结果。
             </p>
@@ -189,36 +191,38 @@ export function SdkDocsPage() {
             <CodeBlock sample={STREAM_SDK_SAMPLE} onNotice={handleNotice} />
 
             <h3>SSE 事件说明</h3>
-            <div className="api-doc-table-wrap">
-              <table className="api-doc-table">
-                <thead>
-                  <tr>
-                    <th>事件</th>
-                    <th>用途</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {SSE_EVENTS.map((event) => (
-                    <tr key={event.name}>
-                      <td><code>{event.name}</code></td>
-                      <td>{event.description}</td>
+            {SSE_EVENTS.length > 0 ? (
+              <div className="api-doc-table-wrap">
+                <table className="api-doc-table">
+                  <thead>
+                    <tr>
+                      <th>事件</th>
+                      <th>用途</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {SSE_EVENTS.map((event) => (
+                      <tr key={event.name}>
+                        <td><code>{event.name}</code></td>
+                        <td>{event.description}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p>公开 SSE 事件名称、字段、结束标识和异常语义均待确认。</p>
+            )}
             <Callout tone="warning">
               <strong>结束与中断：</strong>
-              并非每次调用都会出现工具调用或引用事件。<code>done</code>
-              表示本次流式调用结束，不应作为普通文本增量处理；连接中断时不能视为调用成功。
-              具体事件字段、数据格式和出现条件以后端正式契约为准。
+              Stream 尚未接入，不能将本节示例视为可执行接口。
             </Callout>
           </DocSection>
 
           <DocSection section={API_DOC_SECTIONS[4]}>
             <p>
-              SDK 的安装方式、包名和类型定义仍在规划中。以下内容仅用于说明未来基本调用方式，
-              不代表某个 npm 包已经发布。
+              <code>@minicoze/sdk</code> 当前是仓库内 private package，
+              已实现非流式 Run，尚未发布 npm，也尚未实现 Stream。
             </p>
             <h3>安装方式占位</h3>
             <CodeBlock sample={SDK_INSTALL_SAMPLE} onNotice={handleNotice} />
@@ -243,7 +247,7 @@ export function SdkDocsPage() {
 
           <DocSection section={API_DOC_SECTIONS[5]}>
             <p>
-              以下参考信息用于文档结构展示，接口、字段和错误码均需等待正式契约确认。
+              以下内容对应当前非流式 Run 实现。鉴权和 Stream 相关部分仍待确认。
             </p>
             <h3>接口概览</h3>
             <div className="api-doc-table-wrap">
@@ -297,7 +301,8 @@ export function SdkDocsPage() {
               </table>
             </div>
             <Callout>
-              业务错误码尚未确认。当前 <code>MOCK_ERROR</code> 仅为响应示例占位。
+              当前 HTTP 响应中的 <code>code</code> 是数字 HTTP 状态码。
+              正式 API Key 鉴权错误的字符串业务码尚未接入。
             </Callout>
           </DocSection>
 

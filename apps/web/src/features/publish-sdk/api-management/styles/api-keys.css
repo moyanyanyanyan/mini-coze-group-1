@@ -41,6 +41,13 @@
   line-height: 1.75;
 }
 
+.api-keys-header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
 .api-key-refresh {
   min-height: 38px;
   display: inline-flex;
@@ -57,6 +64,10 @@
   font-weight: 600;
   cursor: pointer;
   transition: color 180ms ease, border-color 180ms ease, background-color 180ms ease;
+}
+
+.api-key-doc-link {
+  text-decoration: none;
 }
 
 .api-key-refresh svg {
@@ -544,6 +555,10 @@
 
   .api-keys-header {
     gap: 18px;
+  }
+
+  .api-keys-header-actions {
+    gap: 6px;
   }
 
   .api-key-refresh span {
