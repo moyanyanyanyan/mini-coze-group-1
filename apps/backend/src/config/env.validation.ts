@@ -32,10 +32,6 @@ class EnvironmentVariables {
   @IsString()
   INTERNAL_SERVICE_TOKEN = '';
 
-  @IsOptional()
-  @IsString()
-  PUBLIC_API_TEST_AGENT_ID = '';
-
   @IsString()
   DATABASE_URL!: string;
 

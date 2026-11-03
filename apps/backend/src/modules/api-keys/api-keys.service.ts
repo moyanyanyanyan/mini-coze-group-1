@@ -69,13 +69,12 @@ export class ApiKeysService {
           select: {
             id: true,
             ownerId: true,
-            status: true,
           },
         },
       },
     });
 
-    if (!apiKey || apiKey.revokedAt || apiKey.agent.status !== 'ACTIVE') {
+    if (!apiKey || apiKey.revokedAt) {
       throw new UnauthorizedException('API Key 无效');
     }
 

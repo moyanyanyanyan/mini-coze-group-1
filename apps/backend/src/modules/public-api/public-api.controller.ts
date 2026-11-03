@@ -4,9 +4,13 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { ResponseInterceptor } from '../../common/response.interceptor';
+import { ApiKeyGuard } from '../api-keys/api-key.guard';
+import { ApiKeyPrincipal } from '../api-keys/api-key-principal.decorator';
+import type { ApiKeyPrincipal as ApiKeyPrincipalPayload } from '../api-keys/api-key-principal';
 import { RunDto } from './dto/run.dto';
 import { PublicApiService } from './public-api.service';
 
@@ -17,7 +21,11 @@ export class PublicApiController {
 
   @Post('run')
   @HttpCode(HttpStatus.OK)
-  run(@Body() dto: RunDto) {
-    return this.publicApi.run(dto);
+  @UseGuards(ApiKeyGuard)
+  run(
+    @Body() dto: RunDto,
+    @ApiKeyPrincipal() principal: ApiKeyPrincipalPayload,
+  ) {
+    return this.publicApi.run(dto, principal);
   }
 }

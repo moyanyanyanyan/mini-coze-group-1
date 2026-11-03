@@ -10,45 +10,37 @@ import {
   RequestTimeoutException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { RuntimeCallError, type RuntimeResult } from '../../chat/runtime-client.service';
 import { ChatService } from '../../chat/chat.service';
 import { AgentsService } from '../agents/agents.service';
+import type { ApiKeyPrincipal } from '../api-keys/api-key-principal';
 import { ConversationsService } from '../conversations/conversations.service';
 import { RunDto } from './dto/run.dto';
 
 @Injectable()
 export class PublicApiService {
   constructor(
-    private readonly config: ConfigService,
     private readonly agents: AgentsService,
     private readonly conversations: ConversationsService,
     private readonly chat: ChatService,
   ) {}
 
-  async run(dto: RunDto): Promise<RuntimeResult> {
-    const nodeEnv = this.config.get<string>('NODE_ENV') ?? 'development';
-    if (nodeEnv !== 'development' && nodeEnv !== 'test') {
-      throw new ServiceUnavailableException('无鉴权公开 Run 仅允许在开发和测试环境使用');
+  async run(dto: RunDto, principal: ApiKeyPrincipal): Promise<RuntimeResult> {
+    const agent = await this.agents.getPublicAgent(principal.agentId);
+    if (agent.ownerId !== principal.userId) {
+      throw new ForbiddenException('API Key 无权调用该 Agent');
     }
-
-    const testAgentId = this.config.get<string>('PUBLIC_API_TEST_AGENT_ID')?.trim();
-    if (!testAgentId) {
-      throw new ServiceUnavailableException('公开 Run 测试 Agent 未配置');
-    }
-
-    const agent = await this.agents.getPublicAgent(testAgentId);
     let conversationId = dto.conversationId;
 
     if (!conversationId) {
-      const conversation = await this.conversations.create(agent.ownerId, agent.agentId);
+      const conversation = await this.conversations.create(principal.userId, agent.agentId);
       conversationId = conversation.id;
     } else {
-      const conversation = await this.conversations.findOwned(conversationId, agent.ownerId);
+      const conversation = await this.conversations.findOwned(conversationId, principal.userId);
       if (!conversation) {
         throw new NotFoundException('会话不存在');
       }
-      if (conversation.userId !== agent.ownerId) {
+      if (conversation.userId !== principal.userId) {
         throw new ForbiddenException('无权访问此会话');
       }
       if (conversation.agentId !== agent.agentId) {
@@ -59,7 +51,7 @@ export class PublicApiService {
     try {
       return await this.chat.runOnce({
         conversationId,
-        userId: agent.ownerId,
+        userId: principal.userId,
         agentId: agent.agentId,
         message: dto.message,
         agentConfig: agent.config,

@@ -42,7 +42,7 @@ describe('ApiKeysService authentication', () => {
       },
       include: {
         agent: {
-          select: { id: true, ownerId: true, status: true },
+          select: { id: true, ownerId: true },
         },
       },
     });
@@ -62,8 +62,6 @@ describe('ApiKeysService authentication', () => {
   it.each([
     ['missing', null],
     ['revoked', { id: 'key-1', revokedAt: new Date(), agent: { id: 'agent-1', ownerId: 'user-1', status: 'ACTIVE' } }],
-    ['draft agent', { id: 'key-1', revokedAt: null, agent: { id: 'agent-1', ownerId: 'user-1', status: 'DRAFT' } }],
-    ['archived agent', { id: 'key-1', revokedAt: null, agent: { id: 'agent-1', ownerId: 'user-1', status: 'ARCHIVED' } }],
   ])('rejects a %s key without updating usage', async (_case, record) => {
     const { service, prisma } = createService();
     prisma.apiKey.findUnique.mockResolvedValue(record);
@@ -71,6 +69,29 @@ describe('ApiKeysService authentication', () => {
     await expect(service.authenticate(SECRET)).rejects.toBeInstanceOf(UnauthorizedException);
     expect(prisma.apiKey.update).not.toHaveBeenCalled();
   });
+
+  it.each(['DRAFT', 'ARCHIVED'])(
+    'authenticates a valid key for a %s agent so the caller can return 403',
+    async (status) => {
+      const { service, prisma } = createService();
+      prisma.apiKey.findUnique.mockResolvedValue({
+        id: 'key-1',
+        revokedAt: null,
+        agent: { id: 'agent-1', ownerId: 'user-1', status },
+      });
+      prisma.apiKey.update.mockResolvedValue({});
+
+      await expect(service.authenticate(SECRET)).resolves.toEqual({
+        userId: 'user-1',
+        agentId: 'agent-1',
+        apiKeyId: 'key-1',
+      });
+      expect(prisma.apiKey.update).toHaveBeenCalledWith({
+        where: { id: 'key-1' },
+        data: { lastUsedAt: expect.any(Date) },
+      });
+    },
+  );
 });
 
 describe('ApiKeysService archived agent management', () => {
