@@ -1,9 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { createHash, randomBytes } from 'node:crypto';
 import type { Agent, ApiKey } from '@prisma/client';
 import type { CurrentUser } from '@minicoze/shared';
 import { PrismaService } from '../../database/prisma.service';
 import { AgentsService } from '../agents/agents.service';
+import type { ApiKeyPrincipal } from './api-key-principal';
+
+const API_KEY_PATTERN = /^mk_live_[A-Za-z0-9_-]{43}$/;
 
 type ApiKeyWithAgent = ApiKey & {
   agent: Pick<Agent, 'id' | 'name'>;
@@ -53,13 +56,47 @@ export class ApiKeysService {
     };
   }
 
+  async authenticate(secret: string): Promise<ApiKeyPrincipal> {
+    if (!API_KEY_PATTERN.test(secret)) {
+      throw new UnauthorizedException('API Key 无效');
+    }
+
+    const keyHash = createHash('sha256').update(secret, 'utf8').digest('hex');
+    const apiKey = await this.prisma.apiKey.findUnique({
+      where: { keyHash },
+      include: {
+        agent: {
+          select: {
+            id: true,
+            ownerId: true,
+            status: true,
+          },
+        },
+      },
+    });
+
+    if (!apiKey || apiKey.revokedAt || apiKey.agent.status !== 'ACTIVE') {
+      throw new UnauthorizedException('API Key 无效');
+    }
+
+    await this.prisma.apiKey.update({
+      where: { id: apiKey.id },
+      data: { lastUsedAt: new Date() },
+    });
+
+    return {
+      userId: apiKey.agent.ownerId,
+      agentId: apiKey.agent.id,
+      apiKeyId: apiKey.id,
+    };
+  }
+
   async list(userId: string): Promise<ApiKeyView[]> {
     const apiKeys = await this.prisma.apiKey.findMany({
       where: {
         revokedAt: null,
         agent: {
           ownerId: userId,
-          status: { not: 'ARCHIVED' },
         },
       },
       include: {
@@ -112,7 +149,6 @@ export class ApiKeysService {
         revokedAt: null,
         agent: {
           ownerId: userId,
-          status: { not: 'ARCHIVED' },
         },
       },
       include: {
