@@ -16,26 +16,26 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { navigate } from '../../../shared/routing/navigation';
-import { getWorkflow, saveDraft } from '../services/workflow';
+import { getWorkflow, saveDraft, validateWorkflow } from '../services/workflow';
 import type {
   NodeData,
   NodeType,
   WorkflowDefinition,
   WorkflowRunResult,
+  ConditionNodeData,
+  ConditionBranch,
 } from '../types/workflow';
-import {
-  canvasToDefinition,
-  downloadDefinition,
-} from '../utils/serialize';
+import { canvasToDefinition, downloadDefinition } from '../utils/serialize';
 import { StartNode } from './nodes/StartNode';
 import { LlmNode } from './nodes/LlmNode';
 import { EndNode } from './nodes/EndNode';
+import { ConditionNode } from './nodes/ConditionNode';
+import { LoopNode } from './nodes/LoopNode';
 import { PropertyPanel } from './PropertyPanel';
 import { NodePalette } from './NodePalette';
 import { RunDialog } from './RunDialog';
 import { ValidationDialog, type ValidationError } from './ValidationDialog';
 import { frontendValidate } from '../utils/frontend-validate';
-import { validateWorkflow } from '../services/workflow';
 
 interface Props {
   workflowId: string;
@@ -47,8 +47,9 @@ const nodeTypes = {
   start: StartNode,
   llm: LlmNode,
   end: EndNode,
+  condition: ConditionNode,
+  loop: LoopNode,
 };
-
 
 function definitionToFlow(def: WorkflowDefinition): {
   nodes: Node[];
@@ -60,10 +61,13 @@ function definitionToFlow(def: WorkflowDefinition): {
     position: n.position,
     data: n.data as unknown as Record<string, unknown>,
   }));
+  // 保留 sourceHandle / targetHandle，多端口才能还原
   const edges: Edge[] = def.edges.map((e) => ({
     id: e.id,
     source: e.source,
     target: e.target,
+    sourceHandle: e.sourceHandle,
+    targetHandle: e.targetHandle,
   }));
   return { nodes, edges };
 }
@@ -86,9 +90,26 @@ function defaultDataFor(type: NodeType): NodeData {
       outputs: [{ name: 'text', type: 'string' }],
     };
   }
+  if (type === 'condition') {
+    const branches: ConditionBranch[] = [
+      { id: 'b1', logic: 'and', conditions: [] },
+    ];
+    return { label: '条件判断', branches };
+  }
+  if (type === 'loop') {
+    return {
+      label: '循环',
+      mode: 'count',
+      count: 3,
+      body: { nodes: [], edges: [] },
+      outputs: [
+        { name: 'results', type: 'array<string>', valueFrom: [] },
+      ],
+    };
+  }
   return {
     label: '结束',
-    outputs: [{ name: 'result', type: 'string', valueFrom: '' }],
+    outputs: [{ name: 'result', type: 'string', valueFrom: [] }],
   };
 }
 
@@ -103,7 +124,6 @@ function WorkflowEditorInner({ workflowId }: Props) {
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
 
-  // 运行相关
   const [showRunDialog, setShowRunDialog] = useState(false);
   const [runStatusMap, setRunStatusMap] = useState<Record<string, string>>({});
   const [runResult, setRunResult] = useState<WorkflowRunResult | null>(null);
@@ -114,16 +134,25 @@ function WorkflowEditorInner({ workflowId }: Props) {
     errors: ValidationError[];
   }>({ valid: true, errors: [] });
 
+  // 后端执行器暂未支持 condition / loop，先拦截
+  const hasPlaceholderNode = useMemo(
+    () => nodes.some((n) => n.type === 'condition' || n.type === 'loop'),
+    [nodes],
+  );
+
   const handleValidate = async () => {
-    // 1. 前端轻量校验
+    if (hasPlaceholderNode) {
+      alert(
+        '条件分支 / 循环节点暂未接入后端执行器，暂不支持校验。可先保存草稿。',
+      );
+      return;
+    }
     const feErrors = frontendValidate(nodes, edges);
     if (feErrors.length > 0) {
       setValidationResult({ valid: false, errors: feErrors });
       setValidationOpen(true);
       return;
     }
-
-    // 2. 调后端 /validate（Mock 也会走 services 层）
     try {
       const def = canvasToDefinition(nodes, edges);
       const res = await validateWorkflow(workflowId, def);
@@ -142,6 +171,7 @@ function WorkflowEditorInner({ workflowId }: Props) {
       setValidationOpen(true);
     }
   };
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -174,8 +204,18 @@ function WorkflowEditorInner({ workflowId }: Props) {
 
   const handleAddNode = useCallback(
     (type: NodeType) => {
-      if (nodes.some((n) => n.type === type)) {
-        alert(`MVP 只支持一条 Start → LLM → End 单链路，${type} 节点已存在`);
+      // 只有 start / end 限制单节点
+      if (
+        (type === 'start' || type === 'end') &&
+        nodes.some((n) => n.type === type)
+      ) {
+        alert(`${type === 'start' ? '开始' : '结束'}节点只能有 1 个`);
+        return;
+      }
+
+      // 节点总数 ≤ 50
+      if (nodes.length >= 50) {
+        alert('节点总数不能超过 50 个');
         return;
       }
 
@@ -210,17 +250,35 @@ function WorkflowEditorInner({ workflowId }: Props) {
   const onConnect = useCallback(
     (params: Connection) => {
       setValidationResult({ valid: true, errors: [] });
+
+      const sourceNode = nodes.find((n) => n.id === params.source);
+
+      // 普通节点（非 condition / loop）只能有 1 条出线
+      if (
+        sourceNode &&
+        sourceNode.type !== 'condition' &&
+        sourceNode.type !== 'loop'
+      ) {
+        const existing = edges.filter((e) => e.source === params.source);
+        if (existing.length >= 1) {
+          alert('普通节点只能有 1 条出线');
+          return;
+        }
+      }
+
       setEdges((eds) => [
         ...eds,
         {
-          id: `edge-${Date.now()}`,
+          id: `edge-${crypto.randomUUID()}`,
           source: params.source,
           target: params.target,
+          sourceHandle: params.sourceHandle ?? undefined,
+          targetHandle: params.targetHandle ?? undefined,
         },
       ]);
       setDirty(true);
     },
-    [setEdges],
+    [nodes, edges, setEdges],
   );
 
   const selectedNode = selectedId
@@ -236,6 +294,26 @@ function WorkflowEditorInner({ workflowId }: Props) {
           : n,
       ),
     );
+
+    // 条件节点：删分支时同步删该出口上的连线
+    if ('branches' in data) {
+      const condData = data as ConditionNodeData;
+      const branchIds = new Set([
+        ...condData.branches.map((b) => b.id),
+        'else',
+      ]);
+      setEdges((es) =>
+        es.filter(
+          (e) =>
+            !(
+              e.source === nodeId &&
+              e.sourceHandle &&
+              !branchIds.has(e.sourceHandle)
+            ),
+        ),
+      );
+    }
+
     setDirty(true);
   };
 
@@ -247,7 +325,6 @@ function WorkflowEditorInner({ workflowId }: Props) {
     );
     setSelectedId(null);
     setDirty(true);
-    // 删节点后清掉该节点的运行状态
     setRunStatusMap((m) => {
       if (!(nodeId in m)) return m;
       const next = { ...m };
@@ -257,6 +334,24 @@ function WorkflowEditorInner({ workflowId }: Props) {
   };
 
   const handleSave = async () => {
+    const hasEmptyEndOutput = nodes
+      .filter((n) => n.type === 'end')
+      .some((n) => {
+        const d = n.data as { outputs?: Array<{ valueFrom?: string | string[] }> };
+        return (d.outputs || []).some((o) => {
+          const arr = Array.isArray(o.valueFrom)
+            ? o.valueFrom
+            : o.valueFrom
+              ? [o.valueFrom]
+              : [];
+          return arr.length === 0;
+        });
+      });
+
+    if (hasEmptyEndOutput) {
+      alert('End 节点的每个输出至少需要勾选一个候选');
+      return;
+    }
     setSaving(true);
     try {
       const def = canvasToDefinition(nodes, edges);
@@ -275,15 +370,37 @@ function WorkflowEditorInner({ workflowId }: Props) {
     downloadDefinition(def, workflowName);
   };
 
-  // 运行：先保存再打开输入表单
   const handleOpenRun = async () => {
+    const hasEmptyEndOutput = nodes
+      .filter((n) => n.type === 'end')
+      .some((n) => {
+        const d = n.data as { outputs?: Array<{ valueFrom?: string | string[] }> };
+        return (d.outputs || []).some((o) => {
+          const arr = Array.isArray(o.valueFrom)
+            ? o.valueFrom
+            : o.valueFrom
+              ? [o.valueFrom]
+              : [];
+          return arr.length === 0;
+        });
+      });
+
+    if (hasEmptyEndOutput) {
+      alert('End 节点的每个输出至少需要勾选一个候选');
+      return;
+    }
+    if (hasPlaceholderNode) {
+      alert(
+        '条件分支 / 循环节点暂未接入后端执行器，暂不支持运行。可先保存草稿。',
+      );
+      return;
+    }
     const startNode = nodes.find((n) => n.type === 'start');
     if (!startNode) {
       alert('请先添加 Start 节点');
       return;
     }
 
-    // 1. 先保存
     if (dirty) {
       setSaving(true);
       try {
@@ -299,7 +416,6 @@ function WorkflowEditorInner({ workflowId }: Props) {
       }
     }
 
-    // 2. 再校验
     const feErrors = frontendValidate(nodes, edges);
     if (feErrors.length > 0) {
       setValidationResult({ valid: false, errors: feErrors });
@@ -317,13 +433,14 @@ function WorkflowEditorInner({ workflowId }: Props) {
     } catch (e: any) {
       setValidationResult({
         valid: false,
-        errors: [{ code: 'VALIDATE_FAILED', message: e.message || '校验失败' }],
+        errors: [
+          { code: 'VALIDATE_FAILED', message: e.message || '校验失败' },
+        ],
       });
       setValidationOpen(true);
       return;
     }
 
-    // 3. 通过才弹表单
     setShowRunDialog(true);
   };
 
@@ -341,8 +458,6 @@ function WorkflowEditorInner({ workflowId }: Props) {
     navigate(BASE);
   };
 
-  // 传给 React Flow 的 nodes：合并运行状态
-  // 校验错误节点集合
   const errorNodeIds = useMemo(() => {
     const set = new Set<string>();
     if (!validationResult.valid) {
@@ -353,7 +468,6 @@ function WorkflowEditorInner({ workflowId }: Props) {
     return set;
   }, [validationResult]);
 
-  // 传给 React Flow 的 nodes：合并运行状态 + 校验错误
   const displayNodes = useMemo(
     () =>
       nodes.map((n) => ({
@@ -366,7 +480,6 @@ function WorkflowEditorInner({ workflowId }: Props) {
       })),
     [nodes, runStatusMap, errorNodeIds],
   );
-
 
   if (loading) {
     return (
@@ -403,9 +516,7 @@ function WorkflowEditorInner({ workflowId }: Props) {
           {runResult && (
             <button
               className="wf-btn wf-btn-outline"
-              onClick={() => {
-                setShowRunDialog(true);
-              }}
+              onClick={() => setShowRunDialog(true)}
               title="查看上次运行结果"
             >
               查看运行结果
@@ -414,10 +525,7 @@ function WorkflowEditorInner({ workflowId }: Props) {
           <button className="wf-btn wf-btn-outline" onClick={handleExport}>
             导出 JSON
           </button>
-          <button
-            className="wf-btn wf-btn-outline"
-            onClick={handleValidate}
-          >
+          <button className="wf-btn wf-btn-outline" onClick={handleValidate}>
             校验
           </button>
           <button

@@ -31,6 +31,14 @@ export function getNodeOutputs(node: Node): Array<{ name: string; type: string }
       ? d.outputs
       : [{ name: 'text', type: 'string' }];
   }
+  // getNodeOutputs 加 condition 分支
+  if (node.type === 'condition') {
+    return [{ name: 'branch', type: 'string' }];
+  }
+  if (node.type === 'loop') {
+    const d = node.data as unknown as { outputs?: Array<{ name: string; type: string }> };
+    return d.outputs || [];
+  }
   // end 无输出
   return [];
 }
