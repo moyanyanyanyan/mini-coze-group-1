@@ -1,7 +1,6 @@
 import asyncio
 import copy
 import json
-from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -14,12 +13,8 @@ from app.workflow.runtime_adapter import RuntimeAdapter
 
 
 @pytest.fixture
-def definition():
-    return json.loads(
-        (
-            Path(__file__).resolve().parents[3] / "docs/workflows/example.workflow.json"
-        ).read_text()
-    )
+def definition(load_example):
+    return load_example()
 
 
 def test_valid(definition):

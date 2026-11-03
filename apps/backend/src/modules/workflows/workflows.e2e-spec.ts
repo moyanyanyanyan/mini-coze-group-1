@@ -45,16 +45,14 @@ describe('Workflow HTTP contract', () => {
     })),
   };
   const agent = { validate: jest.fn(), run: jest.fn() };
-  const definition = JSON.parse(
-    readFileSync(
-      resolve(
-        __dirname,
-        '../../../../..',
-        'docs/workflows/example.workflow.json',
+  const loadExample = (file: string) =>
+    JSON.parse(
+      readFileSync(
+        resolve(__dirname, '../../../../..', 'docs/workflows', file),
+        'utf8',
       ),
-      'utf8',
-    ),
-  );
+    );
+  const definition = loadExample('example.workflow.json');
   async function request(path: string, method = 'GET', body?: unknown) {
     const response = await fetch(`${base}/api/workflows${path}`, {
       method,
@@ -107,6 +105,20 @@ describe('Workflow HTTP contract', () => {
     expect((await request('/wf')).body.draftDefinition).toEqual(draft);
     expect(agent.validate).not.toHaveBeenCalled();
   });
+  it.each(['condition', 'loop'])(
+    'saves and loads a %s draft with nested data unchanged',
+    async (name) => {
+      const draft = loadExample(`example.${name}.workflow.json`);
+      expect(
+        (await request('/wf/draft', 'PUT', { definition: draft })).status,
+      ).toBe(200);
+      expect((await request('/wf')).body.draftDefinition).toEqual(draft);
+      // 列表 nodeCount 计入循环体节点：loop 样例为 4 个顶层 + 1 个 body。
+      expect((await request('')).body.items[0].nodeCount).toBe(
+        name === 'loop' ? 5 : 7,
+      );
+    },
+  );
   it('validates pagination and malformed draft shapes', async () => {
     expect((await request('?size=51')).status).toBe(400);
     expect(

@@ -1,6 +1,7 @@
 import { plainToInstance, Type } from 'class-transformer';
 import { 
   IsInt, 
+  IsNumber,
   IsString, 
   IsUrl, 
   Max, 
@@ -21,6 +22,12 @@ class EnvironmentVariables {
 
   @IsUrl({ require_tld: false })
   AGENT_SERVICE_URL = 'http://localhost:8000';
+
+  // 与 Agent 共用：单次工作流运行总时长，NestJS 在此基础上加余量等待 /run
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  WORKFLOW_RUN_TIMEOUT_SECONDS = 270;
 
   @IsString()
   DATABASE_URL!: string;

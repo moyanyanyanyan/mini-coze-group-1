@@ -28,6 +28,21 @@ const WORKSPACE = 'workflow-dev-workspace';
  */
 const json = (value: unknown) => value as Prisma.InputJsonValue;
 /**
+ * 统计草稿节点数，计入循环节点 data.body.nodes，与 Agent 的 50 节点上限口径一致。
+ * @param definition 草稿定义，可能为 null 或结构不完整。
+ * @returns 节点总数；结构不合法时为 0。
+ */
+const countNodes = (definition: unknown): number => {
+  const nodes = (definition as { nodes?: unknown })?.nodes;
+  if (!Array.isArray(nodes)) {
+    return 0;
+  }
+  return nodes.reduce<number>((total, node) => {
+    const body = (node as { data?: { body?: unknown } })?.data?.body;
+    return total + 1 + (node?.type === 'loop' ? countNodes(body) : 0);
+  }, 0);
+};
+/**
  * 将空值映射为数据库 NULL，其他值按 JSON 写入。
  * @param value 执行输出或错误，可为 null/undefined。
  * @returns Prisma 数据库空值标记或 JSON 写入值。
@@ -133,11 +148,7 @@ export class WorkflowsService {
       items: result.items.map(({ draftDefinition, ...item }) => ({
         ...item,
         currentVersionId: null,
-        nodeCount: Array.isArray(
-          (draftDefinition as { nodes?: unknown })?.nodes,
-        )
-          ? (draftDefinition as { nodes: unknown[] }).nodes.length
-          : 0,
+        nodeCount: countNodes(draftDefinition),
       })),
     };
   }

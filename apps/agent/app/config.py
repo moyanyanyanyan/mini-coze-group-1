@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     provider_timeout: float = Field(default=15, gt=0, validation_alias="PROVIDER_TIMEOUT_SECONDS")
     model_timeout: float = Field(default=60, gt=0, validation_alias="MODEL_TIMEOUT_SECONDS")
     run_timeout: float = Field(default=180, gt=0, validation_alias="RUN_TIMEOUT_SECONDS")
+    workflow_run_timeout: float = Field(
+        default=270, gt=0, validation_alias="WORKFLOW_RUN_TIMEOUT_SECONDS"
+    )
     context_token_limit: int = Field(default=32768, ge=1024, validation_alias="CONTEXT_TOKEN_LIMIT")
 
     model_config = SettingsConfigDict(env_file=ROOT_ENV_FILE, extra="ignore")
