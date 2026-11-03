@@ -10,7 +10,9 @@ describe('HealthController (e2e)', () => {
     process.env.DATABASE_URL ??= 'postgresql://minicoze:minicoze@localhost:5432/minicoze';
     const { AppModule } = await import('../src/app.module');
 
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix('api');
     await app.init();

@@ -15,6 +15,7 @@ interface AuthErrorResponse {
   message: string | string[];
   path: string;
   timestamp: string;
+  details?: unknown;
 }
 
 @Catch()
@@ -46,6 +47,12 @@ export class HttpExceptionFilter implements ExceptionFilter {
       }
     }
 
+    const details = exceptionResponse !== null
+      && typeof exceptionResponse === 'object'
+      && 'details' in exceptionResponse
+      ? (exceptionResponse as { details?: unknown }).details
+      : undefined;
+
     if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
       this.logger.error(
         `${request.method} ${request.url} → ${status}`,
@@ -62,6 +69,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
         path: request.url,
         timestamp: new Date().toISOString(),
       };
+      if (details !== undefined) {
+        body.details = details;
+      }
       response.status(status).json(body);
       return;
     }
@@ -70,6 +80,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       code: status,
       message: Array.isArray(message) ? message.join('; ') : message,
       data: null,
+      ...(details !== undefined ? { details } : {}),
     });
   }
 }

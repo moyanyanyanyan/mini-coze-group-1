@@ -71,7 +71,7 @@
 
 建流前错误体保持 `{statusCode,message,path,timestamp}`，附 `X-Runtime-Error-Code` 响应头，不回显输入或供应商响应。建流后仍为 HTTP 200，通过 run.failed 的 `{code,message,retryable}` 表示失败，不再发送 completed。主要映射：400 INVALID_REQUEST；模型未配置/余额不足/限流为 503 MODEL_NOT_CONFIGURED/MODEL_QUOTA_EXCEEDED/MODEL_RATE_LIMITED；超时 504；供应商认证失败为内部依赖 502 MODEL_AUTH_FAILED，不能解释成终端用户登录失效。
 
-NestJS 负责鉴权和持久化：将 actor.id 解析为登录用户/API Key 所有者，组装已授权 AgentConfig 与历史；内部 knowledge.result 的正文/分数必须投影后才能发给外部；收到 run.completed 后先保存，再向客户端宣布完成。失败、取消、无终态断流均不能存成 completed。
+NestJS 负责鉴权和持久化：将 actor.id 解析为登录用户/API Key 所有者，组装已授权 AgentConfig 与历史；Runtime 的 knowledge.result 已仅含 status/citations，正文与分数不进入事件；收到 run.completed 后先保存，再向客户端宣布完成。失败、取消、无终态断流均不能存成 completed。
 
 ### 工作流公共函数
 
@@ -158,3 +158,12 @@ $env:PYTHONPATH='apps/agent'
 官方依据：https://api-docs.siliconflow.cn/docs/userguide/introduction 与其Chat Completions接口文档。
 
 最终离线验证：pnpm typecheck 与 pnpm test 通过，前端3项、后端1项、Python45项；Python侧保留已知Starlette/AnyIO弃用警告。未新增项目依赖，真实硅基流动生成未通过的原因如上。
+
+
+## 2026-10-25 最新联调结论
+
+依据管逸恬最新回复，聊天侧按 `{status,citations}` 接收 knowledge.result；本分支已同步这一事件格式。Provider仍在内部返回chunks用于模型参考，上下文预算校验通过后才发送来源事件；预算失败不提前公告未使用的来源。matched返回实际纳入参考上下文的来源，no_match返回citations=[]，不传chunks、片段正文或score。真实NestJS SSE转发尚待联调，不能将本地事件测试算成页面已接通。
+
+复用集成分支9224624的通用OpenAI兼容网关适配与两项Mock回归：新增MODEL_PROVIDER=openai_compatible，通用模式不发送thinking/enable_thinking或供应商专有stream_options。显式供应商配置优先，未显式指定时按官方域名识别DeepSeek/硅基流动，其余地址按通用协议处理。未更改本地.env、密钥、网关或模型选择，不自动重试；同事使用个人网关的成功/超时记录不作为本机验证结果。
+
+本轮49项Python测试通过；新增验证引用事件不含正文、正文仍进入模型上下文、no_match空来源、预算拒绝不公告来源，以及通用网关run/stream参数。插件仍沿用服务凭证调用，未提前实现自动Tool Call或替代插件模块的组合Guard。

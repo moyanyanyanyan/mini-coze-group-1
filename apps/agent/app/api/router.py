@@ -7,6 +7,7 @@ from starlette.concurrency import run_in_threadpool
 from app.config import get_settings
 from app.knowledge.embedding import embed_texts
 from app.api.runtime import router as runtime_router
+from app.workflow.router import router as workflow_router
 
 api_router = APIRouter()
 api_router.include_router(runtime_router)
@@ -37,3 +38,5 @@ async def create_embeddings(
         return await run_in_threadpool(embed_texts, request.texts)
     except Exception as exc:
         raise HTTPException(status_code=503, detail="Embedding model is unavailable") from exc
+
+api_router.include_router(workflow_router)

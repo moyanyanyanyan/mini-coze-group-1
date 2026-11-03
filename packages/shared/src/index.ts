@@ -85,3 +85,4 @@ export interface SendMessageResult {
   userMessage: ChatMessage;
   assistantMessage: ChatMessage;
 }
+export * from './workflow';
