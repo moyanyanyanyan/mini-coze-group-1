@@ -1,3 +1,5 @@
+import { ApiKeyManagementPage } from './api-management';
+
 export function PublishSdkPage() {
-  return <section className="feature-page" aria-label="发布管理" />;
+  return <ApiKeyManagementPage />;
 }
