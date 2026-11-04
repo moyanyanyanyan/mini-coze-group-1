@@ -1,10 +1,10 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
-import { BUILTIN_PLUGIN_CATALOG } from '../data/plugins.data';
-import { EchoExecutor } from '../executors/echo.executor';
+import {
+  BUILTIN_PLUGINS,
+  type BuiltinPluginRegistration,
+} from '../data/plugins.data';
 import { HttpExecutor } from '../executors/http.executor';
-import { TimeExecutor } from '../executors/time.executor';
 import type { ToolExecutor } from '../executors/tool-executor.interface';
 import type {
   PluginCatalogItem,
@@ -27,7 +27,7 @@ interface PluginRow {
 /**
  * 插件注册表：目录数据来自 PostgreSQL，执行器按插件类型分发。
  *
- * - 内置插件（echo/time）启动时由代码 upsert 进 DB，执行器走代码类。
+ * - 内置插件启动时由统一注册表 upsert 进 DB，执行器走代码类。
  * - 用户自定义插件（kind = http）由 POST /api/plugins 写入 DB，
  *   执行时按 endpoint 动态构造 {@link HttpExecutor}。
  * - 内存 catalog 是 DB 数据的只读缓存，创建/删除插件后调 {@link reload} 刷新。
@@ -43,9 +43,12 @@ export class PluginRegistry implements OnModuleInit {
   constructor(private readonly prisma: PrismaService) {}
 
   async onModuleInit(): Promise<void> {
-    // 注册内置代码执行器（不依赖 DB）
-    this.registerBuiltinExecutor(new EchoExecutor());
-    this.registerBuiltinExecutor(new TimeExecutor());
+    validateBuiltinPlugins(BUILTIN_PLUGINS);
+    for (const { executors } of BUILTIN_PLUGINS) {
+      for (const executor of executors) {
+        this.registerBuiltinExecutor(executor);
+      }
+    }
 
     try {
       // 1. 把内置插件目录 + 工具定义 upsert 进 DB，保证 DB 是唯一事实来源
@@ -54,19 +57,15 @@ export class PluginRegistry implements OnModuleInit {
       await this.reload();
     } catch (err) {
       // 本地开发无 DB 时回退到内存内置插件，保证后端能启动看页面
-      this.logger.warn(`数据库不可用，回退到内存内置插件：${(err as Error).message}`);
-      for (const meta of BUILTIN_PLUGIN_CATALOG) {
-        const tool = meta.pluginId === 'plugin_echo'
-          ? new EchoExecutor().definition
-          : new TimeExecutor().definition;
-        this.catalog.set(meta.pluginId, {
-          pluginId: meta.pluginId,
-          title: meta.title,
-          content: meta.content,
-          icon: meta.icon ?? undefined,
-          tags: Array.isArray(meta.tags) ? meta.tags : [],
-          configSchema: {},
-          tools: [tool],
+      this.logger.warn(
+        `数据库不可用，回退到内存内置插件：${(err as Error).message}`,
+      );
+      for (const { catalog, executors } of BUILTIN_PLUGINS) {
+        this.catalog.set(catalog.pluginId, {
+          ...catalog,
+          tags: Array.isArray(catalog.tags) ? catalog.tags : [],
+          configSchema: catalog.configSchema ?? {},
+          tools: executors.map((executor) => executor.definition),
         });
       }
     }
@@ -74,37 +73,27 @@ export class PluginRegistry implements OnModuleInit {
 
   /** 启动时把内置插件写入 DB（已存在则按元数据更新，不覆盖 enabled）。 */
   private async seedBuiltinPlugins(): Promise<void> {
-    const seeds: Array<{ meta: (typeof BUILTIN_PLUGIN_CATALOG)[number]; tools: PluginToolDefinition[] }> = [
-      {
-        meta: BUILTIN_PLUGIN_CATALOG[0],
-        tools: [new EchoExecutor().definition],
-      },
-      {
-        meta: BUILTIN_PLUGIN_CATALOG[1],
-        tools: [new TimeExecutor().definition],
-      },
-    ];
-
-    for (const { meta, tools } of seeds) {
+    for (const { catalog, executors } of BUILTIN_PLUGINS) {
+      const tools = executors.map((executor) => executor.definition);
       await this.prisma.plugin.upsert({
-        where: { pluginId: meta.pluginId },
+        where: { pluginId: catalog.pluginId },
         create: {
-          pluginId: meta.pluginId,
-          title: meta.title,
-          content: meta.content,
-          icon: meta.icon ?? null,
-          tags: (meta.tags ?? []) as object,
-          configSchema: (meta.configSchema ?? {}) as object,
+          pluginId: catalog.pluginId,
+          title: catalog.title,
+          content: catalog.content,
+          icon: catalog.icon ?? null,
+          tags: (catalog.tags ?? []) as object,
+          configSchema: (catalog.configSchema ?? {}) as object,
           tools: tools as object,
           kind: 'builtin',
           enabled: true,
         },
         update: {
-          title: meta.title,
-          content: meta.content,
-          icon: meta.icon ?? null,
-          tags: (meta.tags ?? []) as object,
-          configSchema: (meta.configSchema ?? {}) as object,
+          title: catalog.title,
+          content: catalog.content,
+          icon: catalog.icon ?? null,
+          tags: (catalog.tags ?? []) as object,
+          configSchema: (catalog.configSchema ?? {}) as object,
           tools: tools as object,
           kind: 'builtin',
         },
@@ -138,7 +127,9 @@ export class PluginRegistry implements OnModuleInit {
       icon: row.icon ?? undefined,
       tags: Array.isArray(row.tags) ? (row.tags as string[]) : [],
       configSchema: (row.configSchema as Record<string, unknown>) ?? {},
-      tools: Array.isArray(row.tools) ? (row.tools as PluginToolDefinition[]) : [],
+      tools: Array.isArray(row.tools)
+        ? (row.tools as PluginToolDefinition[])
+        : [],
     };
   }
 
@@ -165,7 +156,9 @@ export class PluginRegistry implements OnModuleInit {
     const result: PluginToolDefinition[] = [];
     for (const pluginId of pluginIds) {
       const item = this.catalog.get(pluginId);
-      if (!item) continue;
+      if (!item) {
+        continue;
+      }
       for (const tool of item.tools) {
         result.push({ ...tool });
       }
@@ -180,11 +173,15 @@ export class PluginRegistry implements OnModuleInit {
    */
   getExecutor(toolName: string): ToolExecutor | undefined {
     const builtin = this.builtinExecutors.get(toolName);
-    if (builtin) return builtin;
+    if (builtin) {
+      return builtin;
+    }
 
     for (const item of this.catalog.values()) {
       const tool = item.tools.find((t) => t.name === toolName);
-      if (!tool) continue;
+      if (!tool) {
+        continue;
+      }
 
       // 通过 row 缓存反查 kind/endpoint（reload 时已填充）
       const row = this.rowCache.get(item.pluginId);
@@ -205,5 +202,39 @@ export class PluginRegistry implements OnModuleInit {
   async getRow(pluginId: string): Promise<PluginRow | null> {
     const row = await this.prisma.plugin.findUnique({ where: { pluginId } });
     return (row as unknown as PluginRow) ?? null;
+  }
+}
+
+/** 在访问数据库前校验内置插件声明，避免带着不完整注册表启动。 */
+export function validateBuiltinPlugins(
+  registrations: BuiltinPluginRegistration[],
+): void {
+  const pluginIds = new Set<string>();
+  const toolNames = new Set<string>();
+
+  for (const { catalog, executors } of registrations) {
+    if (pluginIds.has(catalog.pluginId)) {
+      throw new Error(
+        `内置插件 ID 必须唯一，但 "${catalog.pluginId}" 重复注册`,
+      );
+    }
+    pluginIds.add(catalog.pluginId);
+
+    if (executors.length === 0) {
+      throw new Error(`内置插件 "${catalog.pluginId}" 至少需要一个执行器`);
+    }
+
+    for (const executor of executors) {
+      const definition = executor.definition;
+      if (definition.pluginId !== catalog.pluginId) {
+        throw new Error(
+          `工具 "${definition.name}" 属于 "${definition.pluginId}"，与注册插件 "${catalog.pluginId}" 不一致`,
+        );
+      }
+      if (toolNames.has(definition.name)) {
+        throw new Error(`工具名必须全局唯一，但 "${definition.name}" 重复注册`);
+      }
+      toolNames.add(definition.name);
+    }
   }
 }

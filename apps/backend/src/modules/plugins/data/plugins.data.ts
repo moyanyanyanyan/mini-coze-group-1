@@ -1,29 +1,40 @@
 import type { PluginCatalogItem } from '../types/plugin-tool';
+import { EchoExecutor } from '../executors/echo.executor';
+import { TimeExecutor } from '../executors/time.executor';
+import type { ToolExecutor } from '../executors/tool-executor.interface';
 
 /**
- * 内置插件目录（week2 仅内置 echo / time 两个插件，不做持久化）。
- * tools[].parameters 与 registry 中注册的工具定义同源，根 Schema 均带 additionalProperties: false。
+ * 内置插件的单一注册源。目录中的工具定义统一从执行器派生，避免目录、
+ * 数据库 Seed 与内存降级配置分别维护后产生不一致。
  */
-export const BUILTIN_PLUGIN_CATALOG: PluginCatalogItem[] = [
+export interface BuiltinPluginRegistration {
+  catalog: Omit<PluginCatalogItem, 'id' | 'tools'>;
+  executors: ToolExecutor[];
+}
+
+export const BUILTIN_PLUGINS: BuiltinPluginRegistration[] = [
   {
-    id: 1,
-    pluginId: 'plugin_echo',
-    title: '文本回显',
-    content: '把输入文本原样回显，并记录提交时间。适合调试插件链路与参数传递。',
-    icon: 'echo',
-    tags: ['内置', '调试'],
-    configSchema: {},
-    // tools 在 registry 中按工具名注册后由 registry 组装，这里仅保留目录元信息
-    tools: [],
+    catalog: {
+      pluginId: 'plugin_echo',
+      title: '文本回显',
+      content:
+        '把输入文本原样回显，并记录提交时间。适合调试插件链路与参数传递。',
+      icon: 'echo',
+      tags: ['内置', '调试'],
+      configSchema: {},
+    },
+    executors: [new EchoExecutor()],
   },
   {
-    id: 2,
-    pluginId: 'plugin_time',
-    title: '当前时间',
-    content: '返回服务器当前时间，可按 IANA 时区格式化。常用于让 Agent 获取实时时间。',
-    icon: 'clock',
-    tags: ['内置', '时间'],
-    configSchema: {},
-    tools: [],
+    catalog: {
+      pluginId: 'plugin_time',
+      title: '当前时间',
+      content:
+        '返回服务器当前时间，可按 IANA 时区格式化。常用于让 Agent 获取实时时间。',
+      icon: 'clock',
+      tags: ['内置', '时间'],
+      configSchema: {},
+    },
+    executors: [new TimeExecutor()],
   },
 ];
