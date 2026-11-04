@@ -33,9 +33,29 @@ it('passes the selected Agent configuration to Runtime and saves before completi
     stream: async function* (request: RuntimeRequestBody): AsyncGenerator<RuntimeSseEvent> {
       runtimeRequest = request;
       const envelope = { runId: request.runId, conversationId: request.conversationId, timestamp: new Date().toISOString() };
-      yield { ...envelope, seq: 1, type: 'run.started', data: {} };
+      yield {
+        ...envelope,
+        seq: 1,
+        type: 'run.started',
+        data: { assistantMessageId: request.assistantMessageId },
+      };
       yield { ...envelope, seq: 2, type: 'message.delta', data: { content: '40 元' } };
-      yield { ...envelope, seq: 3, type: 'run.completed', data: { content: '40 元' } };
+      yield {
+        ...envelope,
+        seq: 3,
+        type: 'run.completed',
+        data: {
+          runId: request.runId,
+          conversationId: request.conversationId,
+          assistantMessageId: request.assistantMessageId,
+          status: 'completed',
+          content: '40 元',
+          finishReason: 'stop',
+          usage: null,
+          citations: [],
+          toolResults: [],
+        },
+      };
     },
   } as unknown as RuntimeClientService;
   const service = new ChatService(prisma, conversations, {} as MessagesService, runtime, agents);

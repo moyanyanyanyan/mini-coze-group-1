@@ -3,6 +3,7 @@ import {
   RuntimeClientService,
   type RuntimeRequestBody,
   type RuntimeResult,
+  type RuntimeSseEvent,
 } from './runtime-client.service';
 
 const request: RuntimeRequestBody = {
@@ -41,6 +42,40 @@ const result: RuntimeResult = {
   citations: [],
   toolResults: [],
 };
+
+const encoder = new TextEncoder();
+
+function sseResponse(chunks: string[], status = 200): Response {
+  return new Response(new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+      controller.close();
+    },
+  }), { status });
+}
+
+function sseFrame(
+  seq: number,
+  type: RuntimeSseEvent['type'],
+  data: unknown,
+  lineEnding = '\n',
+): string {
+  const event: RuntimeSseEvent = {
+    runId: request.runId,
+    conversationId: request.conversationId,
+    seq,
+    timestamp: '2026-11-04T00:00:00Z',
+    type,
+    data: data as Record<string, unknown>,
+  };
+  return [
+    `id: ${request.runId}:${seq}`,
+    `event: ${type}`,
+    `data: ${JSON.stringify(event)}`,
+    '',
+    '',
+  ].join(lineEnding);
+}
 
 const originalBaseUrl = process.env.AGENT_SERVICE_URL;
 const originalToken = process.env.INTERNAL_SERVICE_TOKEN;
@@ -185,5 +220,112 @@ describe('RuntimeClientService.run', () => {
       options: { kind: 'configuration' },
     });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('RuntimeClientService.stream', () => {
+  it('calls the Runtime stream endpoint and parses SSE events', async () => {
+    const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(sseResponse([
+      ': heartbeat\r\n\r\n',
+      sseFrame(1, 'run.started', { assistantMessageId: 'assistant-message-1' }, '\r\n'),
+      sseFrame(2, 'message.delta', { content: '你好' }, '\r\n'),
+      sseFrame(3, 'run.completed', result, '\r\n'),
+    ]));
+    const events: RuntimeSseEvent[] = [];
+
+    for await (const event of createClient().stream(request)) events.push(event);
+
+    expect(events.map((event) => event.type)).toEqual([
+      'run.started',
+      'message.delta',
+      'run.completed',
+    ]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://runtime.test/internal/runtime/stream',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify(request),
+        headers: expect.objectContaining({
+          Authorization: 'Bearer test-internal-token',
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream',
+        }),
+      }),
+    );
+  });
+
+  it('preserves an HTTP preflight Runtime error code', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValue(new Response(
+      JSON.stringify({ message: '模型限流' }),
+      {
+        status: 503,
+        headers: { 'X-Runtime-Error-Code': 'MODEL_RATE_LIMITED' },
+      },
+    ));
+
+    let error: unknown;
+    try {
+      for await (const _event of createClient().stream(request)) {
+        // The HTTP preflight must fail before yielding any event.
+      }
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error).toMatchObject({
+      code: 'MODEL_RATE_LIMITED',
+      options: { kind: 'runtime', httpStatus: 503 },
+    });
+  });
+
+  it('forwards caller cancellation to the upstream request', async () => {
+    jest.spyOn(global, 'fetch').mockImplementation((_url, init) => new Promise<Response>((resolve) => {
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          init?.signal?.addEventListener('abort', () => {
+            controller.error(init.signal?.reason);
+          }, { once: true });
+          controller.enqueue(encoder.encode(sseFrame(
+            1,
+            'run.started',
+            { assistantMessageId: 'assistant-message-1' },
+          )));
+        },
+      });
+      resolve(new Response(stream, { status: 200 }));
+    }));
+    const controller = new AbortController();
+    const iterator = createClient().stream(request, controller.signal);
+    await iterator.next();
+    const pending = iterator.next();
+    controller.abort(new Error('caller stopped'));
+
+    await expect(pending).rejects.toMatchObject({
+      code: 'REQUEST_ABORTED',
+      options: { kind: 'aborted' },
+    });
+  });
+
+  it('reports stream timeout separately', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(global, 'fetch').mockImplementation((_url, init) => (
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener(
+          'abort',
+          () => reject(init.signal?.reason),
+          { once: true },
+        );
+      })
+    ));
+
+    const pending = createClient().stream(request)
+      .next()
+      .catch((caught: unknown) => caught);
+    await jest.advanceTimersByTimeAsync(190_000);
+
+    await expect(pending).resolves.toMatchObject({
+      code: 'RUN_TIMEOUT',
+      options: { kind: 'timeout' },
+    });
   });
 });

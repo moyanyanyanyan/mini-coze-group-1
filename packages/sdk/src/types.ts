@@ -34,3 +34,73 @@ export interface RunOptions {
   signal?: AbortSignal;
   timeoutMs?: number;
 }
+
+export type StreamOptions = RunOptions;
+
+export interface RunCitation {
+  knowledgeBaseId: string;
+  documentId: string;
+  chunkId: string;
+  title: string;
+  position?: Record<string, unknown> | null;
+}
+
+interface RunStreamEventBase {
+  runId: string;
+  conversationId: string;
+  seq: number;
+  timestamp: string;
+  sseId: string;
+}
+
+export type RunStreamEvent =
+  | (RunStreamEventBase & {
+      type: 'run.started';
+      data: { assistantMessageId: string };
+    })
+  | (RunStreamEventBase & {
+      type: 'knowledge.result';
+      data: {
+        status: 'matched' | 'no_match';
+        citations: RunCitation[];
+      };
+    })
+  | (RunStreamEventBase & {
+      type: 'message.delta';
+      data: { content: string };
+    })
+  | (RunStreamEventBase & {
+      type: 'tool.started';
+      data: {
+        toolCallId: string;
+        toolName: string;
+      };
+    })
+  | (RunStreamEventBase & {
+      type: 'tool.completed';
+      data:
+        | {
+            toolCallId: string;
+            toolName: string;
+            status: 'succeeded';
+            output: unknown;
+          }
+        | {
+            toolCallId: string;
+            toolName: string;
+            status: 'failed';
+            error: Record<string, string>;
+          };
+    })
+  | (RunStreamEventBase & {
+      type: 'run.completed';
+      data: RunResult;
+    })
+  | (RunStreamEventBase & {
+      type: 'run.failed';
+      data: {
+        code: string;
+        message: string;
+        retryable: boolean;
+      };
+    });

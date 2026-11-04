@@ -23,5 +23,8 @@ export type {
   RunOptions,
   RunParams,
   RunResult,
+  RunCitation,
+  RunStreamEvent,
   RunUsage,
+  StreamOptions,
 } from './types.js';

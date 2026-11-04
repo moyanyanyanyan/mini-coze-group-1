@@ -14,6 +14,7 @@ import { AgentsService } from '../modules/agents/agents.service';
 import {
   RuntimeClientService,
   RuntimeCallError,
+  isRuntimeResult,
   type RuntimeAgentConfig,
   type RuntimeHistoryMessage,
   type RuntimeRequestBody,
@@ -30,6 +31,9 @@ export interface RunChatInput {
   content: string;
   /** 前端「停止生成」断开连接时，NestJS 会触发它，一路 abort 到 Runtime（C4） */
   signal: AbortSignal;
+  /** 公开 API 使用已发布 Snapshot；网页端省略并在内部读取当前配置。 */
+  agentId?: string;
+  agentConfig?: RuntimeAgentConfig;
 }
 
 export interface RunOnceInput {
@@ -110,6 +114,10 @@ export class ChatService {
         run.request.assistantMessageId,
         result.content,
         'completed',
+        {
+          runId: run.request.runId,
+          conversationId: input.conversationId,
+        },
       );
       if (!saved) {
         throw new RuntimeCallError(
@@ -121,7 +129,15 @@ export class ChatService {
 
       return result;
     } catch (error) {
-      await this.persist(run.request.assistantMessageId, '', 'failed');
+      await this.persist(
+        run.request.assistantMessageId,
+        '',
+        'failed',
+        {
+          runId: run.request.runId,
+          conversationId: input.conversationId,
+        },
+      );
       throw error;
     }
   }
@@ -132,81 +148,286 @@ export class ChatService {
       input.conversationId,
       input.userId,
     );
-    if (!conversation.agentId) {
+    if (
+      (input.agentId === undefined) !== (input.agentConfig === undefined)
+    ) {
+      throw new HttpException(
+        'Agent 标识与发布配置必须同时提供',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+    const agentId = input.agentId ?? conversation.agentId;
+    if (!agentId) {
       throw new HttpException('请先选择智能体', HttpStatus.BAD_REQUEST);
     }
-    const agentConfig = await this.agents.getAgentConfig(conversation.agentId, input.userId);
+    if (conversation.agentId !== agentId) {
+      throw new ForbiddenException('会话不属于指定 Agent');
+    }
+    const agentConfig = input.agentConfig
+      ?? await this.agents.getAgentConfig(agentId, input.userId);
 
     const run = await this.prepareRun({
       conversationId: input.conversationId,
       userId: input.userId,
-      agentId: conversation.agentId,
+      agentId,
       content: input.content,
       agentConfig,
     });
     const request = run.request;
+    const persistContext = {
+      runId: request.runId,
+      conversationId: request.conversationId,
+    };
 
     //   消费流。铁律：终止事件（completed/failed）必须落库成功才转发，
     //    否则前端会以为生成成功了，刷新后内容却没了
     let content = '';
     let terminal: RuntimeSseEvent | null = null;
+    let started = false;
+    let lastSeq = 0;
+    let finalized = false;
 
     try {
-      for await (const event of this.runtime.stream(request, input.signal)) {
-        // 流式聊天
-        if (event.type === 'message.delta') {
-          content += String(event.data.content ?? '');
+      try {
+        for await (const event of this.runtime.stream(request, input.signal)) {
+          if (
+            event.runId !== request.runId
+            || event.conversationId !== request.conversationId
+            || event.seq !== lastSeq + 1
+          ) {
+            throw new RuntimeCallError(
+              'MODEL_PROTOCOL_ERROR',
+              'Runtime SSE 标识或序号不连续',
+              { kind: 'http' },
+            );
+          }
+          lastSeq = event.seq;
+
+          if (!started) {
+            if (
+              event.type !== 'run.started'
+              || event.data.assistantMessageId !== request.assistantMessageId
+            ) {
+              throw new RuntimeCallError(
+                'MODEL_PROTOCOL_ERROR',
+                'Runtime 未按约定启动本轮运行',
+                { kind: 'http' },
+              );
+            }
+            started = true;
+          } else if (event.type === 'run.started') {
+            throw new RuntimeCallError(
+              'MODEL_PROTOCOL_ERROR',
+              'Runtime 重复发送运行开始事件',
+              { kind: 'http' },
+            );
+          }
+
+          // 流式聊天
+          if (event.type === 'message.delta') {
+            if (typeof event.data.content !== 'string') {
+              throw new RuntimeCallError(
+                'MODEL_PROTOCOL_ERROR',
+                'Runtime 文本增量格式无效',
+                { kind: 'http' },
+              );
+            }
+            content += event.data.content;
+            yield event;
+            continue;
+          }
+          if (event.type === 'knowledge.result') {
+            if (
+              (event.data.status !== 'matched' && event.data.status !== 'no_match')
+              || !Array.isArray(event.data.citations)
+            ) {
+              throw new RuntimeCallError(
+                'MODEL_PROTOCOL_ERROR',
+                'Runtime 知识库事件结构不符合约定',
+                { kind: 'http' },
+              );
+            }
+            yield event;
+            continue;
+          }
+          // 处理终止事件
+          if (event.type === 'run.completed') {
+            if (
+              !isRuntimeResult(event.data)
+              || event.data.runId !== request.runId
+              || event.data.conversationId !== request.conversationId
+              || event.data.assistantMessageId !== request.assistantMessageId
+            ) {
+              throw new RuntimeCallError(
+                'MODEL_PROTOCOL_ERROR',
+                'Runtime 完成事件结构不符合约定',
+                { kind: 'http' },
+              );
+            }
+            terminal = event;
+            break;
+          }
+          if (event.type === 'run.failed') {
+            if (
+              typeof event.data.code !== 'string'
+              || typeof event.data.message !== 'string'
+              || typeof event.data.retryable !== 'boolean'
+            ) {
+              throw new RuntimeCallError(
+                'MODEL_PROTOCOL_ERROR',
+                'Runtime 失败事件结构不符合约定',
+                { kind: 'http' },
+              );
+            }
+            terminal = event;
+            break;
+          }
+          // run.started / knowledge.result / tool.* 原样透传
           yield event;
-          continue;
         }
-        // 处理终止事件
-        if (event.type === 'run.completed' || event.type === 'run.failed') {
-          terminal = event;
-          break;
+      } catch (error) {
+        if (
+          this.isAbort(error)
+          || (error instanceof RuntimeCallError && error.options.kind === 'aborted')
+          || input.signal.aborted
+        ) {
+          finalized = true;
+          await this.persist(
+            request.assistantMessageId,
+            content,
+            'cancelled',
+            persistContext,
+          );
+          return;
         }
-        // run.started / knowledge.result / tool.* 原样透传
-        yield event;
-      }
-    } catch (error) {
-      if (error instanceof RuntimeCallError) {
-        await this.persist(request.assistantMessageId, content, 'failed');
-        yield this.failedEnvelope(request, error.code, error.message, false);
+
+        const runtimeError = error instanceof RuntimeCallError
+          ? error
+          : new RuntimeCallError(
+              'INTERNAL_ERROR',
+              '生成失败，请稍后重试',
+              { kind: 'runtime', cause: error },
+            );
+        const saved = await this.persist(
+          request.assistantMessageId,
+          content,
+          'failed',
+          persistContext,
+        );
+        finalized = true;
+        if (!started) throw runtimeError;
+        if (!saved) {
+          yield this.failedEnvelope(
+            request,
+            'PERSISTENCE_FAILED',
+            '回复保存失败',
+            true,
+            lastSeq,
+          );
+          return;
+        }
+        yield this.failedEnvelope(
+          request,
+          runtimeError.code,
+          runtimeError.message,
+          this.isRetryable(runtimeError),
+          lastSeq,
+        );
         return;
       }
-      //用户主动停止
-      if (this.isAbort(error)) {
-        //  C4 接缝：用户主动停止，半截内容保留，标 cancelled
-        await this.persist(request.assistantMessageId, content, 'cancelled');
+
+      if (!terminal) {
+        const saved = await this.persist(
+          request.assistantMessageId,
+          content,
+          'failed',
+          persistContext,
+        );
+        finalized = true;
+        const interrupted = new RuntimeCallError(
+          'MODEL_STREAM_INTERRUPTED',
+          'Runtime 流在终态前中断',
+          { kind: 'http' },
+        );
+        if (!started) throw interrupted;
+        yield this.failedEnvelope(
+          request,
+          saved ? interrupted.code : 'PERSISTENCE_FAILED',
+          saved ? interrupted.message : '回复保存失败',
+          true,
+          lastSeq,
+        );
         return;
       }
-      await this.persist(request.assistantMessageId, content, 'failed');
-      yield this.failedEnvelope(request, 'RUNTIME_UNAVAILABLE', '生成失败，请稍后重试', true);
-      return;
-    }
 
-    if (!terminal) {
-      // 流断了但没收到终止事件：按契约「断连无终止事件按中断处理」
-      await this.persist(request.assistantMessageId, content, 'cancelled');
-      return;
-    }
+      if (terminal.type === 'run.completed') {
+        const finalContent = String(terminal.data.content ?? '');
+        if (finalContent !== content) {
+          const saved = await this.persist(
+            request.assistantMessageId,
+            content,
+            'failed',
+            persistContext,
+          );
+          finalized = true;
+          yield this.failedEnvelope(
+            request,
+            saved ? 'MODEL_PROTOCOL_ERROR' : 'PERSISTENCE_FAILED',
+            saved ? 'Runtime 最终内容与文本增量不一致' : '回复保存失败',
+            false,
+            lastSeq,
+          );
+          return;
+        }
+        const saved = await this.persist(
+          request.assistantMessageId,
+          finalContent,
+          'completed',
+          persistContext,
+        );
+        finalized = true;
+        if (!saved) {
+          yield this.failedEnvelope(
+            request,
+            'PERSISTENCE_FAILED',
+            '回复保存失败',
+            true,
+            lastSeq,
+          );
+          return;
+        }
+        yield terminal;
+        return;
+      }
 
-    if (terminal.type === 'run.completed') {
-      const finalContent = String(terminal.data.content ?? '') || content;
       const saved = await this.persist(
         request.assistantMessageId,
-        finalContent,
-        'completed',
+        content,
+        'failed',
+        persistContext,
       );
+      finalized = true;
       if (!saved) {
-        yield this.failedEnvelope(request, 'PERSISTENCE_FAILED', '回复保存失败', true);
+        yield this.failedEnvelope(
+          request,
+          'PERSISTENCE_FAILED',
+          '回复保存失败',
+          true,
+          lastSeq,
+        );
         return;
       }
       yield terminal;
-      return;
+    } finally {
+      if (!finalized) {
+        await this.persist(
+          request.assistantMessageId,
+          content,
+          'cancelled',
+          persistContext,
+        );
+      }
     }
-
-    await this.persist(request.assistantMessageId, content, 'failed');
-    yield terminal;
   }
 
   private async prepareRun(input: {
@@ -330,6 +551,7 @@ export class ChatService {
     assistantMessageId: string,
     content: string,
     status: 'completed' | 'failed' | 'cancelled' | 'running',
+    context?: { runId: string; conversationId: string },
   ): Promise<boolean> {
     try {
       await this.prisma.message.update({
@@ -338,7 +560,10 @@ export class ChatService {
       });
       return true;
     } catch (error) {
-      this.logger.error(`消息落库失败 id=${assistantMessageId}`, error as Error);
+      const errorType = error instanceof Error ? error.name : typeof error;
+      this.logger.error(
+        `消息落库失败 runId=${context?.runId ?? 'unknown'} conversationId=${context?.conversationId ?? 'unknown'} messageId=${assistantMessageId} status=${status} errorType=${errorType}`,
+      );
       return false;
     }
   }
@@ -347,17 +572,23 @@ export class ChatService {
     return error instanceof Error && error.name === 'AbortError';
   }
 
+  private isRetryable(error: RuntimeCallError): boolean {
+    return error.options.kind === 'network'
+      || error.options.kind === 'timeout';
+  }
+
   /** 自己造一个 failed 信封，结构和 Runtime 发的一致，前端不用特殊处理 */
   private failedEnvelope(
     request: RuntimeRequestBody,
     code: string,
     message: string,
     retryable: boolean,
+    seq: number,
   ): RuntimeSseEvent {
     return {
       runId: request.runId,
       conversationId: request.conversationId,
-      seq: Number.MAX_SAFE_INTEGER,
+      seq: seq + 1,
       timestamp: new Date().toISOString(),
       type: 'run.failed',
       data: { code, message, retryable },

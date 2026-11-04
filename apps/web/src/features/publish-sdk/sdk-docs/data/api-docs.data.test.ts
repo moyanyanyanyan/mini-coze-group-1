@@ -3,13 +3,18 @@ import {
   API_DOC_SECTIONS,
   ENDPOINTS,
   FAQ_ITEMS,
+  HTTP_STATUSES,
   QUICK_START_SAMPLES,
+  RUNTIME_ERRORS,
   REQUEST_PARAMETERS,
   RUN_ERROR_SAMPLE,
   RUN_REQUEST_SAMPLE,
   RUN_RESPONSE_SAMPLE,
   SDK_TYPES,
   SSE_EVENTS,
+  STREAM_REQUEST_SAMPLE,
+  STREAM_RESPONSE_SAMPLE,
+  TOOL_EVENTS_SAMPLE,
 } from './api-docs.data';
 
 describe('API docs mock content', () => {
@@ -43,14 +48,35 @@ describe('API docs mock content', () => {
     expect(RUN_ERROR_SAMPLE.code).toContain('"data": null');
   });
 
-  it('keeps the unimplemented Stream contract explicitly pending', () => {
-    expect(SSE_EVENTS).toEqual([]);
+  it('matches the implemented Stream contract', () => {
+    expect(ENDPOINTS[1]).toMatchObject({
+      method: 'POST',
+      path: '/api/v1/stream',
+    });
+    expect(SSE_EVENTS.map((event) => event.name)).toEqual([
+      'run.started',
+      'knowledge.result',
+      'message.delta',
+      'tool.started',
+      'tool.completed',
+      'run.completed',
+      'run.failed',
+    ]);
+    expect(STREAM_REQUEST_SAMPLE.code).toContain('/api/v1/stream');
+    expect(STREAM_REQUEST_SAMPLE.code).toContain('Accept: text/event-stream');
+    expect(STREAM_RESPONSE_SAMPLE.code).toContain('id: run_example:1');
+    expect(TOOL_EVENTS_SAMPLE.code).toContain('event: tool.started');
+    expect(TOOL_EVENTS_SAMPLE.code).toContain('"status":"failed"');
+    expect(HTTP_STATUSES.some((item) => item.status === '501')).toBe(false);
     expect(SDK_TYPES.map((row) => row.name)).toEqual([
       'MiniCozeClientOptions',
       'RunParams',
       'RunOptions',
       'RunResult',
+      'StreamOptions',
+      'RunStreamEvent',
     ]);
-    expect(FAQ_ITEMS).toHaveLength(5);
+    expect(FAQ_ITEMS).toHaveLength(6);
+    expect(RUNTIME_ERRORS).toHaveLength(32);
   });
 });

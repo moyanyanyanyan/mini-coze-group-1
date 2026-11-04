@@ -6,6 +6,7 @@ import {
   MiniCozeSDKError,
   MiniCozeTimeoutError,
 } from './errors.js';
+import { parseSSEStream, type SSEEvent } from '../stream/sse-parser.js';
 
 export type FetchImplementation = (
   input: string,
@@ -189,20 +190,7 @@ export class HttpClient {
       }
 
       if (!response.ok) {
-        const details = extractErrorDetails(payload);
-        const traceId = response.headers.get('x-trace-id')
-          ?? response.headers.get('traceparent')
-          ?? undefined;
-        const message = details.message
-          ? this.#redact(details.message)
-          : `HTTP request failed with status ${response.status}`;
-
-        throw new MiniCozeHTTPError(message, {
-          httpStatus: response.status,
-          errorCode: details.code ? this.#redact(details.code) : undefined,
-          traceId,
-          cause: parseError ?? payload,
-        });
+        throw this.#createHTTPError(response, payload, parseError);
       }
 
       if (parseError) {
@@ -240,8 +228,132 @@ export class HttpClient {
     }
   }
 
+  async *requestSse(options: HttpRequestOptions): AsyncGenerator<SSEEvent> {
+    if (!options.path.trim()) {
+      throw new MiniCozeSDKError('path must be a non-empty string');
+    }
+
+    const timeoutMs = options.timeoutMs === undefined
+      ? this.#timeoutMs
+      : options.timeoutMs;
+
+    if (timeoutMs !== null && (!Number.isFinite(timeoutMs) || timeoutMs <= 0)) {
+      throw new MiniCozeSDKError('timeoutMs must be a positive finite number or null');
+    }
+
+    let body: string | undefined;
+    if (options.body !== undefined) {
+      try {
+        body = JSON.stringify(options.body);
+      } catch (cause) {
+        throw new MiniCozeSDKError('Request body must be JSON serializable', { cause });
+      }
+      if (body === undefined) {
+        throw new MiniCozeSDKError('Request body must be JSON serializable');
+      }
+    }
+
+    const headers = new Headers({
+      Accept: 'text/event-stream',
+      Authorization: `Bearer ${this.#apiKey}`,
+    });
+    if (body !== undefined) headers.set('Content-Type', 'application/json');
+    new Headers(options.headers).forEach((value, key) => headers.set(key, value));
+
+    const controller = new AbortController();
+    const callerSignal = options.signal;
+    let timedOut = false;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const forwardAbort = () => controller.abort(callerSignal?.reason);
+
+    if (callerSignal?.aborted) {
+      throw new MiniCozeAbortError('Request was aborted', {
+        cause: callerSignal.reason,
+      });
+    }
+    callerSignal?.addEventListener('abort', forwardAbort, { once: true });
+    if (timeoutMs !== null) {
+      timeout = setTimeout(() => {
+        timedOut = true;
+        controller.abort(new DOMException('Stream timed out', 'TimeoutError'));
+      }, timeoutMs);
+    }
+
+    try {
+      const response = await this.#fetch(this.#joinURL(options.path), {
+        method: options.method ?? 'POST',
+        headers,
+        body,
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        let payload: unknown;
+        let parseError: unknown;
+        if (text.trim()) {
+          try {
+            payload = JSON.parse(text);
+          } catch (error) {
+            parseError = error;
+          }
+        }
+        throw this.#createHTTPError(response, payload, parseError);
+      }
+
+      if (!response.body) {
+        throw new MiniCozeNetworkError('Stream response has no body');
+      }
+
+      for await (const event of parseSSEStream(response.body, {
+        signal: controller.signal,
+      })) {
+        yield event;
+      }
+    } catch (error) {
+      if (timedOut) {
+        throw new MiniCozeTimeoutError(`Stream timed out after ${timeoutMs} ms`, {
+          timeoutMs: timeoutMs as number,
+          cause: error,
+        });
+      }
+      if (callerSignal?.aborted) {
+        throw new MiniCozeAbortError('Request was aborted', {
+          cause: callerSignal.reason ?? error,
+        });
+      }
+      if (error instanceof MiniCozeSDKError) throw error;
+      if (isAbortLikeError(error)) {
+        throw new MiniCozeAbortError('Request was aborted', { cause: error });
+      }
+      throw new MiniCozeNetworkError('Network stream request failed', {
+        cause: error,
+      });
+    } finally {
+      if (timeout !== undefined) clearTimeout(timeout);
+      callerSignal?.removeEventListener('abort', forwardAbort);
+    }
+  }
+
   #joinURL(path: string) {
     return `${this.#baseURL}/${path.replace(/^\/+/, '')}`;
+  }
+
+  #createHTTPError(response: Response, payload: unknown, cause?: unknown) {
+    const details = extractErrorDetails(payload);
+    const traceId = response.headers.get('x-trace-id')
+      ?? response.headers.get('traceparent')
+      ?? undefined;
+    const message = details.message
+      ? this.#redact(details.message)
+      : `HTTP request failed with status ${response.status}`;
+
+    return new MiniCozeHTTPError(message, {
+      httpStatus: response.status,
+      errorCode: details.code ? this.#redact(details.code) : undefined,
+      traceId,
+      cause: cause ?? payload,
+    });
   }
 
   #redact(value: string) {

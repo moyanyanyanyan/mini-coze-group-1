@@ -1,6 +1,6 @@
 # @minicoze/sdk
 
-MiniCoze TypeScript SDK。当前提供客户端配置、公开非流式 Run API、通用 HTTP 基础设施、基础错误分类和协议级 SSE 解析。
+MiniCoze TypeScript SDK。当前提供公开 Run、Stream、通用 HTTP 基础设施、基础错误分类和协议级 SSE 解析。
 
 ## 目录
 
@@ -69,6 +69,33 @@ await client.run(
 );
 ```
 
+## Stream
+
+```ts
+const controller = new AbortController();
+
+for await (const event of client.stream(
+  { message: '你好' },
+  { signal: controller.signal },
+)) {
+  if (event.type === 'message.delta') {
+    process.stdout.write(event.data.content);
+  }
+  if (event.type === 'run.completed') {
+    console.log(event.data.content);
+  }
+  if (event.type === 'run.failed') {
+    console.error(event.data.code, event.data.message);
+  }
+}
+```
+
+`stream()` 请求 `POST /api/v1/stream`，默认超时 190 秒。调用方可通过
+`AbortSignal` 提前结束，并检查 `run.completed` 或 `run.failed` 终态。
+
+Stream 支持 `tool.started` 与 `tool.completed`。单个
+`tool.completed.status=failed` 只表示该次工具调用失败，不代表 Run 结束。
+
 ## 当前状态
 
 已完成：
@@ -77,7 +104,8 @@ await client.run(
 - `MiniCozeClient` 基础结构与配置校验。
 - `MiniCozeClientOptions` 公共配置类型。
 - `client.run()` 非流式公开 API。
-- `RunParams`、`RunOptions`、`RunResult`、`RunUsage` 类型。
+- `client.stream()` 流式公开 API，返回 `AsyncIterable<RunStreamEvent>`。
+- `RunParams`、`RunOptions`、`RunResult`、`RunUsage`、`StreamOptions` 类型。
 - 基于标准 `fetch` 的 JSON 请求、超时和取消处理。
 - HTTP、网络、JSON 解析、流读取、取消和超时错误分类。
 - 增量 SSE 解析器及异步流读取函数。
@@ -85,6 +113,5 @@ await client.run(
 
 尚未实现：
 
-- `client.stream()`。
-- MiniCoze 业务事件模型、服务端错误码映射和重试策略。
+- 自动重试和断点续传。
 - npm 发布配置或发布流程。

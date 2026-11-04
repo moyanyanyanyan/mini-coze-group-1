@@ -1,17 +1,22 @@
 import {
   MiniCozeResponseParseError,
   MiniCozeSDKError,
+  MiniCozeStreamError,
 } from './http/errors.js';
 import { HttpClient } from './http/http-client.js';
+import type { SSEEvent } from './stream/sse-parser.js';
 import type {
   MiniCozeClientOptions,
   RunOptions,
   RunParams,
   RunResult,
+  RunStreamEvent,
+  StreamOptions,
 } from './types.js';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_RUN_TIMEOUT_MS = 190_000;
+const DEFAULT_STREAM_TIMEOUT_MS = 190_000;
 
 function requireNonEmptyString(value: unknown, field: string) {
   if (typeof value !== 'string' || value.trim().length === 0) {
@@ -94,6 +99,105 @@ function validateRunParams(params: RunParams) {
   }
 }
 
+function buildRunBody(params: RunParams) {
+  return params.conversationId === undefined
+    ? { message: params.message }
+    : { message: params.message, conversationId: params.conversationId };
+}
+
+function parseStreamEvent(raw: SSEEvent): RunStreamEvent {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw.data);
+  } catch (error) {
+    throw new MiniCozeResponseParseError('Invalid Stream event JSON', {
+      cause: error,
+    });
+  }
+
+  if (
+    !isRecord(parsed)
+    || typeof parsed.runId !== 'string'
+    || typeof parsed.conversationId !== 'string'
+    || !Number.isInteger(parsed.seq)
+    || (parsed.seq as number) < 1
+    || typeof parsed.timestamp !== 'string'
+    || typeof parsed.type !== 'string'
+    || !isRecord(parsed.data)
+    || raw.event !== parsed.type
+    || raw.id !== `${parsed.runId}:${parsed.seq}`
+  ) {
+    throw new MiniCozeStreamError('Invalid Stream event envelope');
+  }
+
+  switch (parsed.type) {
+    case 'run.started':
+      if (typeof parsed.data.assistantMessageId !== 'string') {
+        throw new MiniCozeStreamError('Invalid run.started event');
+      }
+      break;
+    case 'knowledge.result':
+      if (
+        (parsed.data.status !== 'matched' && parsed.data.status !== 'no_match')
+        || !Array.isArray(parsed.data.citations)
+      ) {
+        throw new MiniCozeStreamError('Invalid knowledge.result event');
+      }
+      break;
+    case 'message.delta':
+      if (typeof parsed.data.content !== 'string') {
+        throw new MiniCozeStreamError('Invalid message.delta event');
+      }
+      break;
+    case 'tool.started':
+      if (
+        typeof parsed.data.toolCallId !== 'string'
+        || typeof parsed.data.toolName !== 'string'
+      ) {
+        throw new MiniCozeStreamError('Invalid tool.started event');
+      }
+      break;
+    case 'tool.completed':
+      if (
+        typeof parsed.data.toolCallId !== 'string'
+        || typeof parsed.data.toolName !== 'string'
+        || (parsed.data.status !== 'succeeded' && parsed.data.status !== 'failed')
+        || (
+          parsed.data.status === 'failed'
+          && !isRecord(parsed.data.error)
+        )
+        || (
+          parsed.data.status === 'succeeded'
+          && !('output' in parsed.data)
+        )
+      ) {
+        throw new MiniCozeStreamError('Invalid tool.completed event');
+      }
+      break;
+    case 'run.completed':
+      if (!isRunResult(parsed.data)) {
+        throw new MiniCozeStreamError('Invalid run.completed event');
+      }
+      break;
+    case 'run.failed':
+      if (
+        typeof parsed.data.code !== 'string'
+        || typeof parsed.data.message !== 'string'
+        || typeof parsed.data.retryable !== 'boolean'
+      ) {
+        throw new MiniCozeStreamError('Invalid run.failed event');
+      }
+      break;
+    default:
+      throw new MiniCozeStreamError(`Unsupported Stream event: ${parsed.type}`);
+  }
+
+  return {
+    ...parsed,
+    sseId: raw.id ?? '',
+  } as RunStreamEvent;
+}
+
 export class MiniCozeClient {
   readonly baseURL: string;
   readonly timeoutMs: number;
@@ -117,13 +221,10 @@ export class MiniCozeClient {
   async run(params: RunParams, options: RunOptions = {}): Promise<RunResult> {
     validateRunParams(params);
 
-    const body = params.conversationId === undefined
-      ? { message: params.message }
-      : { message: params.message, conversationId: params.conversationId };
     const payload = await this.#httpClient.requestJson<unknown>({
       path: '/api/v1/run',
       method: 'POST',
-      body,
+      body: buildRunBody(params),
       signal: options.signal,
       timeoutMs: options.timeoutMs ?? DEFAULT_RUN_TIMEOUT_MS,
     });
@@ -142,5 +243,83 @@ export class MiniCozeClient {
     return payload.data;
   }
 
-  // TODO(api): 待公开 Stream 接口契约确认后实现 stream()。
+  async *stream(
+    params: RunParams,
+    options: StreamOptions = {},
+  ): AsyncGenerator<RunStreamEvent> {
+    validateRunParams(params);
+
+    let expectedSeq = 1;
+    let started = false;
+    let expectedRunId: string | undefined;
+    let expectedConversationId: string | undefined;
+    let expectedAssistantMessageId: string | undefined;
+    let streamedContent = '';
+    for await (const raw of this.#httpClient.requestSse({
+      path: '/api/v1/stream',
+      method: 'POST',
+      body: buildRunBody(params),
+      signal: options.signal,
+      timeoutMs: options.timeoutMs ?? DEFAULT_STREAM_TIMEOUT_MS,
+    })) {
+      const event = parseStreamEvent(raw);
+      if (event.seq !== expectedSeq) {
+        throw new MiniCozeStreamError('Stream event sequence is not continuous', {
+          cause: event,
+        });
+      }
+      if (
+        (expectedRunId !== undefined && event.runId !== expectedRunId)
+        || (
+          expectedConversationId !== undefined
+          && event.conversationId !== expectedConversationId
+        )
+      ) {
+        throw new MiniCozeStreamError('Stream event identifiers changed mid-run', {
+          cause: event,
+        });
+      }
+      expectedRunId ??= event.runId;
+      expectedConversationId ??= event.conversationId;
+
+      if (!started) {
+        if (event.type !== 'run.started') {
+          throw new MiniCozeStreamError('Stream did not start with run.started', {
+            cause: event,
+          });
+        }
+        started = true;
+        expectedAssistantMessageId = event.data.assistantMessageId;
+      } else if (event.type === 'run.started') {
+        throw new MiniCozeStreamError('Stream repeated run.started', {
+          cause: event,
+        });
+      }
+      if (
+        event.type === 'run.completed'
+        && (
+          event.data.runId !== expectedRunId
+          || event.data.conversationId !== expectedConversationId
+          || event.data.assistantMessageId !== expectedAssistantMessageId
+          || event.data.content !== streamedContent
+        )
+      ) {
+        throw new MiniCozeStreamError('run.completed does not match the streamed result', {
+          cause: event,
+        });
+      }
+      if (event.type === 'message.delta') {
+        streamedContent += event.data.content;
+      }
+
+      expectedSeq += 1;
+      yield event;
+
+      if (event.type === 'run.completed' || event.type === 'run.failed') {
+        return;
+      }
+    }
+
+    throw new MiniCozeStreamError('Stream ended without a terminal event');
+  }
 }
