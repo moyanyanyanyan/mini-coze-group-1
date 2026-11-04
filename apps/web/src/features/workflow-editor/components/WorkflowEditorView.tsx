@@ -36,6 +36,8 @@ import { NodePalette } from './NodePalette';
 import { RunDialog } from './RunDialog';
 import { ValidationDialog, type ValidationError } from './ValidationDialog';
 import { frontendValidate } from '../utils/frontend-validate';
+import { LoopBodyEditor } from './LoopBodyEditor';
+import type { LoopNodeData } from '../types/workflow';
 
 interface Props {
   workflowId: string;
@@ -121,6 +123,8 @@ function WorkflowEditorInner({ workflowId }: Props) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [leftOpen, setLeftOpen] = useState(true);
+  const [rightOpen, setRightOpen] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
 
@@ -134,19 +138,9 @@ function WorkflowEditorInner({ workflowId }: Props) {
     errors: ValidationError[];
   }>({ valid: true, errors: [] });
 
-  // 后端执行器暂未支持 condition / loop，先拦截
-  const hasPlaceholderNode = useMemo(
-    () => nodes.some((n) => n.type === 'condition' || n.type === 'loop'),
-    [nodes],
-  );
+  const [editingLoopId, setEditingLoopId] = useState<string | null>(null);
 
   const handleValidate = async () => {
-    if (hasPlaceholderNode) {
-      alert(
-        '条件分支 / 循环节点暂未接入后端执行器，暂不支持校验。可先保存草稿。',
-      );
-      return;
-    }
     const feErrors = frontendValidate(nodes, edges);
     if (feErrors.length > 0) {
       setValidationResult({ valid: false, errors: feErrors });
@@ -389,12 +383,6 @@ function WorkflowEditorInner({ workflowId }: Props) {
       alert('End 节点的每个输出至少需要勾选一个候选');
       return;
     }
-    if (hasPlaceholderNode) {
-      alert(
-        '条件分支 / 循环节点暂未接入后端执行器，暂不支持运行。可先保存草稿。',
-      );
-      return;
-    }
     const startNode = nodes.find((n) => n.type === 'start');
     if (!startNode) {
       alert('请先添加 Start 节点');
@@ -546,9 +534,24 @@ function WorkflowEditorInner({ workflowId }: Props) {
       </header>
 
       <div className="wf-editor-body">
-        <NodePalette nodes={nodes} onAdd={handleAddNode} />
+        {leftOpen && <NodePalette nodes={nodes} onAdd={handleAddNode} />}
 
         <div className="wf-canvas-wrap">
+          <button
+            className="wf-side-toggle wf-side-toggle-left"
+            onClick={() => setLeftOpen((v) => !v)}
+            title={leftOpen ? '收起节点库' : '展开节点库'}
+          >
+            {leftOpen ? '‹' : '›'}
+          </button>
+          <button
+            className="wf-side-toggle wf-side-toggle-right"
+            onClick={() => setRightOpen((v) => !v)}
+            title={rightOpen ? '收起配置面板' : '展开配置面板'}
+          >
+            {rightOpen ? '›' : '‹'}
+          </button>
+
           <ReactFlow
             nodes={displayNodes}
             edges={edges}
@@ -561,7 +564,10 @@ function WorkflowEditorInner({ workflowId }: Props) {
               setDirty(true);
             }}
             onConnect={onConnect}
-            onNodeClick={(_, node) => setSelectedId(node.id)}
+            onNodeClick={(_, node) => {
+              setSelectedId(node.id);
+              if (!rightOpen) setRightOpen(true);  // 点节点自动展开右侧
+            }}
             onPaneClick={() => setSelectedId(null)}
             nodeTypes={nodeTypes}
           >
@@ -571,13 +577,16 @@ function WorkflowEditorInner({ workflowId }: Props) {
           </ReactFlow>
         </div>
 
-        <PropertyPanel
-          node={selectedNode}
-          nodes={nodes}
-          edges={edges}
-          onChange={handleNodeChange}
-          onDelete={handleNodeDelete}
-        />
+        {rightOpen && (
+          <PropertyPanel
+            node={selectedNode}
+            nodes={nodes}
+            edges={edges}
+            onChange={handleNodeChange}
+            onDelete={handleNodeDelete}
+            onEditLoopBody={(loopId) => setEditingLoopId(loopId)}
+          />
+        )}
       </div>
 
       {showRunDialog && (
@@ -606,6 +615,25 @@ function WorkflowEditorInner({ workflowId }: Props) {
           }}
         />
       )}
+
+      {editingLoopId && (() => {
+        const loopNode = nodes.find((n) => n.id === editingLoopId);
+        if (!loopNode || loopNode.type !== 'loop') return null;
+        const loopData = loopNode.data as unknown as LoopNodeData;
+        return (
+          <LoopBodyEditor
+            loopId={editingLoopId}
+            loopData={loopData}
+            mainNodes={nodes}
+            mainEdges={edges}
+            onChange={(newData) => {
+              handleNodeChange(editingLoopId, newData);
+            }}
+            onClose={() => setEditingLoopId(null)}
+          />
+        );
+      })()}
+
     </section>
   );
 }

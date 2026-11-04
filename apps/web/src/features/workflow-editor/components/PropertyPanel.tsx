@@ -6,12 +6,14 @@ import type {
   EndNodeData,
   ConditionNodeData,
   LoopNodeData,
+  LlmNodeData,
 } from '../types/workflow';
 import { StartPanel } from './panels/StartPanel';
 import { LlmPanel } from './panels/LlmPanel';
 import { EndPanel } from './panels/EndPanel';
 import { ConditionPanel } from './panels/ConditionPanel';
 import { LoopPanel } from './panels/LoopPanel';
+import { type LoopContext } from '../utils/upstream';
 
 interface Props {
   node: Node | null;
@@ -19,6 +21,8 @@ interface Props {
   edges: Edge[];
   onChange: (nodeId: string, data: NodeData) => void;
   onDelete: (nodeId: string) => void;
+  loopContext?: LoopContext;     
+  onEditLoopBody?: (loopId: string) => void; 
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -30,11 +34,7 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 export function PropertyPanel({
-  node,
-  nodes,
-  edges,
-  onChange,
-  onDelete,
+  node, nodes, edges, loopContext, onChange, onDelete, onEditLoopBody,
 }: Props) {
   if (!node) {
     return (
@@ -77,10 +77,11 @@ export function PropertyPanel({
         )}
         {node.type === 'llm' && (
           <LlmPanel
-            data={data as Parameters<typeof LlmPanel>[0]['data']}
+            data={data as LlmNodeData}
             nodeId={node.id}
             nodes={nodes}
             edges={edges}
+            loopContext={loopContext} 
             onChange={handleChange}
           />
         )}
@@ -99,14 +100,17 @@ export function PropertyPanel({
             nodeId={node.id}
             nodes={nodes}
             edges={edges}
+            loopContext={loopContext}    
             onChange={handleChange}
           />
         )}
         {node.type === 'loop' && (
           <LoopPanel
             data={data as LoopNodeData}
+            nodeId={node.id}
             nodes={nodes}
             onChange={handleChange}
+            onEditBody={onEditLoopBody} 
           />
         )}
       </div>

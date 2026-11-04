@@ -5,14 +5,14 @@ import type { LoopNodeData } from '../../types/workflow';
 
 interface Props {
   data: LoopNodeData;
+  nodeId: string;
   nodes: Node[];
   onChange: (data: LoopNodeData) => void;
+  onEditBody?: (loopId: string) => void;
 }
 
-export function LoopPanel({ data, nodes, onChange }: Props) {
-  const candidates = nodes.filter(
-    (n) => n.type !== 'start' && n.type !== 'loop',
-  );
+export function LoopPanel({ data, nodeId, nodes, onChange, onEditBody }: Props) {
+  const bodyNodeCount = data.body?.nodes?.length || 0;
 
   return (
     <div className="wf-form">
@@ -26,39 +26,162 @@ export function LoopPanel({ data, nodes, onChange }: Props) {
       </label>
 
       <label className="wf-form-field">
-        <span>最大迭代次数</span>
-        <input
-          className="wf-input"
-          type="number"
-          min={1}
-          max={100}
-          value={data.maxIterations ?? 3}
-          onChange={(e) =>
-            onChange({ ...data, maxIterations: Number(e.target.value) })
-          }
-        />
-      </label>
-
-      <label className="wf-form-field">
-        <span>循环体起点</span>
+        <span>模式</span>
         <select
           className="wf-input"
-          value={data.loopBodyStartId || ''}
+          value={data.mode}
           onChange={(e) =>
-            onChange({ ...data, loopBodyStartId: e.target.value || undefined })
+            onChange({ ...data, mode: e.target.value as 'array' | 'count' })
           }
         >
-          <option value="">未设置</option>
-          {candidates.map((n) => (
-            <option key={n.id} value={n.id}>
-              {n.id}
-            </option>
-          ))}
+          <option value="count">固定次数</option>
+          <option value="array">遍历数组</option>
         </select>
-        <small className="wf-form-help">
-          从该节点开始，沿连线走到 loop 节点为止，重复执行 maxIterations 次。
-        </small>
       </label>
+
+      {data.mode === 'count' ? (
+        <label className="wf-form-field">
+          <span>循环次数（1-50）</span>
+          <input
+            className="wf-input"
+            type="number"
+            min={1}
+            max={50}
+            value={data.count ?? 3}
+            onChange={(e) =>
+              onChange({ ...data, count: Number(e.target.value) })
+            }
+          />
+        </label>
+      ) : (
+        <label className="wf-form-field">
+          <span>遍历数组（引用上游字段）</span>
+          <input
+            className="wf-input"
+            value={data.items || ''}
+            onChange={(e) => onChange({ ...data, items: e.target.value })}
+            placeholder="如 node-start-1.questions"
+          />
+          <small className="wf-form-help">
+            从 Start 或上游节点拿 array 类型字段
+          </small>
+        </label>
+      )}
+
+      <div className="wf-form-field">
+        <button
+          className="wf-btn wf-btn-outline"
+          style={{ width: '100%' }}
+          onClick={() => onEditBody?.(nodeId)}
+        >
+          编辑循环体（{bodyNodeCount} 个节点）
+        </button>
+        <small className="wf-form-help">
+          循环体里只能放 LLM 和条件节点，恰好一个无入线起点
+        </small>
+      </div>
+
+      <div className="wf-form-field">
+        <div className="wf-form-label-row">
+          <span>循环输出</span>
+          <button
+            className="wf-link-btn"
+            type="button"
+            onClick={() =>
+              onChange({
+                ...data,
+                outputs: [
+                  ...(data.outputs || []),
+                  {
+                    name: `results_${(data.outputs?.length || 0) + 1}`,
+                    type: 'array<string>',
+                    valueFrom: [],
+                  },
+                ],
+              })
+            }
+          >
+            + 添加
+          </button>
+        </div>
+        {(data.outputs || []).map((o, idx) => {
+          // 循环体内的候选：llm 输出 text，condition 输出 branch
+          const bodyCandidates = (data.body?.nodes || []).flatMap((n) => {
+            if (n.type === 'llm') return [{ ref: `${n.id}.text` }];
+            if (n.type === 'condition') return [{ ref: `${n.id}.branch` }];
+            return [];
+          });
+
+          return (
+            <div
+              key={idx}
+              className="wf-input-row"
+              style={{ gridTemplateColumns: '1fr 110px 1fr 24px' }}
+            >
+              <input
+                className="wf-input"
+                value={o.name}
+                onChange={(e) => {
+                  const next = (data.outputs || []).map((it, i) =>
+                    i === idx ? { ...it, name: e.target.value } : it,
+                  );
+                  onChange({ ...data, outputs: next });
+                }}
+                placeholder="输出名"
+              />
+              <select
+                className="wf-input"
+                value={o.type}
+                onChange={(e) => {
+                  const next = (data.outputs || []).map((it, i) =>
+                    i === idx
+                      ? { ...it, type: e.target.value as typeof o.type }
+                      : it,
+                  );
+                  onChange({ ...data, outputs: next });
+                }}
+              >
+                <option value="array<string>">array&lt;string&gt;</option>
+                <option value="array<number>">array&lt;number&gt;</option>
+                <option value="array<boolean>">array&lt;boolean&gt;</option>
+              </select>
+              <select
+                className="wf-input"
+                value={o.valueFrom[0] || ''}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  const next = (data.outputs || []).map((it, i) =>
+                    i === idx ? { ...it, valueFrom: v ? [v] : [] } : it,
+                  );
+                  onChange({ ...data, outputs: next });
+                }}
+              >
+                <option value="">选择循环体字段</option>
+                {bodyCandidates.map((c) => (
+                  <option key={c.ref} value={c.ref}>
+                    {c.ref}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="wf-icon-btn wf-btn-danger"
+                onClick={() =>
+                  onChange({
+                    ...data,
+                    outputs: (data.outputs || []).filter((_, i) => i !== idx),
+                  })
+                }
+                type="button"
+              >
+                ×
+              </button>
+            </div>
+          );
+        })}
+        <small className="wf-form-help">
+          outputs 的 valueFrom 引用循环体内节点的字段（暂时手动填 `node-llm-body-1.text`）
+        </small>
+      </div>
     </div>
   );
 }

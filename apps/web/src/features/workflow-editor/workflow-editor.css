@@ -1149,3 +1149,74 @@
   min-width: 16px;
   text-align: center;
 }
+
+/* ---------- 子画布（循环体编辑器） ---------- */
+.wf-loop-editor-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: grid;
+  place-items: center;
+  z-index: 1000;
+}
+.wf-loop-editor {
+  width: 92vw;
+  height: 90vh;
+  background: #f7f8fa;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.wf-loop-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: #fff;
+  border-bottom: 1px solid #e5e6eb;
+}
+.wf-loop-editor-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+}
+
+/* ---------- 侧边栏折叠按钮 ---------- */
+.wf-side-toggle {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 15;
+  width: 20px;
+  height: 56px;
+  background: #ffffff;
+  border: 1px solid #d9dce3;
+  color: #4e5969;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  transition: background 0.12s, color 0.12s;
+}
+.wf-side-toggle:hover {
+  background: #eef0fe;
+  color: #4d53e8;
+  border-color: #4d53e8;
+}
+
+.wf-side-toggle-left {
+  left: 0;
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+}
+.wf-side-toggle-right {
+  right: 0;
+  border-right: none;
+  border-radius: 6px 0 0 6px;
+}

@@ -8,13 +8,14 @@ import type {
   ConditionOperator,
   ConditionLogic,
 } from '../../types/workflow';
-import { getUpstreamFields } from '../../utils/upstream';
+import { getUpstreamFields ,type LoopContext } from '../../utils/upstream';
 
 interface Props {
   data: ConditionNodeData;
   nodeId: string;
   nodes: Node[];
   edges: Edge[];
+  loopContext?: LoopContext;
   onChange: (data: ConditionNodeData) => void;
 }
 
@@ -48,9 +49,9 @@ function needsRight(op: ConditionOperator): boolean {
   return op !== 'empty' && op !== 'not_empty';
 }
 
-export function ConditionPanel({ data, nodeId, nodes, edges, onChange }: Props) {
+export function ConditionPanel({ data, nodeId, nodes, edges, loopContext,  onChange }: Props) {
   const branches = data.branches || [];
-  const upstream = getUpstreamFields(nodes, edges, nodeId);
+  const upstream = getUpstreamFields(nodes, edges, nodeId, loopContext);
 
   const updateBranch = (idx: number, patch: Partial<ConditionBranch>) => {
     onChange({
