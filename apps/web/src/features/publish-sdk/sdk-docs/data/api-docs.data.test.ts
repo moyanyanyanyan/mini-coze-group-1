@@ -77,9 +77,11 @@ describe('API docs mock content', () => {
     expect(SSE_EVENTS.every((event) => event.data.length > 0)).toBe(true);
     expect(SDK_INIT_SAMPLE.code).toContain('MiniCozeClient');
     expect(SDK_INIT_SAMPLE.code).toContain('http://127.0.0.1:3000');
-    expect(SDK_INSTALL_SAMPLE.code).toContain('/releases/download/');
-    expect(SDK_INSTALL_SAMPLE.code).toContain('<release-tag>');
-    expect(SDK_INSTALL_SAMPLE.code).toContain('<sdk-asset>.tgz');
+    expect(SDK_INSTALL_SAMPLE.code).toBe(
+      'npm install https://github.com/moyanyanyanyan/mini-coze-group-1/releases/download/v0.1.0/minicoze-sdk-0.1.0.tgz',
+    );
+    expect(SDK_INSTALL_SAMPLE.code).not.toContain('<release-tag>');
+    expect(SDK_INSTALL_SAMPLE.code).not.toContain('<sdk-asset>');
     expect(STREAM_SDK_SAMPLE.code).toContain('client.stream');
     expect(STREAM_SDK_SAMPLE.code).toContain("event.type === 'tool.completed'");
     expect(STREAM_SDK_SAMPLE.code).not.toContain('/internal/runtime');

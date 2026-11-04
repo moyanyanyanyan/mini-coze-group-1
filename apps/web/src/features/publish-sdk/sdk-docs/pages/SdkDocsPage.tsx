@@ -106,7 +106,7 @@ export function SdkDocsPage() {
             <Callout>
               TypeScript 示例对应当前 <code>@minicoze/sdk</code> 的
               <code>client.run()</code> 或 <code>client.stream()</code>；
-              该包仍为仓库内 private package。
+              SDK 通过 GitHub Release <code>v0.1.0</code> 分发。
             </Callout>
           </DocSection>
 
@@ -268,17 +268,15 @@ export function SdkDocsPage() {
 
           <DocSection section={API_DOC_SECTIONS[4]}>
             <p>
-              <code>@minicoze/sdk</code> 当前是仓库内 private package，
-              已实现 Run 与 Stream，尚未通过源码确认真实 GitHub Release 资产。
-              发布后请以
+              <code>@minicoze/sdk</code> 已实现 Run 与 Stream，并通过
               <a
-                href="https://github.com/moyanyanyanyan/mini-coze-group-1/releases"
+                href="https://github.com/moyanyanyanyan/mini-coze-group-1/releases/tag/v0.1.0"
                 target="_blank"
                 rel="noreferrer"
               >
-                GitHub Releases
+                GitHub Release v0.1.0
               </a>
-              页面上的实际标签和 <code>.tgz</code> 资产地址为准。
+              分发。
             </p>
             <h3>GitHub Release 安装</h3>
             <CodeBlock sample={SDK_INSTALL_SAMPLE} onNotice={handleNotice} />

@@ -216,9 +216,7 @@ export const SDK_INSTALL_SAMPLE: CodeSample = {
   id: 'sdk-install',
   label: 'GitHub Release 安装',
   language: 'bash',
-  code: `# @minicoze/sdk 目前没有可从源码确认的正式 GitHub Release。
-# 发布后，请从 Releases 页面复制实际 .tgz 资产 URL，替换以下占位符：
-pnpm add "https://github.com/moyanyanyanyan/mini-coze-group-1/releases/download/<release-tag>/<sdk-asset>.tgz"`,
+  code: 'npm install https://github.com/moyanyanyanyan/mini-coze-group-1/releases/download/v0.1.0/minicoze-sdk-0.1.0.tgz',
 };
 
 export const SDK_INIT_SAMPLE: CodeSample = {
