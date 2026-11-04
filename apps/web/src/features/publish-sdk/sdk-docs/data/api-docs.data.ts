@@ -20,6 +20,7 @@ export interface ParameterRow {
 export interface EventRow {
   name: string;
   description: string;
+  data: string;
 }
 
 export interface EndpointRow {
@@ -48,7 +49,7 @@ export interface RuntimeErrorRow {
 export const API_DOC_SECTIONS: readonly DocSection[] = [
   { id: 'quick-start', label: '快速开始' },
   { id: 'api-key-usage', label: 'API Key 使用说明' },
-  { id: 'run-sync', label: 'Run 同步调用' },
+  { id: 'run-sync', label: '非流式 Run' },
   { id: 'stream', label: 'Stream 流式调用' },
   { id: 'typescript-sdk', label: 'TypeScript SDK' },
   { id: 'api-reference', label: 'API 参考' },
@@ -67,7 +68,7 @@ const curlRunCode = [
 const typescriptRunCode = `import { MiniCozeClient } from '@minicoze/sdk';
 
 const client = new MiniCozeClient({
-  baseURL: 'http://127.0.0.1:3100',
+  baseURL: 'http://127.0.0.1:3000',
   apiKey: process.env.MINICOZE_API_KEY ?? '',
 });
 
@@ -131,7 +132,7 @@ export const RUN_ERROR_SAMPLE: CodeSample = {
   language: 'json',
   code: `{
   "code": 503,
-  "message": "Runtime unavailable",
+  "message": "Runtime 服务不可用",
   "data": null
 }`,
 };
@@ -158,7 +159,7 @@ export const STREAM_SDK_SAMPLE: CodeSample = {
   code: `import { MiniCozeClient, MiniCozeStreamError } from '@minicoze/sdk';
 
 const client = new MiniCozeClient({
-  baseURL: 'http://127.0.0.1:3100',
+  baseURL: 'http://127.0.0.1:3000',
   apiKey: process.env.MINICOZE_API_KEY ?? '',
 });
 
@@ -213,10 +214,11 @@ data: {"runId":"run_example","conversationId":"conversation_example","seq":3,"ti
 
 export const SDK_INSTALL_SAMPLE: CodeSample = {
   id: 'sdk-install',
-  label: 'SDK 安装说明',
+  label: 'GitHub Release 安装',
   language: 'bash',
-  code: `# @minicoze/sdk 当前是仓库内 private package
-# npm 包发布与安装方式待确认`,
+  code: `# @minicoze/sdk 目前没有可从源码确认的正式 GitHub Release。
+# 发布后，请从 Releases 页面复制实际 .tgz 资产 URL，替换以下占位符：
+pnpm add "https://github.com/moyanyanyanyan/mini-coze-group-1/releases/download/<release-tag>/<sdk-asset>.tgz"`,
 };
 
 export const SDK_INIT_SAMPLE: CodeSample = {
@@ -226,7 +228,7 @@ export const SDK_INIT_SAMPLE: CodeSample = {
   code: `import { MiniCozeClient } from '@minicoze/sdk';
 
 const client = new MiniCozeClient({
-  baseURL: 'http://127.0.0.1:3100',
+  baseURL: 'http://127.0.0.1:3000',
   apiKey: process.env.MINICOZE_API_KEY ?? '',
 });`,
 };
@@ -257,7 +259,24 @@ data: {"runId":"run_example","conversationId":"conversation_example","seq":4,"ti
 
 id: run_example:5
 event: tool.completed
-data: {"runId":"run_example","conversationId":"conversation_example","seq":5,"timestamp":"2026-11-04T00:00:04Z","type":"tool.completed","data":{"toolCallId":"call_1","toolName":"echo_text","status":"failed","error":{"code":"TOOL_TIMEOUT","message":"工具超时"}}}`,
+data: {"runId":"run_example","conversationId":"conversation_example","seq":5,"timestamp":"2026-11-04T00:00:04Z","type":"tool.completed","data":{"toolCallId":"call_1","toolName":"echo_text","status":"failed","error":{"code":"TOOL_TIMEOUT","message":"工具超时"}}}
+
+id: run_example:6
+event: tool.started
+data: {"runId":"run_example","conversationId":"conversation_example","seq":6,"timestamp":"2026-11-04T00:00:05Z","type":"tool.started","data":{"toolCallId":"call_2","toolName":"echo_text"}}
+
+id: run_example:7
+event: tool.completed
+data: {"runId":"run_example","conversationId":"conversation_example","seq":7,"timestamp":"2026-11-04T00:00:06Z","type":"tool.completed","data":{"toolCallId":"call_2","toolName":"echo_text","status":"succeeded","output":{"text":"ok"}}}`,
+};
+
+export const STREAM_FAILED_EVENT_SAMPLE: CodeSample = {
+  id: 'stream-failed-event',
+  label: 'run.failed SSE 示例',
+  language: 'text',
+  code: `id: run_example:8
+event: run.failed
+data: {"runId":"run_example","conversationId":"conversation_example","seq":8,"timestamp":"2026-11-04T00:00:07Z","type":"run.failed","data":{"code":"MODEL_UNAVAILABLE","message":"模型服务请求失败","retryable":true}}`,
 };
 
 export const REQUEST_PARAMETERS: readonly ParameterRow[] = [
@@ -274,13 +293,41 @@ export const REQUEST_PARAMETERS: readonly ParameterRow[] = [
 ];
 
 export const SSE_EVENTS: readonly EventRow[] = [
-  { name: 'run.started', description: '本轮运行开始，包含 assistantMessageId。' },
-  { name: 'knowledge.result', description: '知识库上下文校验通过后返回状态和脱敏引用。' },
-  { name: 'message.delta', description: '模型文本增量，可出现多次。' },
-  { name: 'tool.started', description: '一次工具调用开始，包含 toolCallId 和 toolName。' },
-  { name: 'tool.completed', description: '一次工具调用结束；status=failed 不代表 Run 终态。' },
-  { name: 'run.completed', description: '成功终态，data 为完整 RuntimeResult。' },
-  { name: 'run.failed', description: '失败终态，包含 code、message 和 retryable。' },
+  {
+    name: 'run.started',
+    description: '本轮运行开始，必须是第一个业务事件。',
+    data: '{ assistantMessageId: string }',
+  },
+  {
+    name: 'knowledge.result',
+    description: '知识库上下文校验通过后返回脱敏引用。',
+    data: "{ status: 'matched' | 'no_match'; citations: Array<{ knowledgeBaseId, documentId, chunkId, title, position? }> }",
+  },
+  {
+    name: 'message.delta',
+    description: '模型文本增量，可出现多次。',
+    data: '{ content: string }',
+  },
+  {
+    name: 'tool.started',
+    description: '一次工具调用开始，可多轮出现。',
+    data: '{ toolCallId: string; toolName: string }',
+  },
+  {
+    name: 'tool.completed',
+    description: '一次工具调用结束；status=failed 不代表 Run 终态。',
+    data: "{ toolCallId, toolName, status: 'succeeded', output: unknown } | { toolCallId, toolName, status: 'failed', error: Record<string, string> }",
+  },
+  {
+    name: 'run.completed',
+    description: '唯一成功终态，data 为完整 RunResult。',
+    data: '{ runId, conversationId, assistantMessageId, status: "completed", content, finishReason, usage, citations, toolResults }',
+  },
+  {
+    name: 'run.failed',
+    description: '唯一失败终态，SSE 的 HTTP 连接可能仍为 200。',
+    data: '{ code: string; message: string; retryable: boolean }',
+  },
 ];
 
 export const SDK_TYPES: readonly ParameterRow[] = [
@@ -332,21 +379,21 @@ export const ENDPOINTS: readonly EndpointRow[] = [
 ];
 
 export const HTTP_STATUSES: readonly StatusRow[] = [
-  { status: '200', meaning: 'Run 成功', note: '响应 code 为数字 200。' },
+  { status: '200', meaning: 'Run 成功或 Stream 已建立', note: 'Stream 建立后的业务失败通过 run.failed 事件返回。' },
   { status: '400', meaning: '请求参数或 Runtime 输入无效', note: '响应 code 为数字 400。' },
   { status: '401', meaning: 'API Key 无效或已撤销', note: '响应 code 为数字 401。' },
   { status: '403', meaning: 'Agent 未发布、已归档或无调用权限', note: '响应 code 为数字 403。' },
   { status: '404', meaning: '会话或发布资源不存在', note: '响应 code 为数字 404。' },
   { status: '500', meaning: '消息持久化或服务内部错误', note: '响应 code 为数字 500。' },
   { status: '502', meaning: 'Runtime HTTP 或响应协议异常', note: '响应 code 为数字 502。' },
-  { status: '503', meaning: '测试 Agent、Runtime 配置或网络不可用', note: '响应 code 为数字 503。' },
+  { status: '503', meaning: 'Runtime 配置、依赖或网络不可用', note: '响应 code 为数字 503。' },
   { status: '504', meaning: 'Runtime 执行超时', note: '响应 code 为数字 504。' },
 ];
 
 export const FAQ_ITEMS: readonly FaqItem[] = [
   {
     question: '调用时需要传 agentId 吗？',
-    answer: '不需要。目标 Agent 由 API Key 的绑定关系确定；正式鉴权接入前，开发环境使用临时测试 Agent 配置。',
+    answer: '不需要。API Key 经 Guard 校验后会反查绑定的 Agent，请求体和查询参数都不能覆盖这个 Agent。',
   },
   {
     question: '如何继续已有会话？',

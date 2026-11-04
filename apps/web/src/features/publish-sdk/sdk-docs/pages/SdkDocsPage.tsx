@@ -18,6 +18,7 @@ import {
   SDK_INSTALL_SAMPLE,
   SDK_TYPES,
   SSE_EVENTS,
+  STREAM_FAILED_EVENT_SAMPLE,
   STREAM_REQUEST_SAMPLE,
   STREAM_RESPONSE_SAMPLE,
   STREAM_SDK_SAMPLE,
@@ -173,6 +174,10 @@ export function SdkDocsPage() {
               成功响应使用 <code>{'{ code, message, data }'}</code> 信封，
               错误响应的数字 code 与 HTTP 状态码一致。
             </Callout>
+            <p>
+              请求体不得包含 <code>agentId</code>。目标 Agent 和所有者身份均由
+              API Key 绑定关系及后端反查结果确定。
+            </p>
           </DocSection>
 
           <DocSection section={API_DOC_SECTIONS[3]}>
@@ -218,7 +223,8 @@ export function SdkDocsPage() {
             <CodeBlock sample={STREAM_RESPONSE_SAMPLE} onNotice={handleNotice} />
             <p>
               SSE 的 <code>id</code> 格式为 <code>{'${runId}:${seq}'}</code>，
-              seq 从 1 连续递增；注释心跳不属于业务事件。
+              seq 从 1 连续递增；注释心跳不属于业务事件。当前
+              <code>id</code> 不提供断点续传。
             </p>
             <h3>TypeScript SDK 流式调用</h3>
             <CodeBlock sample={STREAM_SDK_SAMPLE} onNotice={handleNotice} />
@@ -230,6 +236,7 @@ export function SdkDocsPage() {
                   <tr>
                     <th>事件</th>
                     <th>用途</th>
+                    <th>data 字段</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -237,6 +244,7 @@ export function SdkDocsPage() {
                     <tr key={event.name}>
                       <td><code>{event.name}</code></td>
                       <td>{event.description}</td>
+                      <td><code>{event.data}</code></td>
                     </tr>
                   ))}
                 </tbody>
@@ -248,6 +256,8 @@ export function SdkDocsPage() {
               <code>run.failed</code> 会结束 Stream。
             </p>
             <CodeBlock sample={TOOL_EVENTS_SAMPLE} onNotice={handleNotice} />
+            <h3>run.failed 事件示例</h3>
+            <CodeBlock sample={STREAM_FAILED_EVENT_SAMPLE} onNotice={handleNotice} />
             <Callout tone="warning">
               <strong>结束与中断：</strong>
               每个正常流必须且只能收到一个 run.completed 或 run.failed。
@@ -259,9 +269,18 @@ export function SdkDocsPage() {
           <DocSection section={API_DOC_SECTIONS[4]}>
             <p>
               <code>@minicoze/sdk</code> 当前是仓库内 private package，
-              已实现 Run 与 Stream，尚未发布 npm。
+              已实现 Run 与 Stream，尚未通过源码确认真实 GitHub Release 资产。
+              发布后请以
+              <a
+                href="https://github.com/moyanyanyanyan/mini-coze-group-1/releases"
+                target="_blank"
+                rel="noreferrer"
+              >
+                GitHub Releases
+              </a>
+              页面上的实际标签和 <code>.tgz</code> 资产地址为准。
             </p>
-            <h3>安装方式占位</h3>
+            <h3>GitHub Release 安装</h3>
             <CodeBlock sample={SDK_INSTALL_SAMPLE} onNotice={handleNotice} />
             <h3>客户端初始化</h3>
             <CodeBlock sample={SDK_INIT_SAMPLE} onNotice={handleNotice} />
@@ -280,11 +299,18 @@ export function SdkDocsPage() {
             <ParameterTable rows={SDK_TYPES} />
             <h3>基本错误处理</h3>
             <CodeBlock sample={SDK_ERROR_SAMPLE} onNotice={handleNotice} />
+            <p>
+              SSE 建立前的 HTTP 错误使用 <code>MiniCozeHTTPError</code>；
+              流协议或缺少终态使用 <code>MiniCozeStreamError</code>；
+              网络、超时和主动取消分别使用 SDK 的
+              <code>MiniCozeNetworkError</code>、<code>MiniCozeTimeoutError</code>
+              和 <code>MiniCozeAbortError</code>。
+            </p>
           </DocSection>
 
           <DocSection section={API_DOC_SECTIONS[5]}>
             <p>
-              以下内容对应当前非流式 Run 实现。鉴权和 Stream 相关部分仍待确认。
+              以下内容对应当前公开 Run 和 Stream 实现。
             </p>
             <h3>接口概览</h3>
             <div className="api-doc-table-wrap">
@@ -358,7 +384,8 @@ export function SdkDocsPage() {
             </div>
             <Callout>
               当前 HTTP 响应中的 <code>code</code> 是数字 HTTP 状态码。
-              Runtime 在响应开始前失败时返回 JSON；开始后失败则以 run.failed 事件结束。
+              Runtime 在 SSE 响应开始前失败时返回 JSON HTTP 错误；响应开始后，
+              即使 HTTP 状态已经为 200，也会以 <code>run.failed</code> 事件结束。
             </Callout>
           </DocSection>
 
