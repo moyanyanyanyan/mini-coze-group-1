@@ -47,3 +47,30 @@ def test_retrieval_failure_http_and_sse_before_model(settings, body, monkeypatch
     finally:
         app.dependency_overrides.clear()
         app.dependency_overrides.update(previous)
+
+
+def test_unexpected_runtime_failure_http_and_sse(settings, body, monkeypatch):
+    class BrokenKnowledge:
+        async def get_context(self, request):
+            raise RuntimeError('test-only internal detail')
+
+    body['agentConfig']['knowledgeBaseIds'] = ['kb-1']
+    service = RuntimeService(settings, knowledge=BrokenKnowledge())
+    monkeypatch.setattr(routes, 'get_settings', lambda: settings)
+    previous = app.dependency_overrides.copy()
+    app.dependency_overrides[routes.get_runtime] = lambda: service
+    try:
+        with TestClient(app) as client:
+            headers = {'Authorization': 'Bearer test-internal'}
+            response = client.post('/internal/runtime/run', json=body, headers=headers)
+            assert response.status_code == 500
+            assert response.headers['x-runtime-error-code'] == 'INTERNAL_ERROR'
+            assert 'test-only internal detail' not in response.text
+            response = client.post('/internal/runtime/stream', json=body, headers=headers)
+            assert response.status_code == 200
+            events = [json.loads(line[5:]) for line in response.text.splitlines() if line.startswith('data:')]
+            assert [event['type'] for event in events] == ['run.started', 'run.failed']
+            assert events[-1]['data'] == {'code': 'INTERNAL_ERROR', 'message': '运行服务异常', 'retryable': False}
+    finally:
+        app.dependency_overrides.clear()
+        app.dependency_overrides.update(previous)

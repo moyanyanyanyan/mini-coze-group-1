@@ -121,7 +121,7 @@ class RuntimeService:
                 data = item["data"]
                 if data["code"].endswith("_TIMEOUT"):
                     raise ModelError(data["code"], data["message"], 504, data["retryable"])
-                status = {"INVALID_REQUEST": 400, "MODEL_TIMEOUT": 504, "RUN_TIMEOUT": 504,
+                status = {"INTERNAL_ERROR": 500, "INVALID_REQUEST": 400, "MODEL_TIMEOUT": 504, "RUN_TIMEOUT": 504,
                           "MODEL_NOT_CONFIGURED": 503, "MODEL_RATE_LIMITED": 503,
                           "MODEL_QUOTA_EXCEEDED": 503,
                           "KNOWLEDGE_NOT_CONFIGURED": 503, "TOOL_NOT_CONFIGURED": 503,
