@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BindingPickerModal,
   type PickerItem,
@@ -53,6 +53,8 @@ export function AgentDetailView({
   const [versions, setVersions] = useState<AgentVersionSummary[]>([]);
   const [versionsLoading, setVersionsLoading] = useState(false);
   const [versionsError, setVersionsError] = useState<string | null>(null);
+  const [versionDetailOpen, setVersionDetailOpen] = useState(false);
+  const versionRequestId = useRef(0);
   const [selectedVersion, setSelectedVersion] = useState<AgentVersionDetail | null>(null);
   const [selectedVersionLoading, setSelectedVersionLoading] = useState(false);
   const [selectedVersionError, setSelectedVersionError] = useState<string | null>(null);
@@ -74,17 +76,29 @@ export function AgentDetailView({
     fetchVersions();
   }, [fetchVersions, agent.updatedAt]);
 
+  const closeVersionDetail = () => {
+    // 关闭后忽略未完成的请求，避免旧结果覆盖下一次打开的版本。
+    versionRequestId.current += 1;
+    setVersionDetailOpen(false);
+  };
+
   const openVersionDetail = async (version: AgentVersionSummary) => {
+    const requestId = ++versionRequestId.current;
+    setVersionDetailOpen(true);
     setSelectedVersion(null);
     setSelectedVersionError(null);
     setSelectedVersionLoading(true);
     try {
       const detail = await getAgentVersion(agent.id, version.id);
+      if (requestId !== versionRequestId.current) return;
       setSelectedVersion(detail);
     } catch (err) {
+      if (requestId !== versionRequestId.current) return;
       setSelectedVersionError(err instanceof Error ? err.message : '加载版本详情失败');
     } finally {
-      setSelectedVersionLoading(false);
+      if (requestId === versionRequestId.current) {
+        setSelectedVersionLoading(false);
+      }
     }
   };
 
@@ -505,14 +519,14 @@ export function AgentDetailView({
         />
       )}
 
-      {(selectedVersion || selectedVersionLoading) && (
-        <div className="ab-modal-backdrop" onClick={() => setSelectedVersion(null)} role="dialog" aria-modal="true" aria-label="版本详情">
+      {versionDetailOpen && (
+        <div className="ab-modal-backdrop" onClick={closeVersionDetail} role="dialog" aria-modal="true" aria-label="版本详情">
           <div className="ab-modal ab-modal-picker" onClick={(e) => e.stopPropagation()}>
             <header className="ab-modal-header">
               <h3 className="ab-modal-title">
                 版本快照 {selectedVersion?.version ? `v${selectedVersion.version}` : ''}
               </h3>
-              <button className="ab-modal-close" onClick={() => setSelectedVersion(null)} aria-label="关闭">×</button>
+              <button className="ab-modal-close" onClick={closeVersionDetail} aria-label="关闭">×</button>
             </header>
             <div className="ab-modal-body">
               {selectedVersionLoading && <div className="ab-versions-empty">加载中…</div>}
