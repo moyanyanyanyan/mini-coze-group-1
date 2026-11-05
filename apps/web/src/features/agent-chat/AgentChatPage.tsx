@@ -9,6 +9,7 @@ import {
 } from './api/chat-api';
 import { ChatBubble } from './components/ChatBubble';
 import { MessageComposer } from './components/MessageComposer';
+import { Icon } from '../../shared/ui/Icon';
 import styles from './agent-chat.module.css';
 
 export function AgentChatPage() {
@@ -152,12 +153,21 @@ export function AgentChatPage() {
             {conversationId ? '消息存在你的账号下，刷新不丢' : '正在准备会话…'}
           </p>
         </div>
-        <span className={styles.badge}>C6 · 流式生成</span>
+        <span className={styles.badge}>
+          <span className={styles.badgeDot} aria-hidden="true" />
+          流式输出
+        </span>
       </header>
 
       <div className={styles.stream}>
         {messages.length === 0 ? (
-          <p className={styles.empty}>还没有消息。发一条试试，回答会一个字一个字出来。</p>
+          <div className={styles.empty}>
+            <span className={styles.emptyIcon} aria-hidden="true">
+              <Icon name="chat" />
+            </span>
+            <strong>开始你的第一段对话</strong>
+            <p>发送一条消息，回答会一个字一个字地流出来。</p>
+          </div>
         ) : null}
 
         {messages.map((message) => (
