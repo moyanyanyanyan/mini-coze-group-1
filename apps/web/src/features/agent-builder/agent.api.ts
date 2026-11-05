@@ -217,3 +217,29 @@ export async function listPlugins(): Promise<PluginSummary[]> {
   const response = await fetch(`${API_BASE}/api/plugins`, { credentials: 'include' });
   return readResponse<PluginSummary[]>(response);
 }
+
+export interface AgentVersionSummary {
+  id: string;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AgentVersionDetail extends AgentVersionSummary {
+  snapshot: Record<string, unknown>;
+}
+
+export async function listAgentVersions(agentId: string): Promise<AgentVersionSummary[]> {
+  const response = await fetch(`${API_BASE}/api/agents/${encodeURIComponent(agentId)}/versions`, {
+    credentials: 'include',
+  });
+  return readResponse<AgentVersionSummary[]>(response);
+}
+
+export async function getAgentVersion(agentId: string, versionId: string): Promise<AgentVersionDetail> {
+  const response = await fetch(
+    `${API_BASE}/api/agents/${encodeURIComponent(agentId)}/versions/${encodeURIComponent(versionId)}`,
+    { credentials: 'include' },
+  );
+  return readResponse<AgentVersionDetail>(response);
+}
