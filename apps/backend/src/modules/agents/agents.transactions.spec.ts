@@ -5,7 +5,7 @@ function setup(status = 'ACTIVE') {
     id: 'agent-1', ownerId: 'user-1', status, name: 'Agent',
     systemPrompt: '', model: 'deepseek-chat', temperature: 0.7, maxTokens: 1024,
     createdAt: new Date(), updatedAt: new Date(), currentVersionId: 'version-1',
-    pluginBindings: [{ id: 'binding-1', pluginId: 'plugin_echo', enabled: true }],
+    pluginBindings: [{ id: 'binding-1', pluginId: 'plugin_echo', enabled: true, autoInvoke: false, sortOrder: 7, config: { legacy: 'keep' } }],
     knowledgeBaseBindings: [], workflowBindings: [],
   };
   const tx = {
@@ -19,9 +19,9 @@ function setup(status = 'ACTIVE') {
     },
     agentPluginBinding: {
       deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
-      createMany: jest.fn().mockImplementation(async ({ data }) => {
-        agent.pluginBindings = data;
-        return { count: data.length };
+      upsert: jest.fn().mockImplementation(async ({ update }) => {
+        Object.assign(agent.pluginBindings[0], update);
+        return agent.pluginBindings[0];
       }),
     },
     knowledgeBaseAgentBinding: {
@@ -55,7 +55,7 @@ it('绑定、快照和当前版本指针均在持锁的同一事务内写入', a
   expect(tx.$queryRaw.mock.calls[0][0].join('?')).toContain('FOR UPDATE');
   expect(tx.$queryRaw.mock.calls[0][1]).toBe('agent-1');
   expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(tx.agent.findUnique.mock.invocationCallOrder[0]);
-  expect(tx.agentPluginBinding.createMany.mock.invocationCallOrder[0]).toBeLessThan(tx.agentVersion.create.mock.invocationCallOrder[0]);
+  expect(tx.agentPluginBinding.upsert.mock.invocationCallOrder[0]).toBeLessThan(tx.agentVersion.create.mock.invocationCallOrder[0]);
   expect(tx.agentVersion.create).toHaveBeenCalledWith({ data: expect.objectContaining({
     version: 2, snapshot: expect.objectContaining({ pluginIds: [], revision: 2 }),
   }) });
@@ -105,4 +105,43 @@ it.each(['update', 'knowledge', 'workflow'] as const)('共享快照调用方 %s 
   expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
   expect(tx.agentVersion.create).toHaveBeenCalledTimes(1);
+});
+
+
+it('普通启停保留绑定 ID 和历史配置，只更新 enabled', async () => {
+  const { service, tx } = setup();
+  const result = await service.replacePluginBindings('agent-1', input, user);
+  expect(tx.agentPluginBinding.deleteMany).toHaveBeenCalledWith({
+    where: { agentId: 'agent-1', pluginId: { notIn: ['plugin_echo'] } },
+  });
+  expect(tx.agentPluginBinding.upsert).toHaveBeenCalledWith({
+    where: { agentId_pluginId: { agentId: 'agent-1', pluginId: 'plugin_echo' } },
+    create: { agentId: 'agent-1', pluginId: 'plugin_echo', enabled: false },
+    update: { enabled: false },
+  });
+  expect(result[0]).toMatchObject({ id: 'binding-1', autoInvoke: false, sortOrder: 7, config: { legacy: 'keep' }, enabled: false });
+});
+
+
+it.each(['autoInvoke', 'sortOrder', 'config'])('服务层也拒绝未实现字段 %s', async (field) => {
+  const { service, prisma } = setup();
+  const bindings = [{ pluginId: 'plugin_echo', [field]: null }];
+  await expect(service.replacePluginBindings('agent-1', { bindings }, user)).rejects.toThrow('MVP 不支持');
+  expect(prisma.$transaction).not.toHaveBeenCalled();
+});
+
+it('清空绑定只删除该智能体的绑定并生成空插件快照', async () => {
+  const { service, tx, agent } = setup();
+  tx.agentPluginBinding.deleteMany.mockImplementationOnce(async () => {
+    agent.pluginBindings = [];
+    return { count: 1 };
+  });
+  await expect(service.replacePluginBindings('agent-1', { bindings: [] }, user)).resolves.toEqual([]);
+  expect(tx.agentPluginBinding.deleteMany).toHaveBeenCalledWith({
+    where: { agentId: 'agent-1', pluginId: { notIn: [] } },
+  });
+  expect(tx.agentPluginBinding.upsert).not.toHaveBeenCalled();
+  expect(tx.agentVersion.create).toHaveBeenCalledWith({ data: expect.objectContaining({
+    snapshot: expect.objectContaining({ pluginIds: [] }),
+  }) });
 });

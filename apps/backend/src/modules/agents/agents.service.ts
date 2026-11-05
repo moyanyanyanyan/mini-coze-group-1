@@ -241,6 +241,9 @@ export class AgentsService {
   }
 
   async replacePluginBindings(agentId: string, dto: ReplacePluginBindingsDto, user: CurrentUserPayload) {
+    if (dto.bindings.some((binding) =>
+      binding.autoInvoke !== undefined || binding.sortOrder !== undefined || binding.config !== undefined,
+    )) throw new BadRequestException('MVP 不支持设置 autoInvoke、sortOrder 或 config');
     return this.withAgentTransaction(agentId, async (tx) => {
       const agent = await this.assertAgentWritable(agentId, user.id, tx);
 
@@ -258,17 +261,17 @@ export class AgentsService {
         if (missing.length > 0) throw new BadRequestException(`以下插件不存在：[${missing.join(', ')}]`);
       }
 
-      await tx.agentPluginBinding.deleteMany({ where: { agentId } });
-      await tx.agentPluginBinding.createMany({
-        data: dto.bindings.map((b) => ({
-          agentId,
-          pluginId: b.pluginId,
-          enabled: b.enabled ?? true,
-          autoInvoke: b.autoInvoke ?? true,
-          sortOrder: b.sortOrder ?? 0,
-          config: (b.config ?? undefined) as Prisma.InputJsonValue | undefined,
-        })),
+      // 只删除解除绑定的项；启停更新不重建记录、不清除历史配置。
+      await tx.agentPluginBinding.deleteMany({
+        where: { agentId, pluginId: { notIn: dto.bindings.map((binding) => binding.pluginId) } },
       });
+      for (const binding of dto.bindings) {
+        await tx.agentPluginBinding.upsert({
+          where: { agentId_pluginId: { agentId, pluginId: binding.pluginId } },
+          create: { agentId, pluginId: binding.pluginId, enabled: binding.enabled ?? true },
+          update: { enabled: binding.enabled ?? true },
+        });
+      }
 
       if (agent.status === 'ACTIVE') await this.takeSnapshot(agentId, tx);
 

@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
-import { ToolExecutionError } from './executors/tool-executor.interface';
+import { ToolExecutionError, type ToolExecutor } from './executors/tool-executor.interface';
 import { PluginRegistry } from './registry/plugin.registry';
 import { validateAgainstSchema } from './registry/schema.validator';
 import type {
@@ -232,12 +232,18 @@ export class PluginsService {
     const req = body as PluginToolRequest;
 
     // 2. 查找工具
-    const executor = this.registry.getExecutor(req.toolName);
+    let executor: ToolExecutor | undefined;
+    try {
+      executor = await this.registry.getExecutor(req.toolName);
+    } catch (err) {
+      this.logger.error(`读取工具状态失败：${(err as Error).message}`);
+      return { code: 503, message: '无法确认插件状态，暂时拒绝执行', data: null };
+    }
     if (!executor) {
       return {
         code: 200,
         message: 'ok',
-        data: this.failed(req.toolCallId, req.toolName, 'TOOL_NOT_FOUND', `工具 "${req.toolName}" 未注册`),
+        data: this.failed(req.toolCallId, req.toolName, 'TOOL_NOT_FOUND', `工具 "${req.toolName}" 不存在、已停用或已移除`),
       };
     }
 

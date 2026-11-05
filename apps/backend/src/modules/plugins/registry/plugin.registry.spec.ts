@@ -7,12 +7,20 @@ import type { ToolExecutor } from '../executors/tool-executor.interface';
 import { PluginRegistry, validateBuiltinPlugins } from './plugin.registry';
 
 function createPrismaMock() {
+  const plugin = {
+    upsert: jest.fn().mockResolvedValue({}),
+    updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    findMany: jest.fn().mockResolvedValue(BUILTIN_PLUGINS.map((item) => toRow(item))),
+    findUnique: jest.fn(),
+  };
+  plugin.findUnique.mockImplementation(async ({ where }) =>
+    (await plugin.findMany()).find((row: { pluginId: string }) => row.pluginId === where.pluginId) ?? null,
+  );
+  const tx = { plugin, $executeRaw: jest.fn().mockResolvedValue(1) };
   return {
-    plugin: {
-      upsert: jest.fn(),
-      findMany: jest.fn(),
-      findUnique: jest.fn(),
-    },
+    plugin,
+    tx,
+    $transaction: jest.fn(async (operation: (client: typeof tx) => Promise<void>) => operation(tx)),
   };
 }
 
@@ -92,37 +100,22 @@ describe('PluginRegistry', () => {
         }),
       );
       for (const executor of registration.executors) {
-        expect(registry.getExecutor(executor.definition.name)).toBe(executor);
+        expect(await registry.getExecutor(executor.definition.name)).toBe(executor);
       }
     }
   });
 
-  it('数据库不可用时从同一注册表构建完整内存目录', async () => {
+  it('数据库不可用时启动失败，不恢复内存执行权限', async () => {
     const prisma = createPrismaMock();
     prisma.plugin.upsert.mockRejectedValue(new Error('database unavailable'));
     const registry = new PluginRegistry(prisma as unknown as PrismaService);
-
-    await registry.onModuleInit();
-
-    const catalog = registry.listCatalog();
-    expect(catalog).toHaveLength(BUILTIN_PLUGINS.length);
-    for (const registration of BUILTIN_PLUGINS) {
-      const item = catalog.find(
-        (candidate) => candidate.pluginId === registration.catalog.pluginId,
-      );
-      expect(item).toEqual({
-        ...registration.catalog,
-        tags: registration.catalog.tags ?? [],
-        configSchema: registration.catalog.configSchema ?? {},
-        tools: registration.executors.map((executor) => executor.definition),
-      });
-      for (const executor of registration.executors) {
-        expect(registry.getExecutor(executor.definition.name)).toBe(executor);
-      }
-    }
+    await expect(registry.onModuleInit()).rejects.toThrow('database unavailable');
+    expect(registry.listCatalog()).toEqual([]);
+    expect(await registry.getExecutor('echo_text')).toBeUndefined();
+    await expect(prisma.$transaction.mock.results[0].value).rejects.toThrow('database unavailable');
   });
 
-  it('数据库中禁用的插件不进入目录，但内置执行器仍保持注册', async () => {
+  it('数据库中禁用的插件不进入目录且不可执行', async () => {
     const prisma = createPrismaMock();
     prisma.plugin.upsert.mockResolvedValue({});
     prisma.plugin.findMany.mockResolvedValue([
@@ -136,8 +129,8 @@ describe('PluginRegistry', () => {
     expect(registry.hasPlugin(BUILTIN_PLUGINS[0].catalog.pluginId)).toBe(false);
     expect(registry.hasPlugin(BUILTIN_PLUGINS[1].catalog.pluginId)).toBe(true);
     expect(
-      registry.getExecutor(BUILTIN_PLUGINS[0].executors[0].definition.name),
-    ).toBe(BUILTIN_PLUGINS[0].executors[0]);
+      await registry.getExecutor(BUILTIN_PLUGINS[0].executors[0].definition.name),
+    ).toBeUndefined();
   });
 
   it('目录和按插件查询工具的返回结构保持不变', async () => {
@@ -164,6 +157,71 @@ describe('PluginRegistry', () => {
     expect(registry.listToolsByPluginIds([selected.catalog.pluginId])).toEqual(
       selected.executors.map((executor) => executor.definition),
     );
+  });
+});
+
+describe('插件同步与运行时状态', () => {
+  it('每次执行读取实时状态，停用或删除后不能复用旧目录', async () => {
+    const prisma = createPrismaMock();
+    const registry = new PluginRegistry(prisma as unknown as PrismaService);
+    await registry.onModuleInit();
+    expect(await registry.getExecutor('echo_text')).toBeDefined();
+    prisma.plugin.findUnique.mockResolvedValue(toRow(BUILTIN_PLUGINS[0], false));
+    expect(await registry.getExecutor('echo_text')).toBeUndefined();
+    prisma.plugin.findUnique.mockResolvedValue(null);
+    expect(await registry.getExecutor('echo_text')).toBeUndefined();
+  });
+
+  it('同步前发现跨类型 ID 冲突，不覆盖原数据', async () => {
+    const prisma = createPrismaMock();
+    prisma.plugin.findMany.mockResolvedValue([{ ...toRow(BUILTIN_PLUGINS[0]), kind: 'http' }]);
+    const registry = new PluginRegistry(prisma as unknown as PrismaService);
+    await expect(registry.onModuleInit()).rejects.toThrow('ID');
+    expect(prisma.plugin.upsert).not.toHaveBeenCalled();
+    expect(prisma.plugin.updateMany).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false])('已有 HTTP 插件 enabled=%s 时工具名也不能与内置工具冲突', async (enabled) => {
+    const prisma = createPrismaMock();
+    const row = toRow(BUILTIN_PLUGINS[0], enabled);
+    prisma.plugin.findMany.mockResolvedValue([{
+      ...row, pluginId: 'custom_echo', kind: 'http',
+      tools: row.tools.map((tool) => ({ ...tool, pluginId: 'custom_echo' })),
+    }]);
+    const registry = new PluginRegistry(prisma as unknown as PrismaService);
+    await expect(registry.onModuleInit()).rejects.toThrow('工具名必须全局唯一');
+    expect(prisma.plugin.upsert).not.toHaveBeenCalled();
+    expect(prisma.plugin.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('旧内置插件被停用并从目录移除，重复启动不覆盖已有启停状态', async () => {
+    const prisma = createPrismaMock();
+    const old = { ...toRow(BUILTIN_PLUGINS[0]), pluginId: 'retired_plugin', tools: [] };
+    prisma.plugin.findMany.mockResolvedValue([old, ...BUILTIN_PLUGINS.map((item) => toRow(item))]);
+    for (let i = 0; i < 2; i += 1) {
+      const registry = new PluginRegistry(prisma as unknown as PrismaService);
+      await registry.onModuleInit();
+      expect(registry.hasPlugin('retired_plugin')).toBe(false);
+      expect(registry.listCatalog()).toHaveLength(BUILTIN_PLUGINS.length);
+    }
+    expect(prisma.plugin.updateMany).toHaveBeenCalledWith({
+      where: { kind: 'builtin', pluginId: { notIn: BUILTIN_PLUGINS.map(({ catalog }) => catalog.pluginId) } },
+      data: { enabled: false },
+    });
+    for (const [args] of prisma.plugin.upsert.mock.calls) expect(args.update).not.toHaveProperty('enabled');
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+    expect(prisma.tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(prisma.plugin.findMany.mock.invocationCallOrder[0]);
+  });
+
+  it('刷新目录冲突时保留原缓存，不发布一半目录', async () => {
+    const prisma = createPrismaMock();
+    const registry = new PluginRegistry(prisma as unknown as PrismaService);
+    await registry.onModuleInit();
+    const before = registry.listCatalog();
+    const row = toRow(BUILTIN_PLUGINS[0]);
+    prisma.plugin.findMany.mockResolvedValue([{ ...row, tools: [...row.tools, ...row.tools] }]);
+    await expect(registry.reload()).rejects.toThrow('工具名必须全局唯一');
+    expect(registry.listCatalog()).toEqual(before);
   });
 });
 
