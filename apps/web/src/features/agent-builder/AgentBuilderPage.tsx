@@ -169,18 +169,11 @@ export function AgentBuilderPage() {
     agentId: string,
     bindings: Array<{ pluginId: string; enabled: boolean }>,
   ) => {
-    try {
-      await replacePluginBindings(agentId, {
-        bindings: bindings.map((b) => ({
-          pluginId: b.pluginId,
-          enabled: b.enabled,
-        })),
-      });
-      await refreshAgents();
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '更新插件绑定失败');
-    }
+    const saved = await replacePluginBindings(agentId, { bindings });
+    setAgents((list) => list.map((agent) =>
+      agent.id === agentId ? { ...agent, pluginBindings: saved } : agent,
+    ));
+    setError(null);
   };
 
   return (
@@ -201,6 +194,7 @@ export function AgentBuilderPage() {
 
           {view.type === 'detail' && selectedAgent && (
             <AgentDetailView
+              key={selectedAgent.id}
               agent={selectedAgent}
               knowledgeBases={knowledgeBases}
               plugins={plugins}

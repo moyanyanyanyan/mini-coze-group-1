@@ -34,7 +34,7 @@ interface Props {
   ) => void;
   onUpdatePluginBindings: (
     bindings: Array<{ pluginId: string; enabled: boolean }>,
-  ) => void;
+  ) => Promise<void>;
 }
 
 export function AgentDetailView({
@@ -49,6 +49,9 @@ export function AgentDetailView({
   onUpdateKnowledgeBindings,
   onUpdatePluginBindings,
 }: Props) {
+  const [pluginSaving, setPluginSaving] = useState(false);
+  const [pluginSaveError, setPluginSaveError] = useState<string | null>(null);
+  const pluginSavePending = useRef(false);
   const [pickerOpen, setPickerOpen] = useState<PickerKind | null>(null);
   const [versions, setVersions] = useState<AgentVersionSummary[]>([]);
   const [versionsLoading, setVersionsLoading] = useState(false);
@@ -74,7 +77,7 @@ export function AgentDetailView({
 
   useEffect(() => {
     fetchVersions();
-  }, [fetchVersions, agent.updatedAt]);
+  }, [fetchVersions, agent.updatedAt, agent.pluginBindings]);
 
   const closeVersionDetail = () => {
     // 关闭后忽略未完成的请求，避免旧结果覆盖下一次打开的版本。
@@ -162,12 +165,32 @@ export function AgentDetailView({
     onUpdateKnowledgeBindings(bindings);
   };
 
+  const savePluginBindings = async (
+    bindings: Array<{ pluginId: string; enabled: boolean }>,
+  ): Promise<boolean> => {
+    // ref 立即锁定，避免同一次渲染中的连续点击提交旧绑定。
+    if (pluginSavePending.current || saveState === 'saving') return false;
+    pluginSavePending.current = true;
+    setPluginSaving(true);
+    setPluginSaveError(null);
+    try {
+      await onUpdatePluginBindings(bindings);
+      return true;
+    } catch (err) {
+      setPluginSaveError(err instanceof Error ? err.message : '更新插件绑定失败');
+      return false;
+    } finally {
+      pluginSavePending.current = false;
+      setPluginSaving(false);
+    }
+  };
+
   const togglePlugin = (pluginId: string) => {
     const bindings = agent.pluginBindings.map((b) => ({
       pluginId: b.pluginId,
       enabled: b.pluginId === pluginId ? !b.enabled : b.enabled,
     }));
-    onUpdatePluginBindings(bindings);
+    void savePluginBindings(bindings);
   };
 
   const statusLabel: Record<Agent['status'], string> = {
@@ -182,12 +205,12 @@ export function AgentDetailView({
   const enabledKbCount = agent.knowledgeBaseBindings.filter((b) => b.enabled).length;
   const enabledPluginCount = agent.pluginBindings.filter((b) => b.enabled).length;
 
-  const busy = saveState === 'saving';
+  const busy = saveState === 'saving' || pluginSaving;
 
   return (
     <div className="ab-detail">
       <header className="ab-detail-header">
-        <button className="ab-btn ab-btn-ghost" onClick={onBack}>← 返回列表</button>
+        <button className="ab-btn ab-btn-ghost" onClick={onBack} disabled={pluginSaving}>← 返回列表</button>
         <div className="ab-detail-title-row">
           <h2 className="ab-detail-title">{form.name || '未命名 Agent'}</h2>
           <span className={`ab-status-badge status-${agent.status.toLowerCase()}`}>{statusLabel[agent.status]}</span>
@@ -385,21 +408,23 @@ export function AgentDetailView({
               <button
                 type="button"
                 className="ab-btn ab-btn-ghost ab-btn-mini"
-                onClick={() => setPickerOpen('plugin')}
-                disabled={plugins.length === 0}
+                onClick={() => { setPluginSaveError(null); setPickerOpen('plugin'); }}
+                disabled={busy || plugins.length === 0}
                 title={plugins.length === 0 ? '插件目录暂无可用项' : '从目录中添加或移除'}
               >
                 + 添加
               </button>
             </div>
+            {pluginSaving && <p role="status">正在保存插件绑定…</p>}
+            {pluginSaveError && <p role="alert">{pluginSaveError}</p>}
             {agent.pluginBindings.length === 0 ? (
               <div className="ab-empty-inline">
                 未绑定插件
                 <button
                   type="button"
                   className="ab-btn ab-btn-ghost ab-btn-mini"
-                  onClick={() => setPickerOpen('plugin')}
-                  disabled={plugins.length === 0}
+                  onClick={() => { setPluginSaveError(null); setPickerOpen('plugin'); }}
+                  disabled={busy || plugins.length === 0}
                 >
                   选择插件
                 </button>
@@ -418,6 +443,7 @@ export function AgentDetailView({
                         <input
                           type="checkbox"
                           checked={b.enabled}
+                          disabled={busy}
                           onChange={() => togglePlugin(b.pluginId)}
                         />
                         <span className="ab-switch-slider" />
@@ -495,9 +521,14 @@ export function AgentDetailView({
           subtitle="选择要绑定到此 Agent 的插件"
           items={pluginPickerItems}
           selectedIds={boundPluginIds}
-          onConfirm={(ids) => {
-            onUpdatePluginBindings(ids.map((pluginId) => ({ pluginId, enabled: true })));
-            setPickerOpen(null);
+          saving={pluginSaving}
+          error={pluginSaveError}
+          onConfirm={async (ids) => {
+            const bindings = ids.map((pluginId) => ({
+              pluginId,
+              enabled: agent.pluginBindings.find((binding) => binding.pluginId === pluginId)?.enabled ?? true,
+            }));
+            if (await savePluginBindings(bindings)) setPickerOpen(null);
           }}
           onClose={() => setPickerOpen(null)}
         />

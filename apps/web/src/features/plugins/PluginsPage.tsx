@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   fetchPluginCatalog,
   type PluginCatalogItem,
-  type PluginToolDefinition,
 } from "./plugins.api";
 import {
   CATEGORY_META,
@@ -11,8 +10,6 @@ import {
   type MarketPlugin,
   type PluginCategory,
 } from "./PluginCard";
-import { ToolTestModal } from "./ToolTestModal";
-import { UploadIcon } from "./plugin-icons";
 import "./plugins.css";
 
 /** 内置插件 → 市场分类的展示映射（分类仅用于 UI 分组，不改后端契约） */
@@ -49,22 +46,7 @@ export function PluginsPage() {
   const [catalog, setCatalog] = useState<PluginCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [testingTool, setTestingTool] = useState<PluginToolDefinition | null>(
-    null,
-  );
-  const [toast, setToast] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const toastTimer = useRef<number | null>(null);
-
   const market = useMemo(() => catalog.map(toMarketPlugin), [catalog]);
-
-  const notify = (message: string) => {
-    setToast(message);
-    if (toastTimer.current !== null) {
-      window.clearTimeout(toastTimer.current);
-    }
-    toastTimer.current = window.setTimeout(() => setToast(null), 3000);
-  };
 
   useEffect(() => {
     let cancelled = false;
@@ -83,42 +65,14 @@ export function PluginsPage() {
       });
     return () => {
       cancelled = true;
-      if (toastTimer.current !== null) {
-        window.clearTimeout(toastTimer.current);
-      }
     };
   }, []);
-
-  const handleUploadFile = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      notify(`已收到 ${file.name}，插件包解析功能将在后续版本接入`);
-    }
-    event.target.value = "";
-  };
 
   return (
     <section className="feature-page plugins-page" aria-label="插件市场">
       <header className="pm-header">
         <div className="pm-header-inner">
           <span className="pm-header-brand">插件</span>
-          <div className="pm-header-actions">
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".zip,.json"
-              hidden
-              onChange={handleUploadFile}
-            />
-            <button
-              type="button"
-              className="pm-button pm-button-primary pm-button-header"
-              onClick={() => fileRef.current?.click()}
-            >
-              <UploadIcon className="h-4 w-4" />
-              上传插件包
-            </button>
-          </div>
         </div>
       </header>
 
@@ -146,8 +100,6 @@ export function PluginsPage() {
                     <PluginCard
                       key={plugin.pluginId}
                       plugin={plugin}
-                      onNotify={notify}
-                      onTestTool={setTestingTool}
                     />
                   ))}
                 </div>
@@ -156,19 +108,6 @@ export function PluginsPage() {
           })}
       </main>
 
-      {toast ? (
-        <div className="pm-toast" role="status">
-          {toast}
-        </div>
-      ) : null}
-
-      {testingTool ? (
-        <ToolTestModal
-          tool={testingTool}
-          onClose={() => setTestingTool(null)}
-          onNotify={notify}
-        />
-      ) : null}
     </section>
   );
 }

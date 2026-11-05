@@ -36,11 +36,9 @@ const PLUGIN_ICONS: Record<string, string> = {
 
 type PluginCardProps = {
   plugin: MarketPlugin;
-  onNotify: (message: string) => void;
-  onTestTool: (tool: PluginToolDefinition) => void;
 };
 
-export function PluginCard({ plugin, onNotify, onTestTool }: PluginCardProps) {
+export function PluginCard({ plugin }: PluginCardProps) {
   return (
     <article className="pm-card">
       <div className="pm-card-header">
@@ -53,18 +51,6 @@ export function PluginCard({ plugin, onNotify, onTestTool }: PluginCardProps) {
         </div>
       </div>
       <p className="pm-card-desc">{plugin.description}</p>
-      <div className="pm-card-tools">
-        {plugin.tools.map((tool) => (
-          <button
-            key={tool.name}
-            type="button"
-            className="pm-button pm-button-sm"
-            onClick={() => onTestTool(tool)}
-          >
-            测试 {tool.name}
-          </button>
-        ))}
-      </div>
     </article>
   );
 }
