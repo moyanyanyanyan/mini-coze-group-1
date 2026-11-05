@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Logger,
@@ -9,12 +10,14 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import type { Response } from 'express';
+import { randomUUID } from 'node:crypto';
 import type { CurrentUser as CurrentUserPayload } from '@minicoze/shared';
 // 必须显式 import 装饰器文件，只做类型导入的话 TS 会把它当类型擦掉
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ConversationsService } from '../modules/conversations/conversations.service';
 import { SendMessageDto } from '../modules/conversations/dto/send-message.dto';
 import { ChatService } from './chat.service';
+import { AgentsService } from '../modules/agents/agents.service';
 import type { RuntimeSseEvent } from './runtime-client.service';
 
 /**
@@ -29,7 +32,27 @@ const INTERNAL_TO_OUTBOUND: Record<string, string> = {
   PERSISTENCE_FAILED: 'PERSISTENCE_FAILED',
 };
 
-function sanitize(event: RuntimeSseEvent): RuntimeSseEvent {
+export function projectPublicEvent(event: RuntimeSseEvent): RuntimeSseEvent {
+  if (event.type === 'knowledge.result') {
+    const citations = Array.isArray(event.data.citations) ? event.data.citations : [];
+    return {
+      ...event,
+      data: {
+        status: event.data.status === 'matched' ? 'matched' : 'no_match',
+        citations: citations.map((value) => {
+          const source = value as Record<string, unknown>;
+          const position = source.position as Record<string, unknown> | undefined;
+          return {
+            knowledgeBaseId: source.knowledgeBaseId,
+            documentId: source.documentId,
+            chunkId: source.chunkId,
+            title: source.title,
+            ...(typeof position?.page === 'number' ? { position: { page: position.page } } : {}),
+          };
+        }),
+      },
+    };
+  }
   if (event.type !== 'run.failed') {
     return event;
   }
@@ -42,7 +65,7 @@ function sanitize(event: RuntimeSseEvent): RuntimeSseEvent {
 
 /** 写出去的一帧。带 id 行方便前端断点续传，目前只用到 event + data */
 function frame(event: RuntimeSseEvent): string {
-  const safe = sanitize(event);
+  const safe = projectPublicEvent(event);
   return `id: ${safe.seq}\nevent: ${safe.type}\ndata: ${JSON.stringify(safe)}\n\n`;
 }
 
@@ -54,6 +77,7 @@ export class ChatController {
   constructor(
     private readonly chat: ChatService,
     private readonly conversations: ConversationsService,
+    private readonly agents: AgentsService,
   ) {}
 
   /**
@@ -69,7 +93,11 @@ export class ChatController {
   ): Promise<void> {
     // 归属校验必须赶在写响应头之前。
     // SSE 头一旦写出去，错误就只能当成事件帧往下游丢了，出不了标准 JSON 404
-    await this.conversations.assertOwned(id, user.id);
+    const conversation = await this.conversations.assertOwned(id, user.id);
+    if (!conversation.agentId) {
+      throw new BadRequestException('请先选择智能体');
+    }
+    await this.agents.getAgentConfig(conversation.agentId, user.id);
     this.chat.acquire(id);
     res.writeHead(200, {
       'Content-Type': 'text/event-stream; charset=utf-8',
@@ -85,6 +113,7 @@ export class ChatController {
     const controller = new AbortController();
     res.on('close', () => controller.abort());
 
+    let lastEvent: RuntimeSseEvent | null = null;
     try {
       for await (const event of this.chat.run({
         conversationId: id,
@@ -92,23 +121,25 @@ export class ChatController {
         content: dto.content,
         signal: controller.signal,
       })) {
+        lastEvent = event;
         res.write(frame(event));
       }
     } catch (error) {
       this.logger.error(`聊天流异常 conversationId=${id}`, error as Error);
       if (!res.writableEnded) {
-        res.write(
-          'event: run.failed\ndata: ' +
-            JSON.stringify({ code: 'MODEL_ERROR', message: '生成失败，请稍后重试', retryable: true }) +
-            '\n\n',
-        );
+        res.write(frame({
+          runId: lastEvent?.runId ?? randomUUID(),
+          conversationId: id,
+          seq: (lastEvent?.seq ?? 0) + 1,
+          timestamp: new Date().toISOString(),
+          type: 'run.failed',
+          data: { code: 'MODEL_ERROR', message: '生成失败，请稍后重试', retryable: true },
+        }));
       }
     } finally {
-      if (!res.writableEnded) {
-        this.chat.release(id);
+      this.chat.release(id);
       if (!res.writableEnded) {
         res.end();
-      }
       }
     }
   }

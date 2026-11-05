@@ -2,6 +2,7 @@ import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import type { Conversation } from '@prisma/client';
 import type { ConversationSummary } from '@minicoze/shared';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AgentsService } from '../agents/agents.service';
 
 /**
  * 会话的读写入口。
@@ -9,7 +10,7 @@ import { PrismaService } from '../../prisma/prisma.service';
  */
 @Injectable()
 export class ConversationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly agents: AgentsService) {}
 
   /** 数据库对象 → 对外契约。时间统一转成 ISO 字符串 */
   // 该部分是最终conversation需要给前端返回的数据结构，也就是把数据库对象转换为前端需要的会话摘要
@@ -24,13 +25,14 @@ export class ConversationsService {
   }
 
   async create(
-    userId: string, 
-    agentId?: string
+    userId: string,
+    agentId: string
   ): Promise<ConversationSummary> {
+    await this.agents.getAgentConfig(agentId, userId);
     const created = await this.prisma.conversation.create({
       data: {
         userId,
-        agentId: agentId ?? null,
+        agentId,
       },
     });
     return this.toSummary(created);

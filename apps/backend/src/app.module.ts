@@ -30,7 +30,6 @@ import { ChatModule } from './chat/chat.module';
     ConversationsModule,
     KnowledgeModule,
     ChatModule,
-    KnowledgeModule,
     PluginsModule,
     WorkflowsModule,
     PublishingModule,

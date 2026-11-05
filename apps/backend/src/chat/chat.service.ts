@@ -4,10 +4,10 @@ import { ErrorCode } from '../common/errors/error-codes';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConversationsService } from '../modules/conversations/conversations.service';
 import { MessagesService } from '../modules/conversations/messages.service';
+import { AgentsService } from '../modules/agents/agents.service';
 import {
   RuntimeClientService,
   RuntimeCallError,
-  type RuntimeAgentConfig,
   type RuntimeHistoryMessage,
   type RuntimeRequestBody,
   type RuntimeSseEvent,
@@ -15,9 +15,6 @@ import {
 
 /** 契约规定：history 最多 20 条 = 10 个完整问答对 */
 const HISTORY_LIMIT = 20;
-
-/** 先用一套默认配置顶上 */
-const DEFAULT_AGENT_ID = '00000000-0000-0000-0000-000000000000';
 
 export interface RunChatInput {
   conversationId: string;
@@ -37,6 +34,7 @@ export class ChatService {
     private readonly conversations: ConversationsService,
     private readonly messages: MessagesService,
     private readonly runtime: RuntimeClientService,
+    private readonly agents: AgentsService,
   ) {}
 
   /**
@@ -62,6 +60,10 @@ export class ChatService {
       input.conversationId,
       input.userId,
     );
+    if (!conversation.agentId) {
+      throw new HttpException('请先选择智能体', HttpStatus.BAD_REQUEST);
+    }
+    const agentConfig = await this.agents.getAgentConfig(conversation.agentId, input.userId);
 
     //    先落库再请求 Runtime。
     //    两条消息必须提前拿到 id，因为 history 校验要求「本轮 id 不在 history 里」，
@@ -123,7 +125,7 @@ export class ChatService {
       conversationId: input.conversationId,
       userMessageId: turn.userMessage.id,
       assistantMessageId: turn.assistantMessage.id,
-      agentConfig: this.resolveAgentConfig(conversation.agentId),
+      agentConfig,
       history,
       message: input.content,
     };
@@ -235,22 +237,6 @@ export class ChatService {
 
     // 只留最近 10 对 = 20 条
     return pairs.slice(-HISTORY_LIMIT);
-  }
-
-  /**  陈弘毅接缝：等 Agent 模块合进来，这里改成按 agentId 查库 */
-  private resolveAgentConfig(agentId: string | null): RuntimeAgentConfig {
-    return {
-      id: agentId ?? DEFAULT_AGENT_ID,
-      revision: 0,
-      name: '默认助手',
-      systemPrompt: '你是一个简洁、有用的中文助手。',
-      // 模型名随供应商不同（DeepSeek 官方是 deepseek-chat，SiliconFlow 是 deepseek-ai/DeepSeek-V3.2）
-      model: process.env.AGENT_MODEL ?? 'deepseek-chat',
-      temperature: 0.7,
-      maxTokens: 1024,
-      knowledgeBaseIds: [],
-      pluginIds: [],
-    };
   }
 
   /** 落库。返回 false 表示写失败，调用方据此发 PERSISTENCE_FAILED */

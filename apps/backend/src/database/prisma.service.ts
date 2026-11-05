@@ -1,9 +1,3 @@
-import { Injectable, OnApplicationShutdown } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
-
-@Injectable()
-export class PrismaService extends PrismaClient implements OnApplicationShutdown {
-  async onApplicationShutdown() {
-    await this.$disconnect();
-  }
-}
+// Keep the knowledge and Agent import path compatible while using the single
+// Prisma provider registered globally by PrismaModule.
+export { PrismaService } from '../prisma/prisma.service';

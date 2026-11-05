@@ -3,9 +3,10 @@ import { ConversationsModule } from '../modules/conversations/conversations.modu
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
 import { RuntimeClientService } from './runtime-client.service';
+import { AgentsModule } from '../modules/agents/agents.module';
 
 @Module({
-  imports: [ConversationsModule],
+  imports: [ConversationsModule, AgentsModule],
   controllers: [ChatController],
   providers: [ChatService, RuntimeClientService],
   exports: [ChatService, RuntimeClientService],

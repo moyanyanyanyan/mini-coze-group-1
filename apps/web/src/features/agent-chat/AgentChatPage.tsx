@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChatMessage } from '@minicoze/shared';
 import { ApiError } from '../../shared/api/http';
+import { listAgents, type Agent } from '../agent-builder/agent.api';
 import {
   createConversation,
   listConversations,
   listMessages,
   streamMessage,
+  type ChatCitation,
 } from './api/chat-api';
 import { ChatBubble } from './components/ChatBubble';
 import { MessageComposer } from './components/MessageComposer';
@@ -14,7 +16,10 @@ import styles from './agent-chat.module.css';
 
 export function AgentChatPage() {
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [selectedAgentId, setSelectedAgentId] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [citationsByMessage, setCitationsByMessage] = useState<Record<string, ChatCitation[]>>({});
   /** 非空 = 这一轮还在生成。同时也用作「禁止再发」的闸门 */
   const [streamingId, setStreamingId] = useState<string | null>(null);
   const [sendError, setSendError] = useState('');
@@ -29,16 +34,39 @@ export function AgentChatPage() {
 
   const boot = useCallback(async () => {
     try {
-      // 先找有没有现成的会话，没有就建一个。MVP 阶段固定用第一个
-      const existing = await listConversations();
-      const conversation = existing[0] ?? (await createConversation());
+      const [agentPage, existing] = await Promise.all([listAgents(), listConversations()]);
+      const available = agentPage.items.filter((agent) => agent.status !== 'ARCHIVED');
+      setAgents(available);
+      if (available.length === 0) {
+        setBootError('请先在智能体页面创建一个智能体');
+        return;
+      }
+      const conversation = existing.find((item) => available.some((agent) => agent.id === item.agentId))
+        ?? (await createConversation(available[0].id));
 
+      setSelectedAgentId(conversation.agentId ?? available[0].id);
       setConversationId(conversation.id);
       setMessages(await listMessages(conversation.id));
     } catch (caught) {
       setBootError(caught instanceof ApiError ? caught.message : '会话加载失败，请稍后再试');
     }
   }, []);
+
+  const handleAgentChange = async (agentId: string) => {
+    setBootError('');
+    try {
+      const existing = await listConversations();
+      const conversation = existing.find((item) => item.agentId === agentId)
+        ?? (await createConversation(agentId));
+      const history = await listMessages(conversation.id);
+      setSelectedAgentId(agentId);
+      setConversationId(conversation.id);
+      setMessages(history);
+      setCitationsByMessage({});
+    } catch (caught) {
+      setBootError(caught instanceof Error ? caught.message : '切换智能体失败');
+    }
+  };
 
   useEffect(() => {
     if (booted.current) {
@@ -102,6 +130,9 @@ export function AgentChatPage() {
               prev.map((m) => (m.id === targetId ? { ...m, content: m.content + chunk } : m)),
             );
           },
+          onKnowledge: (_status, citations) => {
+            setCitationsByMessage((prev) => ({ ...prev, [targetId]: citations }));
+          },
           onCompleted: (finalContent) => {
             // 以后端给的全量为准，避免网络抖动丢过某个 delta
             setMessages((prev) =>
@@ -153,6 +184,17 @@ export function AgentChatPage() {
             {conversationId ? '消息存在你的账号下，刷新不丢' : '正在准备会话…'}
           </p>
         </div>
+        <label>
+          选择智能体{' '}
+          <select
+            value={selectedAgentId}
+            disabled={streamingId !== null || agents.length === 0}
+            onChange={(event) => void handleAgentChange(event.target.value)}
+          >
+            {agents.length === 0 ? <option value="">暂无智能体</option> : null}
+            {agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
+          </select>
+        </label>
         <span className={styles.badge}>
           <span className={styles.badgeDot} aria-hidden="true" />
           流式输出
@@ -171,7 +213,14 @@ export function AgentChatPage() {
         ) : null}
 
         {messages.map((message) => (
-          <ChatBubble key={message.id} message={message} />
+          <div key={message.id}>
+            <ChatBubble message={message} />
+            {citationsByMessage[message.id]?.length ? (
+              <div aria-label="本次检索来源">
+                来源：{citationsByMessage[message.id].map((source) => source.title).join('、')}
+              </div>
+            ) : null}
+          </div>
         ))}
 
         <div ref={bottomRef} />

@@ -2,7 +2,7 @@
 CREATE TABLE "Conversation" (
     "id" UUID NOT NULL,
     "userId" UUID NOT NULL,
-    "agentId" UUID,
+    "agentId" TEXT,
     "title" TEXT NOT NULL DEFAULT '新对话',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,

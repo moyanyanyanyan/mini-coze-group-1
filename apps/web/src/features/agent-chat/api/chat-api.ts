@@ -9,9 +9,8 @@ export function listConversations() {
   return get<ConversationSummary[]>('/api/conversations');
 }
 
-/** 不传 agentId 也能建会话：陈弘毅的 Agent 模块还没合进来 */
-export function createConversation(agentId?: string) {
-  return post<ConversationSummary>('/api/conversations', agentId ? { agentId } : {});
+export function createConversation(agentId: string) {
+  return post<ConversationSummary>('/api/conversations', { agentId });
 }
 
 export function listMessages(conversationId: string) {
@@ -36,11 +35,20 @@ interface ChatStreamEvent {
   data: Record<string, unknown>;
 }
 
+export interface ChatCitation {
+  knowledgeBaseId: string;
+  documentId: string;
+  chunkId: string;
+  title: string;
+  position?: { page?: number };
+}
+
 export interface StreamHandlers {
   /** 第一个事件，拿到本轮 assistant 消息 id */
   onStarted?: (assistantMessageId: string) => void;
   /** 每个增量片段，直接往气泡后面拼 */
   onDelta: (chunk: string) => void;
+  onKnowledge?: (status: string, citations: ChatCitation[]) => void;
   /** 正常结束，data.content 是全量最终文本（以它为准，比拼 delta 更可靠） */
   onCompleted?: (content: string) => void;
   /** code 已被后端脱敏成 MODEL_ERROR / MODEL_TIMEOUT / PERSISTENCE_FAILED */
@@ -85,6 +93,12 @@ function dispatch(event: ChatStreamEvent | null, handlers: StreamHandlers): void
     case 'message.delta':
       handlers.onDelta(String(event.data.content ?? ''));
       break;
+    case 'knowledge.result':
+      handlers.onKnowledge?.(
+        String(event.data.status ?? 'no_match'),
+        Array.isArray(event.data.citations) ? event.data.citations as ChatCitation[] : [],
+      );
+      break;
     case 'run.completed':
       handlers.onCompleted?.(String(event.data.content ?? ''));
       break;
@@ -96,7 +110,7 @@ function dispatch(event: ChatStreamEvent | null, handlers: StreamHandlers): void
       );
       break;
     default:
-      // knowledge.result / tool.* 以后接，先忽略
+      // tool.* 暂不展示
       break;
   }
 }
