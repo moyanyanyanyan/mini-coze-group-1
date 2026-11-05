@@ -19,6 +19,14 @@ export const ErrorCode = {
   /** 注册时邮箱已被占用 */
   EMAIL_ALREADY_REGISTERED: 'EMAIL_ALREADY_REGISTERED',
 
+  // ---- Google OAuth ----
+  /** 回调时 state 和 Cookie 里那个对不上（CSRF / 登录劫持） */
+  GOOGLE_STATE_MISMATCH: 'GOOGLE_STATE_MISMATCH',
+  /** code 换 token 失败：过期、已被用过、redirect_uri 与 Console 不一致 */
+  GOOGLE_TOKEN_EXCHANGE_FAILED: 'GOOGLE_TOKEN_EXCHANGE_FAILED',
+  /** Google 说这个邮箱没验证过，不能当登录依据 */
+  GOOGLE_EMAIL_NOT_VERIFIED: 'GOOGLE_EMAIL_NOT_VERIFIED',
+
   // ---- 权限 ----
   /** 登录了，但资源不是你的 */
   FORBIDDEN: 'FORBIDDEN',

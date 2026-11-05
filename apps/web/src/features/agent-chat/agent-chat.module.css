@@ -2,18 +2,28 @@
   position: relative;
   z-index: 1;
   display: grid;
-  /* 头部和输入区固定，中间消息区自己滚，聊天页才不会整页跟着动 */
+  /* 头部和输入区固定，中间消息区自己滚 */
   grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: 16px;
   height: 100vh;
-  padding: 28px 34px 24px;
+  padding: 0;
 }
 
+/* 三个区域共用一条 860px 的中轴，聊天像文档一样立起来 */
+.header,
+.stream,
+.footer {
+  width: min(860px, calc(100% - 48px));
+  margin-inline: auto;
+}
+
+/* —— 头部 —— */
 .header {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
+  padding: 24px 0 16px;
+  border-bottom: 1px solid var(--line);
 }
 
 .title {
@@ -30,36 +40,84 @@
   font-size: 13px;
 }
 
+/* 状态徽章：小圆点 + 等宽字，代替彩色大标签 */
 .badge {
   flex: none;
-  padding: 5px 11px;
-  border: 1px solid var(--violet-200);
-  border-radius: var(--radiusPill, 999px);
-  color: var(--violet-700);
-  background: var(--violet-50);
-  font-size: 12px;
-  font-weight: 620;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  padding: 0 12px;
+  margin-bottom: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  color: var(--ink-600);
+  background: var(--surface-raised);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
   white-space: nowrap;
 }
 
+.badgeDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success-600);
+  box-shadow: 0 0 0 3px var(--success-100);
+}
+
+/* —— 消息流：沉浸式，无边框无底色 —— */
 .stream {
   overflow-y: auto;
   display: grid;
   align-content: start;
-  gap: 14px;
-  padding: 20px 22px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.72);
+  gap: 20px;
+  padding: 26px 0 20px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
 }
 
+/* —— 空状态 —— */
 .empty {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  margin: auto 0;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.emptyIcon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 10px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 50%;
+  color: var(--violet-500);
+}
+
+.emptyIcon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.empty strong {
+  color: var(--ink-800);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.empty p {
   margin: 0;
   color: var(--ink-500);
   font-size: 13px;
   line-height: 1.8;
 }
 
+/* —— 消息行 —— */
 .row {
   display: flex;
   align-items: flex-start;
@@ -77,26 +135,26 @@
   width: 30px;
   height: 30px;
   place-items: center;
-  border-radius: 9px;
+  margin-top: 2px;
+  border-radius: var(--radius-sm);
   color: #fff;
   font-size: 11px;
   font-weight: 700;
 }
 
 .avatarUser {
-  background: var(--ink-600);
+  background: var(--ink-700);
 }
 
 .avatarAssistant {
   background: var(--violet-600);
+  box-shadow: inset 0 0 0 1px var(--on-brand-border);
 }
 
 .bubble {
   max-width: min(560px, 78%);
-  padding: 11px 14px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  color: var(--ink-800);
+  padding: 11px 15px;
+  border: 1px solid transparent;
   font-size: 14px;
   line-height: 1.75;
   /* 保留用户敲的换行，同时长单词不会撑破气泡 */
@@ -104,53 +162,80 @@
   overflow-wrap: anywhere;
 }
 
+/* 用户：品牌紫实底白字，一眼分清两侧 */
 .bubbleUser {
-  border-color: var(--violet-200);
-  background: var(--violet-100);
+  border-color: var(--violet-700);
+  border-radius: 14px 4px 14px 14px;
+  color: #fff;
+  background: var(--violet-600);
 }
 
+/* AI：白底细边框，回答是阅读主体，要像卡片一样干净 */
 .bubbleAssistant {
-  background: #fff;
+  border-color: var(--line);
+  border-radius: 4px 14px 14px 14px;
+  color: var(--ink-800);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-xs);
 }
 
 .bubblePending {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 5px;
   color: var(--ink-500);
-  background: #fff;
+  background: var(--surface-raised);
 }
 
+/* 三点波纹打字指示器 */
 .dot {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: var(--violet-400);
-  animation: chatPulse 1.1s ease-in-out infinite;
+  animation: chatPulse 1.2s ease-in-out infinite;
+}
+
+.dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.dot:nth-child(3) {
+  animation-delay: 0.3s;
 }
 
 @keyframes chatPulse {
-  0%, 100% { opacity: 0.28; }
-  50% { opacity: 1; }
+  0%, 100% { opacity: 0.28; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-2px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .dot { animation: none; }
 }
 
+/* —— 底部：错误条 + 停止按钮 + 输入区 —— */
 .footer {
   display: grid;
-  gap: 10px;
+  gap: 12px;
+  padding: 4px 0 26px;
 }
 
+/* 输入区：一张浮在页面上的纸 */
 .composer {
   display: flex;
   align-items: flex-end;
   gap: 10px;
-  padding: 10px 12px;
+  padding: 10px 10px 10px 16px;
   border: 1px solid var(--line-strong);
-  border-radius: 14px;
-  background: #fff;
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-md);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.composer:focus-within {
+  border-color: var(--violet-400);
+  box-shadow: 0 0 0 3px var(--focus-ring), var(--shadow-md);
 }
 
 .textarea {
@@ -175,73 +260,84 @@
   color: var(--ink-400);
 }
 
+/* 发送：方形图标按钮，视觉重量轻于长条文字按钮 */
 .send {
   flex: none;
-  height: 38px;
-  padding: 0 18px;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
   border: 0;
-  border-radius: var(--radiusPill, 999px);
+  border-radius: var(--radius-md);
   color: #fff;
   background: var(--violet-600);
-  font-size: 14px;
-  font-weight: 620;
   cursor: pointer;
-  transition: background-color 180ms ease;
+  transition: background-color 160ms ease, transform 120ms ease;
+}
+
+.send svg {
+  width: 17px;
+  height: 17px;
 }
 
 .send:hover:not(:disabled) {
   background: var(--violet-700);
 }
 
+.send:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
 .send:disabled {
-  opacity: 0.55;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
 .alert {
   margin: 0;
-  padding: 10px 12px;
-  border: 1px solid #f0c9c4;
-  border-radius: 10px;
-  color: #b4372a;
-  background: #fdf3f2;
+  padding: 10px 13px;
+  border: 1px solid var(--danger-200);
+  border-left: 3px solid var(--danger-600);
+  border-radius: var(--radius-sm);
+  color: var(--danger-600);
+  background: var(--danger-100);
   font-size: 13px;
 }
 
-@media (max-width: 760px) {
-  .page {
-    padding: 20px 18px;
-  }
-
-  .bubble {
-    max-width: 88%;
-  }
-
-  .badge {
-    display: none;
-  }
-}
-
+/* —— 停止生成：小方块符号 + 胶囊 —— */
 .stopRow {
   display: flex;
   justify-content: center;
 }
 
 .stop {
-  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
   padding: 0 16px;
   border: 1px solid var(--line-strong);
-  border-radius: var(--radiusPill, 999px);
+  border-radius: var(--radius-pill);
   color: var(--ink-600);
-  background: #fff;
+  background: var(--surface-raised);
   font-size: 13px;
-  font-weight: 620;
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
-  transition: background-color 180ms ease;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.stop::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--danger-600);
 }
 
 .stop:hover {
-  background: var(--violet-50);
+  border-color: var(--ink-500);
+  box-shadow: var(--shadow-xs);
 }
 
 /* 只给读屏软件的文字：停止生成时的语义提示 */
@@ -255,4 +351,24 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+@media (max-width: 760px) {
+  .header,
+  .stream,
+  .footer {
+    width: calc(100% - 32px);
+  }
+
+  .page {
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+
+  .bubble {
+    max-width: 88%;
+  }
+
+  .badge {
+    display: none;
+  }
 }

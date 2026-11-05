@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BindingPickerModal,
   type PickerItem,
@@ -6,6 +6,10 @@ import {
 import {
   modelOptions,
   contextLimitOptions,
+  getAgentVersion,
+  listAgentVersions,
+  type AgentVersionDetail,
+  type AgentVersionSummary,
   type Agent,
   type AgentStatus,
   type KnowledgeBaseSummary,
@@ -30,7 +34,7 @@ interface Props {
   ) => void;
   onUpdatePluginBindings: (
     bindings: Array<{ pluginId: string; enabled: boolean }>,
-  ) => void;
+  ) => Promise<void>;
 }
 
 export function AgentDetailView({
@@ -45,7 +49,61 @@ export function AgentDetailView({
   onUpdateKnowledgeBindings,
   onUpdatePluginBindings,
 }: Props) {
+  const [pluginSaving, setPluginSaving] = useState(false);
+  const [pluginSaveError, setPluginSaveError] = useState<string | null>(null);
+  const pluginSavePending = useRef(false);
   const [pickerOpen, setPickerOpen] = useState<PickerKind | null>(null);
+  const [versions, setVersions] = useState<AgentVersionSummary[]>([]);
+  const [versionsLoading, setVersionsLoading] = useState(false);
+  const [versionsError, setVersionsError] = useState<string | null>(null);
+  const [versionDetailOpen, setVersionDetailOpen] = useState(false);
+  const versionRequestId = useRef(0);
+  const [selectedVersion, setSelectedVersion] = useState<AgentVersionDetail | null>(null);
+  const [selectedVersionLoading, setSelectedVersionLoading] = useState(false);
+  const [selectedVersionError, setSelectedVersionError] = useState<string | null>(null);
+
+  const fetchVersions = useCallback(async () => {
+    setVersionsLoading(true);
+    setVersionsError(null);
+    try {
+      const list = await listAgentVersions(agent.id);
+      setVersions(list);
+    } catch (err) {
+      setVersionsError(err instanceof Error ? err.message : '加载版本历史失败');
+    } finally {
+      setVersionsLoading(false);
+    }
+  }, [agent.id]);
+
+  useEffect(() => {
+    fetchVersions();
+  }, [fetchVersions, agent.updatedAt, agent.pluginBindings]);
+
+  const closeVersionDetail = () => {
+    // 关闭后忽略未完成的请求，避免旧结果覆盖下一次打开的版本。
+    versionRequestId.current += 1;
+    setVersionDetailOpen(false);
+  };
+
+  const openVersionDetail = async (version: AgentVersionSummary) => {
+    const requestId = ++versionRequestId.current;
+    setVersionDetailOpen(true);
+    setSelectedVersion(null);
+    setSelectedVersionError(null);
+    setSelectedVersionLoading(true);
+    try {
+      const detail = await getAgentVersion(agent.id, version.id);
+      if (requestId !== versionRequestId.current) return;
+      setSelectedVersion(detail);
+    } catch (err) {
+      if (requestId !== versionRequestId.current) return;
+      setSelectedVersionError(err instanceof Error ? err.message : '加载版本详情失败');
+    } finally {
+      if (requestId === versionRequestId.current) {
+        setSelectedVersionLoading(false);
+      }
+    }
+  };
 
   const pluginPickerItems: PickerItem[] = useMemo(
     () => plugins.map((p) => ({ id: p.pluginId, title: p.title, description: p.content })),
@@ -107,12 +165,32 @@ export function AgentDetailView({
     onUpdateKnowledgeBindings(bindings);
   };
 
+  const savePluginBindings = async (
+    bindings: Array<{ pluginId: string; enabled: boolean }>,
+  ): Promise<boolean> => {
+    // ref 立即锁定，避免同一次渲染中的连续点击提交旧绑定。
+    if (pluginSavePending.current || saveState === 'saving') return false;
+    pluginSavePending.current = true;
+    setPluginSaving(true);
+    setPluginSaveError(null);
+    try {
+      await onUpdatePluginBindings(bindings);
+      return true;
+    } catch (err) {
+      setPluginSaveError(err instanceof Error ? err.message : '更新插件绑定失败');
+      return false;
+    } finally {
+      pluginSavePending.current = false;
+      setPluginSaving(false);
+    }
+  };
+
   const togglePlugin = (pluginId: string) => {
     const bindings = agent.pluginBindings.map((b) => ({
       pluginId: b.pluginId,
       enabled: b.pluginId === pluginId ? !b.enabled : b.enabled,
     }));
-    onUpdatePluginBindings(bindings);
+    void savePluginBindings(bindings);
   };
 
   const statusLabel: Record<Agent['status'], string> = {
@@ -127,12 +205,12 @@ export function AgentDetailView({
   const enabledKbCount = agent.knowledgeBaseBindings.filter((b) => b.enabled).length;
   const enabledPluginCount = agent.pluginBindings.filter((b) => b.enabled).length;
 
-  const busy = saveState === 'saving';
+  const busy = saveState === 'saving' || pluginSaving;
 
   return (
     <div className="ab-detail">
       <header className="ab-detail-header">
-        <button className="ab-btn ab-btn-ghost" onClick={onBack}>← 返回列表</button>
+        <button className="ab-btn ab-btn-ghost" onClick={onBack} disabled={pluginSaving}>← 返回列表</button>
         <div className="ab-detail-title-row">
           <h2 className="ab-detail-title">{form.name || '未命名 Agent'}</h2>
           <span className={`ab-status-badge status-${agent.status.toLowerCase()}`}>{statusLabel[agent.status]}</span>
@@ -232,30 +310,30 @@ export function AgentDetailView({
                   onChange={(e) => update('maxTokens', Number(e.target.value))}
                 />
               </div>
-            </div>
 
-            <div className="ab-field">
-              <label className="ab-label">
-                temperature <span className="ab-field-value">{form.temperature.toFixed(1)}</span>
-              </label>
-              <input
-                className="ab-range"
-                type="range"
-                min={0}
-                max={2}
-                step={0.1}
-                value={form.temperature}
-                onChange={(e) => update('temperature', Number(e.target.value))}
-              />
-            </div>
+              <div className="ab-field">
+                <label className="ab-label">
+                  temperature <span className="ab-field-value">{form.temperature.toFixed(1)}</span>
+                </label>
+                <input
+                  className="ab-range"
+                  type="range"
+                  min={0}
+                  max={2}
+                  step={0.1}
+                  value={form.temperature}
+                  onChange={(e) => update('temperature', Number(e.target.value))}
+                />
+              </div>
 
-            <div className="ab-field">
-              <label className="ab-label">历史消息轮数</label>
-              <select className="ab-input" value={form.contextLimit} onChange={(e) => update('contextLimit', Number(e.target.value))}>
-                {contextLimitOptions.map((n) => (
-                  <option key={n} value={n}>{n} 轮</option>
-                ))}
-              </select>
+              <div className="ab-field">
+                <label className="ab-label">历史消息轮数</label>
+                <select className="ab-input" value={form.contextLimit} onChange={(e) => update('contextLimit', Number(e.target.value))}>
+                  {contextLimitOptions.map((n) => (
+                    <option key={n} value={n}>{n} 轮</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
@@ -330,21 +408,23 @@ export function AgentDetailView({
               <button
                 type="button"
                 className="ab-btn ab-btn-ghost ab-btn-mini"
-                onClick={() => setPickerOpen('plugin')}
-                disabled={plugins.length === 0}
+                onClick={() => { setPluginSaveError(null); setPickerOpen('plugin'); }}
+                disabled={busy || plugins.length === 0}
                 title={plugins.length === 0 ? '插件目录暂无可用项' : '从目录中添加或移除'}
               >
                 + 添加
               </button>
             </div>
+            {pluginSaving && <p role="status">正在保存插件绑定…</p>}
+            {pluginSaveError && <p role="alert">{pluginSaveError}</p>}
             {agent.pluginBindings.length === 0 ? (
               <div className="ab-empty-inline">
                 未绑定插件
                 <button
                   type="button"
                   className="ab-btn ab-btn-ghost ab-btn-mini"
-                  onClick={() => setPickerOpen('plugin')}
-                  disabled={plugins.length === 0}
+                  onClick={() => { setPluginSaveError(null); setPickerOpen('plugin'); }}
+                  disabled={busy || plugins.length === 0}
                 >
                   选择插件
                 </button>
@@ -363,6 +443,7 @@ export function AgentDetailView({
                         <input
                           type="checkbox"
                           checked={b.enabled}
+                          disabled={busy}
                           onChange={() => togglePlugin(b.pluginId)}
                         />
                         <span className="ab-switch-slider" />
@@ -396,6 +477,37 @@ export function AgentDetailView({
             </div>
           </div>
 
+          <div className="ab-section">
+            <h3 className="ab-section-title">版本历史</h3>
+            {versionsLoading && <div className="ab-versions-empty">加载中…</div>}
+            {versionsError && <div className="ab-versions-empty ab-versions-error">{versionsError}</div>}
+            {!versionsLoading && !versionsError && versions.length === 0 && (
+              <div className="ab-versions-empty">暂无版本记录</div>
+            )}
+            {!versionsLoading && !versionsError && versions.length > 0 && (
+              <ul className="ab-versions-list">
+                {versions.map((v, idx) => (
+                  <li key={v.id} className="ab-version-item">
+                    <button
+                      type="button"
+                      className="ab-version-btn"
+                      onClick={() => openVersionDetail(v)}
+                      title="查看此版本快照"
+                    >
+                      <span className="ab-version-num">v{v.version}</span>
+                    </button>
+                    <span className="ab-version-time">
+                      {new Date(v.createdAt).toLocaleString()}
+                    </span>
+                    {idx === 0 && agent.status === 'ACTIVE' && (
+                      <span className="ab-version-current">当前</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
           <div className="ab-meta">
             <div>创建于 {new Date(agent.createdAt).toLocaleString()}</div>
             <div>最后更新 {new Date(agent.updatedAt).toLocaleString()}</div>
@@ -409,9 +521,14 @@ export function AgentDetailView({
           subtitle="选择要绑定到此 Agent 的插件"
           items={pluginPickerItems}
           selectedIds={boundPluginIds}
-          onConfirm={(ids) => {
-            onUpdatePluginBindings(ids.map((pluginId) => ({ pluginId, enabled: true })));
-            setPickerOpen(null);
+          saving={pluginSaving}
+          error={pluginSaveError}
+          onConfirm={async (ids) => {
+            const bindings = ids.map((pluginId) => ({
+              pluginId,
+              enabled: agent.pluginBindings.find((binding) => binding.pluginId === pluginId)?.enabled ?? true,
+            }));
+            if (await savePluginBindings(bindings)) setPickerOpen(null);
           }}
           onClose={() => setPickerOpen(null)}
         />
@@ -432,6 +549,93 @@ export function AgentDetailView({
           onClose={() => setPickerOpen(null)}
         />
       )}
+
+      {versionDetailOpen && (
+        <div className="ab-modal-backdrop" onClick={closeVersionDetail} role="dialog" aria-modal="true" aria-label="版本详情">
+          <div className="ab-modal ab-modal-picker" onClick={(e) => e.stopPropagation()}>
+            <header className="ab-modal-header">
+              <h3 className="ab-modal-title">
+                版本快照 {selectedVersion?.version ? `v${selectedVersion.version}` : ''}
+              </h3>
+              <button className="ab-modal-close" onClick={closeVersionDetail} aria-label="关闭">×</button>
+            </header>
+            <div className="ab-modal-body">
+              {selectedVersionLoading && <div className="ab-versions-empty">加载中…</div>}
+              {selectedVersionError && <div className="ab-versions-empty ab-versions-error">{selectedVersionError}</div>}
+              {selectedVersion && <VersionSnapshot snapshot={selectedVersion.snapshot} plugins={plugins} knowledgeBases={knowledgeBases} />}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface VersionSnapshotProps {
+  snapshot: Record<string, unknown>;
+  plugins: PluginSummary[];
+  knowledgeBases: KnowledgeBaseSummary[];
+}
+
+function VersionSnapshot({ snapshot, plugins, knowledgeBases }: VersionSnapshotProps) {
+  const model = (snapshot.model as string) ?? '';
+  const temperature = (snapshot.temperature as number) ?? 0;
+  const maxTokens = (snapshot.maxTokens as number) ?? 0;
+  const systemPrompt = (snapshot.systemPrompt as string) ?? '';
+  const pluginIds = (snapshot.pluginIds as string[]) ?? [];
+  const kbIds = (snapshot.knowledgeBaseIds as string[]) ?? [];
+  const pluginById = new Map(plugins.map((p) => [p.pluginId, p]));
+  const kbById = new Map(knowledgeBases.map((k) => [k.id, k]));
+
+  return (
+    <div className="ab-snapshot">
+      <div className="ab-snapshot-row">
+        <span className="ab-snapshot-label">模型</span>
+        <span className="ab-snapshot-value">{model || '—'}</span>
+      </div>
+      <div className="ab-snapshot-row">
+        <span className="ab-snapshot-label">temperature</span>
+        <span className="ab-snapshot-value">{temperature}</span>
+      </div>
+      <div className="ab-snapshot-row">
+        <span className="ab-snapshot-label">maxTokens</span>
+        <span className="ab-snapshot-value">{maxTokens}</span>
+      </div>
+
+      <div className="ab-snapshot-block">
+        <div className="ab-snapshot-label">系统提示词</div>
+        <pre className="ab-snapshot-prompt">{systemPrompt || '（空）'}</pre>
+      </div>
+
+      <div className="ab-snapshot-block">
+        <div className="ab-snapshot-label">启用的插件 ({pluginIds.length})</div>
+        {pluginIds.length === 0 ? (
+          <div className="ab-snapshot-empty-inline">无</div>
+        ) : (
+          <ul className="ab-snapshot-tags">
+            {pluginIds.map((id) => (
+              <li key={id} className="ab-snapshot-tag">
+                {pluginById.get(id)?.title ?? id}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="ab-snapshot-block">
+        <div className="ab-snapshot-label">启用的知识库 ({kbIds.length})</div>
+        {kbIds.length === 0 ? (
+          <div className="ab-snapshot-empty-inline">无</div>
+        ) : (
+          <ul className="ab-snapshot-tags">
+            {kbIds.map((id) => (
+              <li key={id} className="ab-snapshot-tag ab-snapshot-tag-kb">
+                {kbById.get(id)?.name ?? id}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

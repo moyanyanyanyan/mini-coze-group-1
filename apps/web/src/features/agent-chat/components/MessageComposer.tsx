@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent, KeyboardEvent } from 'react';
+import { Icon } from '../../../shared/ui/Icon';
 import styles from '../agent-chat.module.css';
 
 interface MessageComposerProps {
@@ -44,8 +45,13 @@ export function MessageComposer({ disabled, onSend }: MessageComposerProps) {
         onChange={(event) => setDraft(event.target.value)}
         onKeyDown={handleKeyDown}
       />
-      <button className={styles.send} type="submit" disabled={disabled || draft.trim().length === 0}>
-        发送
+      <button
+        className={styles.send}
+        type="submit"
+        disabled={disabled || draft.trim().length === 0}
+        aria-label="发送"
+      >
+        <Icon name="send" />
       </button>
     </form>
   );

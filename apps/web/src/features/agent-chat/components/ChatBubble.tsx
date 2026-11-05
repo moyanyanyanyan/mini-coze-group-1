@@ -22,6 +22,8 @@ export function ChatBubble({ message }: ChatBubbleProps) {
         {waiting ? (
           <>
             <span className={styles.dot} />
+            <span className={styles.dot} />
+            <span className={styles.dot} />
             <span className={styles.srOnly}>正在生成回答</span>
           </>
         ) : (
