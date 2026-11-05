@@ -31,4 +31,11 @@ describe('feature registry', () => {
   it('resolves nested publish routes to the publish module', () => {
     expect(getWorkspaceFeature('/workspace/publish/docs')?.id).toBe('publish-sdk');
   });
+
+  it('preserves workflow list and detail routes without matching similar prefixes', () => {
+    expect(getWorkspaceFeature('/workspace')?.id).toBe('workspace');
+    expect(getWorkspaceFeature('/workspace/workflows')?.id).toBe('workflow');
+    expect(getWorkspaceFeature('/workspace/workflows/workflow-1')?.id).toBe('workflow');
+    expect(getWorkspaceFeature('/workspace/workflows-invalid')).toBeUndefined();
+  });
 });

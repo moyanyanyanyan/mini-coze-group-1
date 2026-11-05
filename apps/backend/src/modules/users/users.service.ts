@@ -55,4 +55,38 @@ export class UsersService{
             },
         });
     }
+    // ========== A7 Google 登录新增 ==========
+
+    async findByGoogleId(googleId:string):Promise<User|null>{
+        return this.prisma.user.findUnique({
+            where:{googleId},
+        })
+    }
+
+    // 创建一个纯 Google 用户：没有密码
+    async createOAuthUser(input:{
+        email:string;
+        displayName:string;
+        avatarUrl?:string;
+        googleId:string;
+    }):Promise<User>{
+        return this.prisma.user.create({
+            data:{
+                email:input.email.toLowerCase().trim(),
+                displayName:input.displayName,
+                avatarUrl:input.avatarUrl??null,
+                googleId:input.googleId,
+                // 关键：Google 用户没有密码，这里必须是 null 而不是空字符串
+                passwordHash:null,
+            },
+        })
+    }
+
+    // 已有邮箱密码账号的人第一次用 Google 登录：把 googleId 补写上去
+    async linkGoogleId(userId:string,googleId:string):Promise<User>{
+        return this.prisma.user.update({
+            where:{id:userId},
+            data:{googleId},
+        })
+    }
 }

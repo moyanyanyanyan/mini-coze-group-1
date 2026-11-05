@@ -224,6 +224,46 @@ describe('RuntimeClientService.run', () => {
 });
 
 describe('RuntimeClientService.stream', () => {
+  it('reports connection failures without retrying the request', async () => {
+    const fetchMock = jest.spyOn(global, 'fetch').mockRejectedValue(new TypeError('connection refused'));
+
+    await expect(createClient().stream(request).next()).rejects.toMatchObject({
+      code: 'RUNTIME_UNAVAILABLE',
+      options: { kind: 'network' },
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('distinguishes a read failure after the stream has started', async () => {
+    let upstream!: ReadableStreamDefaultController<Uint8Array>;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        upstream = controller;
+        controller.enqueue(encoder.encode(sseFrame(1, 'run.started', {})));
+      },
+    });
+    jest.spyOn(global, 'fetch').mockResolvedValue(new Response(body));
+    const iterator = createClient().stream(request);
+    await expect(iterator.next()).resolves.toMatchObject({ value: { type: 'run.started' } });
+    upstream.error(new TypeError('connection lost'));
+
+    await expect(iterator.next()).rejects.toMatchObject({
+      code: 'MODEL_STREAM_INTERRUPTED',
+      options: { kind: 'network' },
+    });
+    expect(body.locked).toBe(false);
+  });
+
+  it('rejects missing credentials before starting a stream request', async () => {
+    delete process.env.INTERNAL_SERVICE_TOKEN;
+    const fetchMock = jest.spyOn(global, 'fetch');
+
+    await expect(new RuntimeClientService().stream(request).next()).rejects.toMatchObject({
+      code: 'INTERNAL_NOT_CONFIGURED',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('calls the Runtime stream endpoint and parses SSE events', async () => {
     const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(sseResponse([
       ': heartbeat\r\n\r\n',

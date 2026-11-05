@@ -12,7 +12,9 @@
 
 .workspace-sidebar {
   position: relative;
-  padding: 28px 22px;
+  display: flex;
+  flex-direction: column;
+  padding: 28px 18px;
   border-right: 1px solid var(--line);
   background:
     linear-gradient(var(--line-soft) 1px, transparent 1px),
@@ -24,7 +26,7 @@
   content: 'MINICOZE / 01';
   position: absolute;
   bottom: 24px;
-  left: 34px;
+  left: 30px;
   color: var(--ink-400);
   font-size: 9px;
   letter-spacing: 0.15em;
@@ -35,7 +37,7 @@
   align-items: center;
   gap: 11px;
   min-height: 44px;
-  margin: 0 8px 38px;
+  margin: 0 8px 34px;
   color: var(--ink-900);
   font-size: 20px;
   font-weight: 700;
@@ -48,9 +50,10 @@
   width: 31px;
   height: 31px;
   place-items: center;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   color: #fff;
   background: var(--violet-600);
+  box-shadow: inset 0 0 0 1px var(--on-brand-border);
   font-size: 14px;
   font-weight: 720;
 }
@@ -62,53 +65,174 @@
 
 .workspace-nav-item {
   position: relative;
-  min-height: 48px;
+  min-height: 42px;
   display: flex;
   align-items: center;
   gap: 13px;
-  padding: 0 12px;
+  padding: 0 11px;
+  border-radius: var(--radius-sm);
   color: var(--ink-700);
   font-size: 14px;
   font-weight: 540;
   text-decoration: none;
-  transition: color 180ms ease, background-color 180ms ease;
-}
-
-.workspace-nav-item::before {
-  content: '';
-  position: absolute;
-  top: 12px;
-  bottom: 12px;
-  left: -22px;
-  width: 2px;
-  background: transparent;
-  transition: background-color 180ms ease;
+  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 }
 
 .workspace-nav-item svg {
-  width: 20px;
-  height: 20px;
+  width: 19px;
+  height: 19px;
   color: var(--ink-500);
-  transition: color 180ms ease;
+  transition: color 160ms ease;
 }
 
 .workspace-nav-item:hover {
   color: var(--violet-700);
-  background: rgba(255, 255, 255, 0.46);
+  background: rgba(255, 255, 255, 0.6);
 }
 
-.workspace-nav-item:hover svg,
+.workspace-nav-item:hover svg {
+  color: var(--violet-600);
+}
+
+/* 激活态：白底小卡片 + 细边框，比半透明色块更「实体」 */
+.workspace-nav-item.is-active {
+  color: var(--violet-700);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-xs);
+}
+
 .workspace-nav-item.is-active svg {
   color: var(--violet-600);
 }
 
-.workspace-nav-item.is-active {
-  color: var(--violet-700);
-  background: rgba(223, 215, 243, 0.52);
+.workspace-sidebar-footer {
+  margin-top: auto;
+  padding: 14px 0 40px;
+  border-top: 1px solid var(--line-soft);
 }
 
-.workspace-nav-item.is-active::before {
-  background: var(--violet-600);
+.workspace-user {
+  position: relative;
+}
+
+.workspace-user-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-800);
+  font-size: 14px;
+  font-weight: 540;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.workspace-user-trigger:hover {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.workspace-avatar {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border-radius: 50%;
+  overflow: hidden;
+  color: #fff;
+  background: var(--ink-700);
+  font-size: 13px;
+  font-weight: 640;
+}
+
+.workspace-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.workspace-user-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-caret {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  margin-left: auto;
+  color: var(--ink-500);
+  transition: transform 160ms ease;
+}
+
+.workspace-user-trigger[aria-expanded='true'] .workspace-caret {
+  transform: rotate(180deg);
+}
+
+.workspace-user-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-lg);
+}
+
+.workspace-user-menu-info {
+  padding: 8px 10px 10px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.workspace-user-menu-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-900);
+  font-size: 13px;
+  font-weight: 640;
+}
+
+.workspace-user-menu-email {
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-500);
+  font-size: 12px;
+}
+
+.workspace-user-menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 38px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-700);
+  font-size: 13px;
+  font-weight: 540;
+  text-align: left;
+  cursor: pointer;
+  transition: color 140ms ease, background-color 140ms ease;
+}
+
+.workspace-user-menu-item:hover {
+  color: var(--violet-700);
+  background: var(--violet-50);
 }
 
 .workspace-content {
@@ -117,7 +241,7 @@
   background:
     linear-gradient(var(--line-soft) 1px, transparent 1px),
     linear-gradient(90deg, var(--line-soft) 1px, transparent 1px),
-    #fdfcff;
+    var(--surface);
   background-size: 72px 72px;
 }
 
@@ -125,7 +249,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(253, 252, 255, 0.96), rgba(253, 252, 255, 0.58));
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.35));
   pointer-events: none;
 }
 
@@ -146,6 +270,31 @@
   position: relative;
   z-index: 1;
   min-height: 100%;
+}
+
+/* 空模块页：还没开发的 feature 一律显示统一的「建设中」占位 */
+.feature-page:empty {
+  display: grid;
+  place-items: center;
+  padding: 48px 24px;
+}
+
+.feature-page:empty::before {
+  content: '模 块 建 设 中';
+  display: grid;
+  place-items: center;
+  width: min(420px, 100%);
+  min-height: 220px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-lg);
+  color: var(--ink-500);
+  font-size: 14px;
+  letter-spacing: 0.1em;
+  background:
+    linear-gradient(var(--line-soft) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line-soft) 1px, transparent 1px),
+    rgba(255, 255, 255, 0.55);
+  background-size: 28px 28px;
 }
 
 @media (max-width: 760px) {
@@ -175,15 +324,32 @@
     padding: 0;
   }
 
-  .workspace-nav-item::before {
-    left: -12px;
+  .workspace-sidebar-footer {
+    padding: 12px 0 16px;
+  }
+
+  .workspace-user-trigger {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .workspace-user-name,
+  .workspace-caret {
+    display: none;
+  }
+
+  .workspace-user-menu {
+    right: auto;
+    width: 200px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .workspace-nav-item,
-  .workspace-nav-item::before,
-  .workspace-nav-item svg {
+  .workspace-nav-item svg,
+  .workspace-user-trigger,
+  .workspace-caret,
+  .workspace-user-menu-item {
     transition: none;
   }
 }

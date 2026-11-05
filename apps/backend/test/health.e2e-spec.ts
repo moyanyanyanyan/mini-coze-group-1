@@ -6,8 +6,7 @@ describe('HealthController (e2e)', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
-    process.env.PORT = '3000';
-    process.env.DATABASE_URL ??= 'postgresql://minicoze:minicoze@localhost:5432/minicoze';
+    // 数据库连接交给 AppModule 从根 .env 读（本机是 5433），别手改 process.env
     const { AppModule } = await import('../src/app.module');
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();

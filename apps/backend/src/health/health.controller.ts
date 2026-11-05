@@ -8,4 +8,3 @@ export class HealthController {
     return { status: 'ok', service: 'backend' };
   }
 }
-

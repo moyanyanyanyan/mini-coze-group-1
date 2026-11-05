@@ -8,7 +8,8 @@ import {
   Max, 
   Min, 
   validateSync,
-  MinLength 
+  MinLength,
+  ValidateIf
 } from 'class-validator';
 
 class EnvironmentVariables {
@@ -32,6 +33,10 @@ class EnvironmentVariables {
   @IsString()
   INTERNAL_SERVICE_TOKEN = '';
 
+  // 传给 Runtime 的模型名，随模型供应商不同而不同
+  @IsString()
+  AGENT_MODEL = 'deepseek-chat';
+
   @IsString()
   DATABASE_URL!: string;
 
@@ -42,6 +47,31 @@ class EnvironmentVariables {
 
   @IsString()
   JWT_EXPIRES_IN = '7d';
+
+  // ---------- Google OAuth ----------
+
+
+  @IsOptional()
+  @IsString()
+  GOOGLE_CLIENT_ID?: string;
+
+  @IsOptional()
+  @IsString()
+  GOOGLE_CLIENT_SECRET?: string;
+
+  // 用 ValidateIf 而不是 IsOptional：.env 里写了 `GOOGLE_CALLBACK_URL=` 的话，
+  // 拿到的是空字符串 ''，不是 undefined，IsOptional 不会放过它。
+  // 这里改成「有值才校验格式」，空字符串直接跳过。
+  @ValidateIf((env: EnvironmentVariables) => !!env.GOOGLE_CALLBACK_URL)
+  @IsUrl({ require_tld: false })
+  GOOGLE_CALLBACK_URL?: string;
+
+  // 同上：留空 = 自动判断；只有填了才必须是 'true' 或 'false'
+  @ValidateIf((env: EnvironmentVariables) => !!env.AUTH_GOOGLE_MOCK)
+  @IsIn(['true', 'false'], {
+    message: 'AUTH_GOOGLE_MOCK 只能是 true 或 false，或者留空',
+  })
+  AUTH_GOOGLE_MOCK?: string;
 }
 
 export function validateEnvironment(config: Record<string, unknown>) {

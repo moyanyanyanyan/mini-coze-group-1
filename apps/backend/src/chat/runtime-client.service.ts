@@ -490,6 +490,15 @@ export class RuntimeClientService {
           { kind: 'aborted', cause: signal?.reason ?? error },
         );
       }
+      // 尚未收到响应时属于连接失败；收到响应后的读取异常属于流中断。
+      if (!response) {
+        this.logger.warn('无法连接 Runtime 服务');
+        throw new RuntimeCallError(
+          'RUNTIME_UNAVAILABLE',
+          '模型服务暂时不可用，请稍后重试',
+          { kind: 'network', cause: error },
+        );
+      }
       throw new RuntimeCallError(
         'MODEL_STREAM_INTERRUPTED',
         'Runtime 流式响应中断',

@@ -10,9 +10,9 @@
     "dev:agent": "cd apps/agent && python -m app.main",
     "build": "pnpm -r --if-present build",
     "typecheck": "pnpm -r --if-present typecheck && pnpm typecheck:agent",
-    "typecheck:agent": ".venv\\Scripts\\python.exe -m compileall -q apps/agent/app",
+    "typecheck:agent": "node scripts/agent-python.cjs -m compileall -q apps/agent/app",
     "test": "pnpm -r --if-present test && pnpm test:agent",
-    "test:agent": ".venv\\Scripts\\python.exe -m pytest apps/agent/tests"
+    "test:agent": "node scripts/agent-python.cjs -m pytest apps/agent/tests"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

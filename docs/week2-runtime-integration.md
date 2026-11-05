@@ -36,3 +36,12 @@ Runtime分支补充HttpKnowledgeProvider和HttpPluginProvider：按当前NestJS�
 新增硅基流动模型参数与SSE统计帧兼容，保留工作流调用签名。当前本机GET /models成功，生成返回HTTP402/code30001余额不足，因此本次仍未通过真实生成验收。实际密钥未改动，非敏感地址/模型与代理设置已修正；凭据未进入提交。
 
 本轮验证：根typecheck/test通过，前端3项、后端1项、Python45项。Provider覆盖HIT/NO_HIT、401/403、故障/超时、50条候选、去重和预算、重复插件查询参数与失败结果；均为明确注入HTTP替身，未冒充真实NestJS联调。
+
+
+## 2026-10-25 最新联调结论
+
+依据管逸恬最新回复，聊天侧按 `{status,citations}` 接收 knowledge.result；本分支已同步这一事件格式。Provider仍在内部返回chunks用于模型参考，上下文预算校验通过后才发送来源事件；预算失败不提前公告未使用的来源。matched返回实际纳入参考上下文的来源，no_match返回citations=[]，不传chunks、片段正文或score。真实NestJS SSE转发尚待联调，不能将本地事件测试算成页面已接通。
+
+复用集成分支9224624的通用OpenAI兼容网关适配与两项Mock回归：新增MODEL_PROVIDER=openai_compatible，通用模式不发送thinking/enable_thinking或供应商专有stream_options。显式供应商配置优先，未显式指定时按官方域名识别DeepSeek/硅基流动，其余地址按通用协议处理。未更改本地.env、密钥、网关或模型选择，不自动重试；同事使用个人网关的成功/超时记录不作为本机验证结果。
+
+本轮49项Python测试通过；新增验证引用事件不含正文、正文仍进入模型上下文、no_match空来源、预算拒绝不公告来源，以及通用网关run/stream参数。插件仍沿用服务凭证调用，未提前实现自动Tool Call或替代插件模块的组合Guard。

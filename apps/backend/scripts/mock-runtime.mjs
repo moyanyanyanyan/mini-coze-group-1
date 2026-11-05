@@ -1,8 +1,10 @@
 // 本地假 Runtime：不依赖王一恒，先把 C1/C2/C3 跑通。
+// 启动：pnpm --filter @minicoze/backend mock:runtime
+// 默认端口 8001 = 根 .env 里 AGENT_SERVICE_URL 指向的端口，改端口用 MOCK_RUNTIME_PORT 覆盖。
 // 启动：node scripts/mock-runtime.mjs
 import { createServer } from 'node:http';
 
-const PORT = Number(process.env.MOCK_RUNTIME_PORT ?? 9999);
+const PORT = Number(process.env.MOCK_RUNTIME_PORT ?? 8001);
 const TOKEN = process.env.INTERNAL_SERVICE_TOKEN ?? 'dev-internal-token';
 // 每个 SSE 帧按 N 字节切片写出，用来复现「UTF-8 汉字被切半」。0 = 关闭
 const SPLIT = Number(process.env.MOCK_BYTE_SPLIT ?? 0);
