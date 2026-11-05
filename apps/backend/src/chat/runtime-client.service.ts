@@ -114,23 +114,40 @@ export class RuntimeClientService {
     request: RuntimeRequestBody,
     signal: AbortSignal,
   ): AsyncGenerator<RuntimeSseEvent> {
-    const response = await fetch(`${this.baseUrl}/internal/runtime/stream`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'text/event-stream',
-        Authorization: `Bearer ${this.token}`,
-      },
-      body: JSON.stringify(request),
-      signal,
-    });
+    // 连不上（ECONNREFUSED / DNS 失败 / 超时）时 fetch 是直接抛的，
+    // 必须在这里翻译成 RuntimeCallError，否则上层只能当成「未知错误」兜底
+    let response: Response;
+    try {
+      response = await fetch(`${this.baseUrl}/internal/runtime/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream',
+          Authorization: `Bearer ${this.token}`,
+        },
+        body: JSON.stringify(request),
+        signal,
+      });
+    } catch (error) {
+      // 用户主动停止（C4）：原样抛回去，上层会标 cancelled 而不是 failed
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw error;
+      }
+      const reason = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+      this.logger.warn(`连不上 Runtime baseUrl=${this.baseUrl} ${reason}`);
+      throw new RuntimeCallError(
+        'RUNTIME_UNAVAILABLE',
+        '模型服务暂时不可用，请稍后重试',
+      );
+    }
+
     if (!response.ok) {
       throw await this.toCallError(response);
     }
 
     if (!response.body) {
       throw new RuntimeCallError(
-        'RUNTIME_UNAVAILABLE',
+        'RUNTIME_UNAVAILABLE', 
         'Runtime 没有返回流式响应体'
       );
     }
@@ -170,7 +187,7 @@ export class RuntimeClientService {
         }
       }
 
-
+      
       // 收尾：把解码器里残留的半个字符吐完
       buffer += decoder.decode();
       if (buffer.trim()) {

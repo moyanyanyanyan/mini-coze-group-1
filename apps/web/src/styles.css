@@ -1,9 +1,11 @@
 :root {
   font-family: Inter, "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", ui-sans-serif, system-ui, sans-serif;
-  color: #252232;
-  background: #fbfaff;
+  color: var(--ink-900);
+  background: var(--surface);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+
+  /* —— 品牌紫 —— */
   --violet-50: #f5f2fc;
   --violet-100: #eee9fa;
   --violet-200: #dfd7f3;
@@ -12,27 +14,74 @@
   --violet-500: #8269c9;
   --violet-600: #6f56d9;
   --violet-700: #5a42bd;
+  --violet-800: #49379a;
+  --violet-950: #241c40;
+
+  /* —— 墨色 —— */
   --ink-900: #252232;
   --ink-800: #373244;
   --ink-700: #514b60;
   --ink-600: #686273;
   --ink-500: #746e80;
   --ink-400: #787283;
-  --line: #ddd8e9;
-  --line-strong: #cbc3dc;
+
+  /* —— 线与面 —— */
+  --line: #e7e3da;
+  --line-strong: #d3cdc1;
   --line-soft: rgba(111, 86, 217, 0.055);
-  --surface: #fbfaff;
+  --surface: #faf9f5;
+  --surface-raised: #ffffff;
+  --surface-sunken: #f3f1ea;
+
+  /* —— 字体（衬线做标题点缀、等宽做小标签，编辑感的关键） —— */
+  --font-display: Georgia, "Times New Roman", "Songti SC", "STSong", "SimSun", serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, "Courier New", monospace;
+
+  /* —— 圆角 —— */
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* —— 阴影（多层复合：贴地 1px + 漫射，代替廉价单层投影） —— */
+  --shadow-xs: 0 1px 2px rgba(35, 31, 48, 0.06);
+  --shadow-sm: 0 1px 2px rgba(35, 31, 48, 0.05), 0 2px 10px rgba(35, 31, 48, 0.05);
+  --shadow-md: 0 1px 2px rgba(35, 31, 48, 0.05), 0 10px 28px rgba(35, 31, 48, 0.09);
+  --shadow-lg: 0 2px 6px rgba(35, 31, 48, 0.07), 0 20px 48px rgba(35, 31, 48, 0.16);
+
+  /* —— 交互 —— */
+  --focus-ring: rgba(111, 86, 217, 0.15);
+  --on-brand-border: rgba(255, 255, 255, 0.14);
+
+  /* —— 状态色 —— */
+  --danger-700: #9c2f23;
+  --danger-600: #b4372a;
+  --danger-200: #f0c9c4;
+  --danger-100: #fdf3f2;
+  --success-600: #2e7d5b;
+  --success-100: #eff7f2;
 }
 
 * { box-sizing: border-box; }
 
 html { min-width: 320px; scroll-behavior: smooth; }
-body { min-width: 320px; min-height: 100vh; margin: 0; }
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 button, a { -webkit-tap-highlight-color: transparent; }
 
 a:focus-visible, button:focus-visible {
   outline: 3px solid rgba(111, 86, 217, 0.34);
   outline-offset: 3px;
+}
+
+::selection {
+  color: var(--ink-900);
+  background: var(--violet-200);
 }
 
 @media (prefers-reduced-motion: reduce) {

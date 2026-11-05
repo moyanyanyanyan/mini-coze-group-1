@@ -11,6 +11,7 @@ import {
 } from './api/chat-api';
 import { ChatBubble } from './components/ChatBubble';
 import { MessageComposer } from './components/MessageComposer';
+import { Icon } from '../../shared/ui/Icon';
 import styles from './agent-chat.module.css';
 
 export function AgentChatPage() {
@@ -194,12 +195,21 @@ export function AgentChatPage() {
             {agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
           </select>
         </label>
-        <span className={styles.badge}>C6 · 流式生成</span>
+        <span className={styles.badge}>
+          <span className={styles.badgeDot} aria-hidden="true" />
+          流式输出
+        </span>
       </header>
 
       <div className={styles.stream}>
         {messages.length === 0 ? (
-          <p className={styles.empty}>还没有消息。发一条试试，回答会一个字一个字出来。</p>
+          <div className={styles.empty}>
+            <span className={styles.emptyIcon} aria-hidden="true">
+              <Icon name="chat" />
+            </span>
+            <strong>开始你的第一段对话</strong>
+            <p>发送一条消息，回答会一个字一个字地流出来。</p>
+          </div>
         ) : null}
 
         {messages.map((message) => (
