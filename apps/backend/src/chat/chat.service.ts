@@ -244,7 +244,8 @@ export class ChatService {
       revision: 0,
       name: '默认助手',
       systemPrompt: '你是一个简洁、有用的中文助手。',
-      model: 'deepseek-chat',
+      // 模型名随供应商不同（DeepSeek 官方是 deepseek-chat，SiliconFlow 是 deepseek-ai/DeepSeek-V3.2）
+      model: process.env.AGENT_MODEL ?? 'deepseek-chat',
       temperature: 0.7,
       maxTokens: 1024,
       knowledgeBaseIds: [],

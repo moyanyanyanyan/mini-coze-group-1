@@ -13,7 +13,8 @@ datasource db {
 model User {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
-  passwordHash String
+  passwordHash String?                    // ← 可空：Google 用户没有密码
+  googleId     String?  @unique           // ← 新增：Google 的 sub
   displayName  String
   avatarUrl    String?
   createdAt    DateTime @default(now())
