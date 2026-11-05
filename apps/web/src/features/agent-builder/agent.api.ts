@@ -105,12 +105,10 @@ export interface KnowledgeBindingItemInput {
   config?: { topK?: number; minScore?: number } | null;
 }
 
+/** MVP 仅支持绑定和启停，历史配置只读。 */
 export interface PluginBindingItemInput {
   pluginId: string;
   enabled?: boolean;
-  autoInvoke?: boolean;
-  sortOrder?: number;
-  config?: Record<string, unknown> | null;
 }
 
 export interface ReplaceKnowledgeBindingsInput {

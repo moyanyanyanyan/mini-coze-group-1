@@ -28,6 +28,13 @@ python -m pip install -r apps/agent/requirements.txt
 pnpm --filter @minicoze/backend prisma:generate
 ```
 
+## 插件 MVP 边界
+
+- 页面仅提供现有插件目录和智能体绑定，不开放自定义插件创建或直接测试。
+- 后端启动时在事务内同步内置插件，保留已有启停状态；从代码移除的内置插件只停用、不删除历史记录。插件 ID 或工具名冲突会阻止启动，不覆盖其他类型插件。
+- 数据库必须可用，不再以可执行内存目录降级。目录在启动或 `reload()` 时刷新；执行前另查数据库，已停用或移除的工具返回 `TOOL_NOT_FOUND`，状态查询失败返回 HTTP 503。已经开始的调用不会被撤销。
+- `PUT /api/agents/:agentId/plugins` 的绑定项仅接受 `pluginId` 和 `enabled`。显式传入 `autoInvoke`、`sortOrder` 或 `config` 返回 400；历史字段保留但不参与 MVP 执行，普通启停不清空历史配置。解除绑定会删除对应绑定记录。
+
 ## 本地启动
 
 必须先激活 Python 虚拟环境，再在一个终端同时启动三个应用：

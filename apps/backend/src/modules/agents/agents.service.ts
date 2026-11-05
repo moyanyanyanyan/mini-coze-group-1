@@ -175,50 +175,52 @@ export class AgentsService {
   }
 
   async update(agentId: string, dto: UpdateAgentDto, user: CurrentUserPayload) {
-    const existing = await this.assertAgentWritable(agentId, user.id);
+    return this.withAgentTransaction(agentId, async (tx) => {
+      const existing = await this.assertAgentWritable(agentId, user.id, tx);
 
-    const prevStatus = existing.status;
-    const prevWasActive = prevStatus === 'ACTIVE';
-    const becomingActive = dto.status === 'ACTIVE' && prevStatus !== 'ACTIVE';
-    const stayingActiveWithChanges = prevWasActive && (
-      dto.status !== undefined ||
-      dto.name !== undefined ||
-      dto.systemPrompt !== undefined ||
-      dto.model !== undefined ||
-      dto.temperature !== undefined ||
-      dto.maxTokens !== undefined ||
-      dto.contextLimit !== undefined ||
-      dto.openingMessage !== undefined ||
-      dto.description !== undefined ||
-      dto.avatarUrl !== undefined
-    );
+      const prevStatus = existing.status;
+      const prevWasActive = prevStatus === 'ACTIVE';
+      const becomingActive = dto.status === 'ACTIVE' && prevStatus !== 'ACTIVE';
+      const stayingActiveWithChanges = prevWasActive && (
+        dto.status !== undefined ||
+        dto.name !== undefined ||
+        dto.systemPrompt !== undefined ||
+        dto.model !== undefined ||
+        dto.temperature !== undefined ||
+        dto.maxTokens !== undefined ||
+        dto.contextLimit !== undefined ||
+        dto.openingMessage !== undefined ||
+        dto.description !== undefined ||
+        dto.avatarUrl !== undefined
+      );
 
-    const agent = await this.prisma.agent.update({
-      where: { id: agentId },
-      data: {
-        status: dto.status,
-        name: dto.name,
-        description: dto.description,
-        avatarUrl: dto.avatarUrl,
-        systemPrompt: dto.systemPrompt,
-        model: dto.model,
-        temperature: dto.temperature,
-        maxTokens: dto.maxTokens,
-        contextLimit: dto.contextLimit,
-        openingMessage: dto.openingMessage,
-      },
-      include: {
-        pluginBindings: true,
-        knowledgeBaseBindings: true,
-        workflowBindings: true,
-      },
+      const agent = await tx.agent.update({
+        where: { id: agentId },
+        data: {
+          status: dto.status,
+          name: dto.name,
+          description: dto.description,
+          avatarUrl: dto.avatarUrl,
+          systemPrompt: dto.systemPrompt,
+          model: dto.model,
+          temperature: dto.temperature,
+          maxTokens: dto.maxTokens,
+          contextLimit: dto.contextLimit,
+          openingMessage: dto.openingMessage,
+        },
+        include: {
+          pluginBindings: true,
+          knowledgeBaseBindings: true,
+          workflowBindings: true,
+        },
+      });
+
+      if (becomingActive || stayingActiveWithChanges) {
+        await this.takeSnapshot(agentId, tx);
+      }
+
+      return toAgentDetail(agent);
     });
-
-    if (becomingActive || stayingActiveWithChanges) {
-      await this.takeSnapshot(agentId);
-    }
-
-    return toAgentDetail(agent);
   }
 
   async remove(agentId: string, user: CurrentUserPayload) {
@@ -239,39 +241,45 @@ export class AgentsService {
   }
 
   async replacePluginBindings(agentId: string, dto: ReplacePluginBindingsDto, user: CurrentUserPayload) {
-    const agent = await this.assertAgentWritable(agentId, user.id);
+    if (dto.bindings.some((binding) =>
+      binding.autoInvoke !== undefined || binding.sortOrder !== undefined || binding.config !== undefined,
+    )) throw new BadRequestException('MVP 不支持设置 autoInvoke、sortOrder 或 config');
+    return this.withAgentTransaction(agentId, async (tx) => {
+      const agent = await this.assertAgentWritable(agentId, user.id, tx);
 
-    const seen = new Set<string>();
-    for (const b of dto.bindings) {
-      if (seen.has(b.pluginId)) throw new BadRequestException(`插件 ${b.pluginId} 重复绑定`);
-      seen.add(b.pluginId);
-    }
+      const seen = new Set<string>();
+      for (const b of dto.bindings) {
+        if (seen.has(b.pluginId)) throw new BadRequestException(`插件 ${b.pluginId} 重复绑定`);
+        seen.add(b.pluginId);
+      }
 
-    if (dto.bindings.length > 0) {
-      const pluginIds = dto.bindings.map((b) => b.pluginId);
-      const catalogs = await this.pluginCatalog.findByIds(pluginIds);
-      const catalogIds = new Set(catalogs.map((c) => c.pluginId));
-      const missing = pluginIds.filter((id) => !catalogIds.has(id));
-      if (missing.length > 0) throw new BadRequestException(`以下插件不存在：[${missing.join(', ')}]`);
-    }
+      if (dto.bindings.length > 0) {
+        const pluginIds = dto.bindings.map((b) => b.pluginId);
+        const catalogs = await this.pluginCatalog.findByIds(pluginIds);
+        const catalogIds = new Set(catalogs.map((c) => c.pluginId));
+        const missing = pluginIds.filter((id) => !catalogIds.has(id));
+        if (missing.length > 0) throw new BadRequestException(`以下插件不存在：[${missing.join(', ')}]`);
+      }
 
-    await this.prisma.$transaction([
-      this.prisma.agentPluginBinding.deleteMany({ where: { agentId } }),
-      this.prisma.agentPluginBinding.createMany({
-        data: dto.bindings.map((b) => ({
-          agentId,
-          pluginId: b.pluginId,
-          enabled: b.enabled ?? true,
-          autoInvoke: b.autoInvoke ?? true,
-          sortOrder: b.sortOrder ?? 0,
-          config: (b.config ?? undefined) as Prisma.InputJsonValue | undefined,
-        })),
-      }),
-    ]);
+      // 只删除解除绑定的项；启停更新不重建记录、不清除历史配置。
+      await tx.agentPluginBinding.deleteMany({
+        where: { agentId, pluginId: { notIn: dto.bindings.map((binding) => binding.pluginId) } },
+      });
+      for (const binding of dto.bindings) {
+        await tx.agentPluginBinding.upsert({
+          where: { agentId_pluginId: { agentId, pluginId: binding.pluginId } },
+          create: { agentId, pluginId: binding.pluginId, enabled: binding.enabled ?? true },
+          update: { enabled: binding.enabled ?? true },
+        });
+      }
 
-    if (agent.status === 'ACTIVE') await this.takeSnapshot(agentId);
+      if (agent.status === 'ACTIVE') await this.takeSnapshot(agentId, tx);
 
-    return this.getPluginBindings(agentId, user);
+      const saved = await tx.agent.findUniqueOrThrow({
+        where: { id: agentId }, include: { pluginBindings: true },
+      });
+      return saved.pluginBindings;
+    });
   }
 
   async getKnowledgeBindings(agentId: string, user: CurrentUserPayload) {
@@ -284,41 +292,44 @@ export class AgentsService {
   }
 
   async replaceKnowledgeBindings(agentId: string, dto: ReplaceKnowledgeBindingsDto, user: CurrentUserPayload) {
-    const agent = await this.assertAgentWritable(agentId, user.id);
+    return this.withAgentTransaction(agentId, async (tx) => {
+      const agent = await this.assertAgentWritable(agentId, user.id, tx);
 
-    const seen = new Set<string>();
-    for (const b of dto.bindings) {
-      if (seen.has(b.knowledgeBaseId)) throw new BadRequestException(`知识库 ${b.knowledgeBaseId} 重复绑定`);
-      seen.add(b.knowledgeBaseId);
-    }
+      const seen = new Set<string>();
+      for (const b of dto.bindings) {
+        if (seen.has(b.knowledgeBaseId)) throw new BadRequestException(`知识库 ${b.knowledgeBaseId} 重复绑定`);
+        seen.add(b.knowledgeBaseId);
+      }
 
-    if (dto.bindings.length > 0) {
-      const kbIds = dto.bindings.map((b) => b.knowledgeBaseId);
-      const catalogs = await this.knowledgeCatalog.findByIds(kbIds);
-      const catalogIds = new Set(catalogs.map((c) => c.id));
-      const missing = kbIds.filter((id) => !catalogIds.has(id));
-      if (missing.length > 0) throw new BadRequestException(`以下知识库不存在：[${missing.join(', ')}]`);
-      const inactive = catalogs.filter((c) => c.status !== 'ACTIVE').map((c) => c.id);
-      if (inactive.length > 0) throw new BadRequestException(`以下知识库不可用：[${inactive.join(', ')}]`);
-      const foreign = catalogs.filter((c) => c.workspaceId !== user.id).map((c) => c.id);
-      if (foreign.length > 0) throw new ForbiddenException('不能绑定其他用户的知识库');
-    }
+      if (dto.bindings.length > 0) {
+        const kbIds = dto.bindings.map((b) => b.knowledgeBaseId);
+        const catalogs = await this.knowledgeCatalog.findByIds(kbIds);
+        const catalogIds = new Set(catalogs.map((c) => c.id));
+        const missing = kbIds.filter((id) => !catalogIds.has(id));
+        if (missing.length > 0) throw new BadRequestException(`以下知识库不存在：[${missing.join(', ')}]`);
+        const inactive = catalogs.filter((c) => c.status !== 'ACTIVE').map((c) => c.id);
+        if (inactive.length > 0) throw new BadRequestException(`以下知识库不可用：[${inactive.join(', ')}]`);
+        const foreign = catalogs.filter((c) => c.workspaceId !== user.id).map((c) => c.id);
+        if (foreign.length > 0) throw new ForbiddenException('不能绑定其他用户的知识库');
+      }
 
-    await this.prisma.$transaction([
-      this.prisma.knowledgeBaseAgentBinding.deleteMany({ where: { agentId } }),
-      this.prisma.knowledgeBaseAgentBinding.createMany({
+      await tx.knowledgeBaseAgentBinding.deleteMany({ where: { agentId } });
+      await tx.knowledgeBaseAgentBinding.createMany({
         data: dto.bindings.map((b) => ({
           agentId,
           knowledgeBaseId: b.knowledgeBaseId,
           enabled: b.enabled ?? true,
           config: (b.config ? { topK: b.config.topK, minScore: b.config.minScore } : undefined) as Prisma.InputJsonValue | undefined,
         })),
-      }),
-    ]);
+      });
 
-    if (agent.status === 'ACTIVE') await this.takeSnapshot(agentId);
+      if (agent.status === 'ACTIVE') await this.takeSnapshot(agentId, tx);
 
-    return this.getKnowledgeBindings(agentId, user);
+      const saved = await tx.agent.findUniqueOrThrow({
+        where: { id: agentId }, include: { knowledgeBaseBindings: true },
+      });
+      return saved.knowledgeBaseBindings;
+    });
   }
 
   async getWorkflowBindings(agentId: string, user: CurrentUserPayload) {
@@ -331,34 +342,48 @@ export class AgentsService {
   }
 
   async replaceWorkflowBindings(agentId: string, dto: ReplaceWorkflowBindingsDto, user: CurrentUserPayload) {
-    const agent = await this.assertAgentWritable(agentId, user.id);
+    return this.withAgentTransaction(agentId, async (tx) => {
+      const agent = await this.assertAgentWritable(agentId, user.id, tx);
 
-    await this.prisma.$transaction([
-      this.prisma.agentWorkflow.deleteMany({ where: { agentId } }),
-      this.prisma.agentWorkflow.createMany({
+      await tx.agentWorkflow.deleteMany({ where: { agentId } });
+      await tx.agentWorkflow.createMany({
         data: dto.bindings.map((b) => ({
           agentId,
           workflowId: b.workflowId,
           enabled: b.enabled ?? true,
           sortOrder: b.sortOrder ?? 0,
         })),
-      }),
-    ]);
+      });
 
-    if (agent.status === 'ACTIVE') await this.takeSnapshot(agentId);
+      if (agent.status === 'ACTIVE') await this.takeSnapshot(agentId, tx);
 
-    return this.getWorkflowBindings(agentId, user);
+      const saved = await tx.agent.findUniqueOrThrow({
+        where: { id: agentId }, include: { workflowBindings: true },
+      });
+      return saved.workflowBindings;
+    });
   }
 
-  private async assertAgentWritable(agentId: string, userId: string): Promise<{ ownerId: string; status: AgentStatus }> {
-    const agent = await this.prisma.agent.findUnique({ where: { id: agentId } });
+  private async withAgentTransaction<T>(
+    agentId: string,
+    operation: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    return this.prisma.$transaction(async (tx) => {
+      // 同一智能体的绑定、配置和发布快照串行提交，版本号在持锁后分配。
+      await tx.$queryRaw`SELECT "id" FROM "Agent" WHERE "id" = ${agentId} FOR UPDATE`;
+      return operation(tx);
+    });
+  }
+
+  private async assertAgentWritable(agentId: string, userId: string, db: Prisma.TransactionClient = this.prisma): Promise<{ ownerId: string; status: AgentStatus }> {
+    const agent = await db.agent.findUnique({ where: { id: agentId } });
     if (!agent) throw new NotFoundException('Agent 不存在');
     if (agent.ownerId !== userId) throw new ForbiddenException('无权操作此 Agent');
     return agent;
   }
 
-  private async takeSnapshot(agentId: string): Promise<{ version: number; versionId: string }> {
-    const agent = await this.prisma.agent.findUnique({
+  private async takeSnapshot(agentId: string, tx: Prisma.TransactionClient): Promise<{ version: number; versionId: string }> {
+    const agent = await tx.agent.findUnique({
       where: { id: agentId },
       include: {
         pluginBindings: true,
@@ -369,7 +394,7 @@ export class AgentsService {
     if (!agent) throw new NotFoundException('Agent 不存在');
     if (agent.status !== 'ACTIVE') return { version: 0, versionId: agent.currentVersionId ?? '' };
 
-    const maxVersionRow = await this.prisma.agentVersion.aggregate({
+    const maxVersionRow = await tx.agentVersion.aggregate({
       where: { agentId },
       _max: { version: true },
     });
@@ -378,7 +403,7 @@ export class AgentsService {
     const detail = toAgentDetail(agent);
     const snapshot = buildAgentConfig(detail, nextVersion);
 
-    const version = await this.prisma.agentVersion.create({
+    const version = await tx.agentVersion.create({
       data: {
         agentId,
         version: nextVersion,
@@ -386,7 +411,7 @@ export class AgentsService {
       },
     });
 
-    await this.prisma.agent.update({
+    await tx.agent.update({
       where: { id: agentId },
       data: { currentVersionId: version.id },
     });
