@@ -1,0 +1,541 @@
+.api-docs-page {
+  padding: clamp(40px, 5vw, 68px) clamp(22px, 4vw, 56px) 96px;
+  color: var(--ink-800);
+}
+
+.api-doc-layout {
+  width: min(1020px, 100%);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 170px;
+  align-items: start;
+  gap: 34px;
+  margin: 0 auto;
+}
+
+.api-doc-main {
+  min-width: 0;
+}
+
+.api-doc-hero {
+  padding-bottom: 42px;
+  border-bottom: 1px solid var(--line);
+}
+
+.api-doc-eyebrow {
+  margin: 0 0 15px;
+  color: var(--violet-600);
+  font-size: 11px;
+  font-weight: 680;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.api-doc-title-row {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.api-doc-title-row h1 {
+  margin: 0;
+  color: var(--ink-900);
+  font-size: clamp(38px, 4vw, 50px);
+  font-weight: 620;
+  letter-spacing: -0.052em;
+  line-height: 1.08;
+}
+
+.api-doc-title-row > span {
+  padding: 4px 8px;
+  color: var(--violet-700);
+  border: 1px solid var(--violet-200);
+  border-radius: 5px;
+  background: var(--violet-50);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.api-doc-hero > p:last-child {
+  max-width: 710px;
+  margin: 20px 0 0;
+  color: var(--ink-600);
+  font-size: 15px;
+  line-height: 1.9;
+}
+
+.api-doc-section {
+  padding-top: 58px;
+  scroll-margin-top: 24px;
+}
+
+.api-doc-section > h2 {
+  margin: 0 0 24px;
+  color: var(--ink-900);
+  font-size: 29px;
+  font-weight: 630;
+  letter-spacing: -0.038em;
+  line-height: 1.25;
+}
+
+.api-doc-section > p {
+  margin: 0 0 22px;
+  color: var(--ink-700);
+  font-size: 14px;
+  line-height: 1.9;
+}
+
+.api-doc-section h3 {
+  margin: 34px 0 14px;
+  color: var(--ink-900);
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.012em;
+}
+
+.api-doc-section p code,
+.api-doc-section li code,
+.api-doc-callout code {
+  padding: 2px 5px;
+  color: var(--violet-700);
+  border: 1px solid var(--violet-100);
+  border-radius: 4px;
+  background: var(--violet-50);
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.9em;
+  overflow-wrap: anywhere;
+}
+
+.api-doc-steps {
+  display: grid;
+  margin: 28px 0 34px;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.api-doc-steps li {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 12px;
+  padding: 17px 4px;
+  color: var(--ink-700);
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+.api-doc-steps li > span {
+  color: var(--violet-500);
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.api-doc-tabs {
+  display: flex;
+  gap: 22px;
+  margin: 0 0 13px;
+  border-bottom: 1px solid var(--line);
+}
+
+.api-doc-tabs button {
+  position: relative;
+  min-height: 40px;
+  padding: 0 1px;
+  color: var(--ink-500);
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 620;
+  cursor: pointer;
+}
+
+.api-doc-tabs button::after {
+  content: '';
+  position: absolute;
+  right: 50%;
+  bottom: -1px;
+  left: 50%;
+  height: 2px;
+  background: var(--violet-600);
+  transition: right 160ms ease, left 160ms ease;
+}
+
+.api-doc-tabs button:hover,
+.api-doc-tabs button[aria-selected="true"] {
+  color: var(--violet-700);
+}
+
+.api-doc-tabs button[aria-selected="true"]::after {
+  right: 0;
+  left: 0;
+}
+
+.api-doc-code {
+  overflow: hidden;
+  margin: 14px 0 20px;
+  border: 1px solid rgba(196, 182, 232, 0.2);
+  border-radius: 10px;
+  background: #211c31;
+  box-shadow: 0 14px 36px rgba(42, 30, 73, 0.1);
+}
+
+.api-doc-code__header {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px 0 16px;
+  color: #aaa1ba;
+  border-bottom: 1px solid rgba(223, 215, 243, 0.1);
+  background: rgba(255, 255, 255, 0.025);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.api-doc-code__header button {
+  min-height: 28px;
+  padding: 0 10px;
+  color: #c4b6e8;
+  border: 1px solid rgba(196, 182, 232, 0.2);
+  border-radius: 5px;
+  background: transparent;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0;
+  cursor: pointer;
+  transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+.api-doc-code__header button:hover {
+  color: #fff;
+  border-color: rgba(196, 182, 232, 0.46);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.api-doc-code pre {
+  margin: 0;
+  padding: 19px 18px 22px;
+  overflow-x: auto;
+  color: #ddd6eb;
+  tab-size: 2;
+}
+
+.api-doc-code code {
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.75;
+  white-space: pre;
+}
+
+.api-doc-code__token--comment { color: #8d849d; }
+.api-doc-code__token--string { color: #a9d6a2; }
+.api-doc-code__token--keyword { color: #c9b6f5; }
+.api-doc-code__token--type { color: #8fc8e8; }
+.api-doc-code__token--number { color: #e7ba83; }
+
+.api-doc-callout {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  gap: 15px;
+  margin: 22px 0;
+  padding: 14px 16px;
+  color: var(--ink-600);
+  border-left: 3px solid var(--violet-400);
+  background: rgba(245, 242, 252, 0.7);
+  font-size: 12px;
+  line-height: 1.75;
+}
+
+.api-doc-callout > strong {
+  color: var(--violet-700);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.api-doc-callout--warning {
+  border-left-color: #c47b2d;
+  background: #fff9f1;
+}
+
+.api-doc-callout--warning > strong {
+  color: #985916;
+}
+
+.api-doc-endpoint {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 11px;
+  margin: 25px 0;
+  padding: 13px 15px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.api-doc-endpoint > span {
+  padding: 3px 7px;
+  color: var(--violet-700);
+  border-radius: 4px;
+  background: var(--violet-100);
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.api-doc-endpoint code {
+  color: var(--ink-800);
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+}
+
+.api-doc-endpoint small {
+  margin-left: auto;
+  color: var(--ink-500);
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 10px;
+}
+
+.api-doc-list {
+  display: grid;
+  gap: 9px;
+  margin: 20px 0;
+  padding-left: 20px;
+  color: var(--ink-700);
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.api-doc-list li::marker {
+  color: var(--violet-400);
+}
+
+.api-doc-text-link {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--violet-700);
+  font-size: 13px;
+  font-weight: 630;
+  text-decoration: none;
+}
+
+.api-doc-text-link span {
+  transition: transform 160ms ease;
+}
+
+.api-doc-text-link:hover span {
+  transform: translateX(3px);
+}
+
+.api-doc-table-wrap {
+  width: 100%;
+  margin: 16px 0 26px;
+  overflow-x: auto;
+  border-top: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.api-doc-table {
+  width: 100%;
+  min-width: 610px;
+  border-collapse: collapse;
+  color: var(--ink-700);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.api-doc-table th,
+.api-doc-table td {
+  padding: 12px 13px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.api-doc-table th {
+  color: var(--ink-500);
+  background: rgba(245, 242, 252, 0.62);
+  font-size: 10px;
+  font-weight: 660;
+  letter-spacing: 0.04em;
+}
+
+.api-doc-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.api-doc-table code {
+  color: var(--violet-700);
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.api-doc-faq {
+  border-top: 1px solid var(--line);
+}
+
+.api-doc-faq article {
+  padding: 22px 3px;
+  border-bottom: 1px solid var(--line);
+}
+
+.api-doc-faq h3 {
+  margin: 0 0 9px;
+  font-size: 14px;
+}
+
+.api-doc-faq p {
+  margin: 0;
+  color: var(--ink-600);
+  font-size: 13px;
+  line-height: 1.85;
+}
+
+.api-doc-toc {
+  position: sticky;
+  top: 28px;
+  padding-top: 8px;
+}
+
+.api-doc-toc > p {
+  margin: 0 0 13px;
+  color: var(--ink-500);
+  font-size: 10px;
+  font-weight: 680;
+  letter-spacing: 0.1em;
+}
+
+.api-doc-toc nav {
+  display: grid;
+  border-left: 1px solid var(--line);
+}
+
+.api-doc-toc a {
+  position: relative;
+  min-height: 34px;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  padding: 4px 0 4px 13px;
+  color: var(--ink-500);
+  font-size: 11px;
+  line-height: 1.4;
+  text-decoration: none;
+  transition: color 160ms ease;
+}
+
+.api-doc-toc a > span {
+  color: var(--ink-400);
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 9px;
+}
+
+.api-doc-toc a::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: -2px;
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: transparent;
+  transform: translateY(-50%);
+}
+
+.api-doc-toc a:hover {
+  color: var(--violet-700);
+}
+
+.api-doc-toc a.is-active {
+  color: var(--violet-700);
+  font-weight: 650;
+}
+
+.api-doc-toc a.is-active > span {
+  color: var(--violet-500);
+}
+
+.api-doc-toc a.is-active::before {
+  background: var(--violet-600);
+}
+
+@media (max-width: 1180px) {
+  .api-doc-layout {
+    max-width: 780px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .api-doc-toc {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .api-docs-page {
+    padding: 34px 18px 66px;
+  }
+
+  .api-doc-hero {
+    padding-bottom: 32px;
+  }
+
+  .api-doc-title-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .api-doc-title-row h1 {
+    font-size: 38px;
+  }
+
+  .api-doc-hero > p:last-child {
+    font-size: 14px;
+  }
+
+  .api-doc-section {
+    padding-top: 44px;
+    scroll-margin-top: 14px;
+  }
+
+  .api-doc-section > h2 {
+    font-size: 25px;
+  }
+
+  .api-doc-callout {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .api-doc-code pre {
+    padding-inline: 14px;
+  }
+
+  .api-doc-code code {
+    font-size: 11px;
+  }
+
+  .api-doc-endpoint small {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .api-doc-tabs button::after,
+  .api-doc-code__header button,
+  .api-doc-text-link span,
+  .api-doc-toc a {
+    transition: none;
+  }
+}

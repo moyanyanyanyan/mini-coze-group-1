@@ -13,6 +13,8 @@ import { PublishingModule } from './modules/publishing/publishing.module';
 import { UsersModule } from './modules/users/users.module';
 import { WorkflowsModule } from './modules/workflows/workflows.module';
 import { ChatModule } from './chat/chat.module';
+import { ApiKeysModule } from './modules/api-keys/api-keys.module';
+import { PublicApiModule } from './modules/public-api/public-api.module';
 
 
 @Module({
@@ -27,6 +29,8 @@ import { ChatModule } from './chat/chat.module';
     AuthModule,
     UsersModule,
     AgentsModule,
+    ApiKeysModule,
+    PublicApiModule,
     ConversationsModule,
     KnowledgeModule,
     ChatModule,

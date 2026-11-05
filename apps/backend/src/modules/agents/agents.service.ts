@@ -3,12 +3,17 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { Prisma } from '@prisma/client';
 import { AgentStatus } from './types';
-import { toAgentDetail, buildAgentConfig } from './agent-config.mapper';
+import {
+  toAgentDetail,
+  buildAgentConfig,
+  parseRuntimeAgentConfigSnapshot,
+} from './agent-config.mapper';
 import { CreateAgentDto } from './dto/create-agent.dto';
 import { UpdateAgentDto } from './dto/update-agent.dto';
 import { ListAgentsQueryDto } from './dto/list-agents.query.dto';
@@ -20,7 +25,7 @@ import {
   KnowledgeCatalogPort,
 } from './ports/knowledge-catalog.port';
 import { PLUGIN_CATALOG_PORT, PluginCatalogPort } from './ports/plugin-catalog.port';
-import type { CurrentUserPayload } from './types';
+import type { CurrentUserPayload, PublicAgentConfig } from './types';
 
 @Injectable()
 export class AgentsService {
@@ -116,6 +121,57 @@ export class AgentsService {
     if (agent.status === 'ARCHIVED') throw new NotFoundException('Agent 已归档');
     if (agent.ownerId !== userId) throw new ForbiddenException('无权访问此 Agent');
     return buildAgentConfig(toAgentDetail(agent));
+  }
+
+  async getPublicAgent(agentId: string): Promise<PublicAgentConfig> {
+    const agent = await this.prisma.agent.findUnique({
+      where: { id: agentId },
+      select: {
+        id: true,
+        ownerId: true,
+        status: true,
+        currentVersionId: true,
+      },
+    });
+
+    if (!agent) throw new NotFoundException('Agent 不存在');
+    if (agent.status === 'DRAFT') throw new ForbiddenException('Agent 尚未发布');
+    if (agent.status === 'ARCHIVED') {
+      throw new ForbiddenException('Agent 已归档，暂不可调用');
+    }
+    if (!agent.currentVersionId) {
+      throw new NotFoundException('Agent 发布版本不存在');
+    }
+
+    const version = await this.prisma.agentVersion.findUnique({
+      where: { id: agent.currentVersionId },
+      select: {
+        agentId: true,
+        version: true,
+        snapshot: true,
+      },
+    });
+
+    if (!version || version.agentId !== agent.id) {
+      throw new NotFoundException('Agent 发布版本不存在');
+    }
+
+    const config = parseRuntimeAgentConfigSnapshot(
+      version.snapshot,
+      agent.id,
+      version.version,
+    );
+
+    if (!config) {
+      throw new InternalServerErrorException('Agent 发布配置无效');
+    }
+
+    return {
+      agentId: agent.id,
+      ownerId: agent.ownerId,
+      status: agent.status,
+      config,
+    };
   }
 
   async update(agentId: string, dto: UpdateAgentDto, user: CurrentUserPayload) {

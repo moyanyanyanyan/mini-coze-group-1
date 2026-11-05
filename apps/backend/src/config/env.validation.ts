@@ -1,10 +1,10 @@
 import { plainToInstance, Type } from 'class-transformer';
 import { 
   IsInt, 
-  IsString, 
-  IsUrl, 
   IsIn,
   IsOptional,
+  IsString, 
+  IsUrl, 
   Max, 
   Min, 
   validateSync,
@@ -13,6 +13,9 @@ import {
 } from 'class-validator';
 
 class EnvironmentVariables {
+  @IsIn(['development', 'test', 'production'])
+  NODE_ENV = 'development';
+
   @Type(() => Number)
   @IsInt()
   @Min(1)
@@ -24,6 +27,11 @@ class EnvironmentVariables {
 
   @IsUrl({ require_tld: false })
   AGENT_SERVICE_URL = 'http://localhost:8000';
+
+  // Runtime 未配置时后端仍可启动，实际内部调用时再明确报错。
+  @IsOptional()
+  @IsString()
+  INTERNAL_SERVICE_TOKEN = '';
 
   // 传给 Runtime 的模型名，随模型供应商不同而不同
   @IsString()

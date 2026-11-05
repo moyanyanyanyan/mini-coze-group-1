@@ -19,6 +19,7 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   conversations Conversation[]
+  apiKeys       ApiKey[]
 }
 
 enum AgentStatus {
@@ -50,9 +51,28 @@ model Agent {
   pluginBindings        AgentPluginBinding[]
   knowledgeBaseBindings KnowledgeBaseAgentBinding[]
   workflowBindings      AgentWorkflow[]
+  apiKeys               ApiKey[]
 
   @@index([workspaceId])
   @@index([status])
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  agentId     String
+  createdById String    @db.Uuid
+  name        String
+  keyPrefix   String
+  keyHash     String    @unique
+  createdAt   DateTime  @default(now())
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+
+  agent     Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  createdBy User  @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([createdById, revokedAt, createdAt])
+  @@index([agentId, revokedAt])
 }
 
 model AgentVersion {
