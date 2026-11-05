@@ -50,6 +50,7 @@ export function AgentDetailView({
   onUpdatePluginBindings,
 }: Props) {
   const [pluginSaving, setPluginSaving] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [pluginSaveError, setPluginSaveError] = useState<string | null>(null);
   const pluginSavePending = useRef(false);
   const [pickerOpen, setPickerOpen] = useState<PickerKind | null>(null);
@@ -216,6 +217,7 @@ export function AgentDetailView({
           <span className={`ab-status-badge status-${agent.status.toLowerCase()}`}>{statusLabel[agent.status]}</span>
         </div>
         <div className="ab-detail-actions">
+          <button className="ab-btn ab-btn-ghost ab-preview-toggle" onClick={() => setPreviewOpen(true)}>预览与版本</button>
           {agent.status === 'DRAFT' && (
             <button
               className="ab-btn ab-btn-success"
@@ -249,6 +251,7 @@ export function AgentDetailView({
       </header>
 
       <div className="ab-detail-body">
+        <div className="ab-detail-main">
         <aside className="ab-detail-col ab-detail-col-left">
           <div className="ab-detail-avatar">{form.name.slice(0, 1) || '?'}</div>
 
@@ -456,7 +459,10 @@ export function AgentDetailView({
           </div>
         </section>
 
-        <aside className="ab-detail-col ab-detail-col-right">
+        </div>
+        {previewOpen && <button className="ab-preview-backdrop" aria-label="关闭预览与版本" onClick={() => setPreviewOpen(false)} />}
+        <aside className={`ab-detail-col ab-detail-col-right${previewOpen ? ' is-open' : ''}`} aria-label="预览与版本">
+          <button className="ab-btn ab-btn-ghost ab-preview-close" onClick={() => setPreviewOpen(false)}>关闭预览与版本</button>
           <div className="ab-section ab-preview">
             <h3 className="ab-section-title">开场白预览</h3>
             <div className="ab-preview-bubble">

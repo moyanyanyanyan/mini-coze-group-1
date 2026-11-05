@@ -16,6 +16,7 @@ import { LoopPanel } from './panels/LoopPanel';
 import { type LoopContext } from '../utils/upstream';
 
 interface Props {
+  onClose?: () => void;
   node: Node | null;
   nodes: Node[];
   edges: Edge[];
@@ -34,11 +35,12 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 export function PropertyPanel({
-  node, nodes, edges, loopContext, onChange, onDelete, onEditLoopBody,
+  node, nodes, edges, loopContext, onChange, onDelete, onEditLoopBody, onClose,
 }: Props) {
   if (!node) {
     return (
       <aside className="wf-prop-panel">
+        {onClose && <button className="wf-btn wf-btn-outline" onClick={onClose}>关闭配置面板</button>}
         <div className="wf-prop-empty">
           <p>点击画布中的节点</p>
           <p style={{ fontSize: 12, color: '#86909c' }}>
@@ -55,6 +57,7 @@ export function PropertyPanel({
   return (
     <aside className="wf-prop-panel">
       <div className="wf-prop-head">
+        {onClose && <button className="wf-btn wf-btn-outline" onClick={onClose}>关闭配置面板</button>}
         <div className="wf-prop-title">
           {TYPE_LABEL[node.type ?? ''] || node.type || '节点'}
         </div>

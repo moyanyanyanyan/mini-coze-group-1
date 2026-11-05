@@ -15,7 +15,14 @@ interface WorkspaceLayoutProps {
 }
 
 export function WorkspaceLayout({ pathname, children }: WorkspaceLayoutProps) {
-  const editorMode = pathname.startsWith('/workspace/workflows/');
+  const editorMode = pathname.includes('/workflows') || pathname.includes('/chat');
+  const [navPreference, setNavPreference] = useState<boolean | null>(() => {
+    const stored = sessionStorage.getItem('workspace-nav-collapsed');
+    return stored === null ? null : stored === 'true';
+  });
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const collapsed = navPreference ?? editorMode;
+  useEffect(() => { setMobileNavOpen(false); }, [pathname]);
   // 底部头像区：me 为 null = 还没问到 / 问失败，显示「未登录」兜底
   const [me, setMe] = useState<AuthUser | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -67,8 +74,15 @@ export function WorkspaceLayout({ pathname, children }: WorkspaceLayoutProps) {
   const displayName = me ? me.displayName || me.email : '未登录';
 
   return (
-    <div className={`workspace-shell${editorMode ? ' is-editor-mode' : ''}`}>
+    <div className={`workspace-shell${collapsed ? ' is-editor-mode' : ''}${mobileNavOpen ? ' is-nav-open' : ''}`}>
+      <button className="workspace-mobile-toggle" aria-label="打开导航" onClick={() => setMobileNavOpen(true)}>☰ 菜单</button>
+      {mobileNavOpen && <button className="workspace-nav-backdrop" aria-label="关闭导航" onClick={() => setMobileNavOpen(false)} />}
       <aside className="workspace-sidebar" aria-label="功能导航">
+        <button className="workspace-collapse" aria-label={collapsed ? '展开导航' : '收起导航'} onClick={() => {
+          setNavPreference(!collapsed);
+          sessionStorage.setItem('workspace-nav-collapsed', String(!collapsed));
+          setMobileNavOpen(false);
+        }}>{collapsed ? '»' : '«'}</button>
         <AppLink className="workspace-brand" to="/" aria-label="返回 MiniCoze 首页">
           <span className="workspace-brand-mark" aria-hidden="true">M</span>
           <span>MiniCoze</span>
@@ -83,6 +97,8 @@ export function WorkspaceLayout({ pathname, children }: WorkspaceLayoutProps) {
                 key={item.id}
                 className={`workspace-nav-item${isActive ? ' is-active' : ''}`}
                 to={item.route}
+                title={item.navLabel}
+                aria-label={item.navLabel}
                 aria-current={isActive ? 'page' : undefined}
               >
                 <Icon name={item.icon} />
@@ -97,6 +113,7 @@ export function WorkspaceLayout({ pathname, children }: WorkspaceLayoutProps) {
             <button
               type="button"
               className="workspace-user-trigger"
+              aria-label="账户菜单"
               onClick={() => setMenuOpen((open) => !open)}
               aria-haspopup="menu"
               aria-expanded={menuOpen}

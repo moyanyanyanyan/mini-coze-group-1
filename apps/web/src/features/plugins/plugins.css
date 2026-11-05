@@ -131,7 +131,7 @@
 
 .pm-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
   gap: 16px;
 }
 
@@ -143,16 +143,12 @@
   border: 1px solid var(--line);
   border-radius: 12px;
   background: #fff;
-  min-height: 196px;
+  min-height: 0;
   padding: 18px;
   box-shadow: 0 1px 2px rgb(37 34 50 / 0.04);
   transition: border-color 180ms ease, box-shadow 180ms ease;
 }
 
-.pm-card:hover {
-  border-color: var(--violet-300);
-  box-shadow: 0 4px 16px rgb(111 86 217 / 0.08);
-}
 
 .pm-card-head {
   display: flex;
@@ -596,7 +592,7 @@
 
 @media (max-width: 900px) {
   .pm-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
   }
 }
 

@@ -1,12 +1,13 @@
 .workspace-shell {
-  min-height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
   display: grid;
-  grid-template-columns: 238px minmax(0, 1fr);
+  grid-template-columns: 208px minmax(0, 1fr);
   background: var(--surface);
 }
 
 .workspace-shell.is-editor-mode {
-  grid-template-columns: 74px minmax(0, 1fr);
+  grid-template-columns: 64px minmax(0, 1fr);
 }
 
 .workspace-shell.is-editor-mode .workspace-sidebar {
@@ -39,7 +40,8 @@
 
 .workspace-sidebar,
 .workspace-content {
-  min-height: 100vh;
+  min-height: 0;
+  min-width: 0;
 }
 
 .workspace-sidebar {
@@ -269,9 +271,16 @@
 
 .workspace-content {
   position: relative;
-  overflow: hidden;
+  overflow: auto;
   background: #f8f8fb;
 }
+
+.workspace-sidebar { background: #f7f7fa; padding: 12px; }
+.workspace-sidebar::after { display: none; }
+.workspace-nav-item.is-active { box-shadow: none; }
+.workspace-sidebar-footer { padding-bottom: 0; }
+.workspace-collapse { align-self: flex-end; min-width: 40px; min-height: 40px; border: 0; background: transparent; color: var(--ink-600); }
+.workspace-mobile-toggle, .workspace-nav-backdrop { display: none; }
 
 .workspace-content::before {
   display: none;
@@ -367,4 +376,17 @@
   .workspace-user-menu-item {
     transition: none;
   }
+}
+
+@media (max-width: 767px) {
+  .workspace-shell, .workspace-shell.is-editor-mode { grid-template-columns: minmax(0, 1fr); grid-template-rows: 44px minmax(0, 1fr); }
+  .workspace-mobile-toggle { display: block; text-align: left; padding-inline: 16px; border: 0; border-bottom: 1px solid var(--line); background: white; }
+  .workspace-sidebar { display: none; }
+  .workspace-shell.is-nav-open .workspace-sidebar { display: flex; position: fixed; inset: 0 auto 0 0; width: 208px; z-index: 101; }
+  .workspace-shell.is-nav-open .workspace-nav-backdrop { display: block; position: fixed; inset: 0; background: #25223266; border: 0; z-index: 100; }
+  .workspace-shell.is-nav-open .workspace-brand > span:last-child,
+  .workspace-shell.is-nav-open .workspace-nav-item span,
+  .workspace-shell.is-nav-open .workspace-user-name { display: inline; }
+  .workspace-shell.is-nav-open .workspace-nav-item { justify-content: flex-start; padding: 0 10px; }
+  button { min-height: 44px; }
 }

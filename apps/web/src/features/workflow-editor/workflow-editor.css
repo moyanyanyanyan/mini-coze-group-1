@@ -31,6 +31,17 @@
   overflow: hidden;
 }
 
+@media (max-width: 1199px) {
+  .wf-editor-body > .wf-node-palette { position: absolute; inset: 12px auto 12px 12px; width: min(260px, calc(100% - 24px)); z-index: 20; box-shadow: var(--shadow-md); }
+  .wf-editor-body > .wf-prop-panel { position: absolute; inset: 12px 12px 12px auto; width: min(320px, calc(100% - 24px)); z-index: 21; box-shadow: var(--shadow-md); }
+}
+@media (max-width: 767px) {
+  .wf-editor-header { padding: 8px 12px !important; gap: 8px !important; }
+  .wf-editor-actions { flex-wrap: wrap; }
+  .wf-editor-title { min-width: 0; overflow-wrap: anywhere; }
+  .wf-input-row, .wf-output-row { grid-template-columns: minmax(0, 1fr) !important; }
+}
+
 /* ---------- 共用控件 ---------- */
 .wf-input,
 .wf-textarea {
@@ -281,6 +292,7 @@
 
 /* ---------- 画布页 ---------- */
 .wf-editor-header {
+  flex-wrap: wrap;
   display: flex;
   align-items: center;
   min-height: 64px;
@@ -390,6 +402,7 @@
 }
 
 .wf-editor-body {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
@@ -399,7 +412,8 @@
 
 /* 右侧配置面板 */
 .wf-prop-panel {
-  width: clamp(340px, 28vw, 400px);
+  width: 320px;
+  min-height: 0;
   flex: none;
   background: #ffffff;
   border: 1px solid #d9dce3;
@@ -506,13 +520,13 @@
 
 .wf-input-row {
   display: grid;
-  grid-template-columns: 1fr 80px auto 24px;
+  grid-template-columns: minmax(0, 1fr) 70px auto 32px;
   gap: 6px;
   align-items: center;
 }
 .wf-output-row {
   display: grid;
-  grid-template-columns: 1fr 1fr 24px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 32px;
   gap: 6px;
   align-items: center;
 }
@@ -554,7 +568,7 @@
 }
 /* ---------- 左侧节点库 ---------- */
 .wf-node-palette {
-  width: 220px;
+  width: 200px;
   flex: none;
   background: #ffffff;
   border: 1px solid #d9dce3;

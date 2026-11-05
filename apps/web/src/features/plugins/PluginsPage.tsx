@@ -47,6 +47,7 @@ export function PluginsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [reload, setReload] = useState(0);
   const [category, setCategory] = useState<PluginCategory | 'all'>('all');
   const market = useMemo(() => catalog.map(toMarketPlugin), [catalog]);
   const filteredMarket = useMemo(() => {
@@ -63,6 +64,8 @@ export function PluginsPage() {
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setError(null);
     fetchPluginCatalog()
       .then((items) => {
         if (!cancelled) {
@@ -79,7 +82,7 @@ export function PluginsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reload]);
 
   return (
     <section className="feature-page plugins-page" aria-label="插件市场">
@@ -118,27 +121,22 @@ export function PluginsPage() {
           </div>
         ) : null}
         {error ? (
-          <p className="pm-status pm-status-error">加载失败：{error}</p>
+          <p className="pm-status pm-status-error">加载失败：{error} <button onClick={() => setReload((value) => value + 1)}>重试</button></p>
         ) : null}
         {!loading && !error && filteredMarket.length === 0 ? (
           <div className="pm-empty">
             <strong>没有找到匹配的插件</strong>
             <span>调整搜索词或分类后再试。</span>
+            <button onClick={() => { setQuery(''); setCategory('all'); }}>清空筛选</button>
           </div>
         ) : null}
 
         {!loading &&
           !error &&
-          CATEGORY_ORDER.map((category) => {
-            const plugins = filteredMarket.filter(
-              (plugin) => plugin.category === category,
-            );
-            if (plugins.length === 0) return null;
-            return (
-              <section key={category} className="pm-section">
-                <h2>{CATEGORY_META[category]}</h2>
+          (
+              <section className="pm-section" aria-label="插件列表">
                 <div className="pm-grid">
-                  {plugins.map((plugin) => (
+                  {filteredMarket.map((plugin) => (
                     <PluginCard
                       key={plugin.pluginId}
                       plugin={plugin}
@@ -146,8 +144,7 @@ export function PluginsPage() {
                   ))}
                 </div>
               </section>
-            );
-          })}
+            )}
       </main>
 
     </section>

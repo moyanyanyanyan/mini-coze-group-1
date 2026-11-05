@@ -6,6 +6,7 @@ import type { NodeType } from '../types/workflow';
 interface Props {
   nodes: Node[];
   onAdd: (type: NodeType) => void;
+  onClose?: () => void;
 }
 
 const ITEMS: Array<{
@@ -22,11 +23,12 @@ const ITEMS: Array<{
   { type: 'end', label: '结束', color: '#86909c', icon: '■', desc: '返回结果' },
 ];
 
-export function NodePalette({ nodes, onAdd }: Props) {
+export function NodePalette({ nodes, onAdd, onClose }: Props) {
   const has = (t: NodeType) => nodes.some((n) => n.type === t);
   const isSingleton = (t: NodeType) => t === 'start' || t === 'end';
   return (
     <aside className="wf-node-palette" aria-label="节点库">
+      {onClose && <button className="wf-btn wf-btn-outline" onClick={onClose}>关闭节点库</button>}
       <div className="wf-palette-title">节点</div>
       <div className="wf-palette-hint">点击添加到画布</div>
 

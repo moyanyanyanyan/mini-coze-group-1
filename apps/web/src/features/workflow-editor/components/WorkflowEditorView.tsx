@@ -123,8 +123,8 @@ function WorkflowEditorInner({ workflowId }: Props) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [leftOpen, setLeftOpen] = useState(true);
-  const [rightOpen, setRightOpen] = useState(true);
+  const [leftOpen, setLeftOpen] = useState(() => window.innerWidth >= 1200);
+  const [rightOpen, setRightOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
 
@@ -534,7 +534,7 @@ function WorkflowEditorInner({ workflowId }: Props) {
       </header>
 
       <div className="wf-editor-body">
-        {leftOpen && <NodePalette nodes={nodes} onAdd={handleAddNode} />}
+        {leftOpen && <NodePalette nodes={nodes} onAdd={handleAddNode} onClose={() => setLeftOpen(false)} />}
 
         <div className="wf-canvas-wrap">
           <button
@@ -579,6 +579,7 @@ function WorkflowEditorInner({ workflowId }: Props) {
 
         {rightOpen && (
           <PropertyPanel
+            onClose={() => setRightOpen(false)}
             node={selectedNode}
             nodes={nodes}
             edges={edges}

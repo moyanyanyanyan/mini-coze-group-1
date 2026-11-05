@@ -50,7 +50,7 @@ export function PluginCard({ plugin }: PluginCardProps) {
       <p className="pm-card-desc">{plugin.description}</p>
       <footer className="pm-card-foot">
         <span className="pm-cap">工具 <b>{plugin.tools.length}</b></span>
-        <span className="pm-plugin-kind">内置插件</span>
+        <span className="pm-plugin-kind">{CATEGORY_META[plugin.category]} · 内置插件</span>
       </footer>
     </article>
   );
