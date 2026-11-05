@@ -1,0 +1,27 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {"id":"node-start-1","type":"start","position":{"x":80,"y":160},"data":{"inputs":[{"name":"questions","type":"array<string>","required":true}]}},
+    {"id":"node-loop-1","type":"loop","position":{"x":360,"y":120},"data":{
+      "mode":"array",
+      "items":"node-start-1.questions",
+      "body":{
+        "nodes":[
+          {"id":"node-llm-answer","type":"llm","position":{"x":40,"y":60},"data":{"model":"deepseek-flash","systemPrompt":"用一句话回答","userPromptTemplate":"第 {{node-loop-1.index}} 题：{{node-loop-1.item}}"}}
+        ],
+        "edges":[]
+      },
+      "outputs":[{"name":"answers","type":"array<string>","valueFrom":"node-llm-answer.text"}]
+    }},
+    {"id":"node-llm-summary","type":"llm","position":{"x":720,"y":160},"data":{"model":"deepseek-flash","userPromptTemplate":"汇总以下回答：{{node-loop-1.answers}}"}},
+    {"id":"node-end-1","type":"end","position":{"x":960,"y":160},"data":{"outputs":[
+      {"name":"answers","type":"array<string>","valueFrom":"node-loop-1.answers"},
+      {"name":"summary","type":"string","valueFrom":"node-llm-summary.text"}
+    ]}}
+  ],
+  "edges": [
+    {"id":"edge-1","source":"node-start-1","target":"node-loop-1"},
+    {"id":"edge-2","source":"node-loop-1","target":"node-llm-summary"},
+    {"id":"edge-3","source":"node-llm-summary","target":"node-end-1"}
+  ]
+}

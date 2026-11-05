@@ -17,19 +17,21 @@ const ITEMS: Array<{
 }> = [
   { type: 'start', label: '开始', color: '#10b981', icon: '▶', desc: '工作流入口' },
   { type: 'llm', label: 'LLM', color: '#4d53e8', icon: '🤖', desc: '大模型调用' },
+  { type: 'condition', label: '条件分支', color: '#f59e0b', icon: '⑂', desc: '按条件走不同分支' },
+  { type: 'loop', label: '循环', color: '#0ea5e9', icon: '↻', desc: '重复执行循环体' },
   { type: 'end', label: '结束', color: '#86909c', icon: '■', desc: '返回结果' },
 ];
 
 export function NodePalette({ nodes, onAdd }: Props) {
   const has = (t: NodeType) => nodes.some((n) => n.type === t);
-
+  const isSingleton = (t: NodeType) => t === 'start' || t === 'end';
   return (
     <aside className="wf-node-palette" aria-label="节点库">
       <div className="wf-palette-title">节点</div>
       <div className="wf-palette-hint">点击添加到画布</div>
 
       {ITEMS.map((it) => {
-        const disabled = has(it.type);
+        const disabled = isSingleton(it.type) && has(it.type);
         return (
           <button
             key={it.type}
@@ -38,7 +40,7 @@ export function NodePalette({ nodes, onAdd }: Props) {
             onClick={() => onAdd(it.type)}
             title={
               disabled
-                ? `已存在${it.label}节点（MVP 单链路限制）`
+                ? `已存在${it.label}节点`
                 : `添加${it.label}节点`
             }
           >

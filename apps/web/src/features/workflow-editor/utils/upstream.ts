@@ -3,23 +3,23 @@ import type { Node, Edge } from '@xyflow/react';
 import type {
   StartNodeData,
   LlmNodeData,
-  EndNodeData,
+  LoopNodeData,
 } from '../types/workflow';
 
 export interface UpstreamField {
-  /** 完整引用，如 node-start-1.query */
   ref: string;
-  /** 节点 id */
   nodeId: string;
-  /** 字段名 */
   field: string;
-  /** 展示用：节点标签 */
   nodeLabel: string;
-  /** 展示用：字段类型 */
   type: string;
 }
 
-/** 节点的固定输出字段名 */
+export interface LoopContext {
+  loopId: string;
+  mode: 'array' | 'count';
+  externalNodes: Node[];
+}
+
 export function getNodeOutputs(node: Node): Array<{ name: string; type: string }> {
   if (node.type === 'start') {
     const d = node.data as unknown as StartNodeData;
@@ -31,18 +31,30 @@ export function getNodeOutputs(node: Node): Array<{ name: string; type: string }
       ? d.outputs
       : [{ name: 'text', type: 'string' }];
   }
-  // end 无输出
+  if (node.type === 'condition') {
+    return [{ name: 'branch', type: 'string' }];
+  }
+  if (node.type === 'loop') {
+    const d = node.data as unknown as LoopNodeData;
+    return (d.outputs || []).map((o) => ({ name: o.name, type: o.type }));
+  }
   return [];
 }
 
-/** 节点的展示名 */
 export function getNodeLabel(node: Node): string {
   const d = node.data as { label?: string };
   if (d.label) return d.label;
-  return node.type === 'start' ? '开始' : node.type === 'llm' ? 'LLM' : '结束';
+  return node.type === 'start'
+    ? '开始'
+    : node.type === 'llm'
+    ? 'LLM'
+    : node.type === 'condition'
+    ? '条件'
+    : node.type === 'loop'
+    ? '循环'
+    : '结束';
 }
 
-/** 找出 currentId 的所有上游节点（沿 edges 反向 BFS） */
 export function getUpstreamNodes(
   nodes: Node[],
   edges: Edge[],
@@ -53,12 +65,10 @@ export function getUpstreamNodes(
     if (!incoming.has(e.target)) incoming.set(e.target, []);
     incoming.get(e.target)!.push(e.source);
   });
-
   const visited = new Set<string>();
   const queue = [...(incoming.get(currentId) || [])];
   const result: Node[] = [];
   const nodeMap = new Map(nodes.map((n) => [n.id, n]));
-
   while (queue.length) {
     const id = queue.shift()!;
     if (visited.has(id)) continue;
@@ -71,13 +81,8 @@ export function getUpstreamNodes(
   return result;
 }
 
-/** 收集 currentId 所有可选的上游字段 */
-export function getUpstreamFields(
-  nodes: Node[],
-  edges: Edge[],
-  currentId: string,
-): UpstreamField[] {
-  return getUpstreamNodes(nodes, edges, currentId).flatMap((n) =>
+function nodesToFields(nodes: Node[]): UpstreamField[] {
+  return nodes.flatMap((n) =>
     getNodeOutputs(n).map((o) => ({
       ref: `${n.id}.${o.name}`,
       nodeId: n.id,
@@ -86,4 +91,38 @@ export function getUpstreamFields(
       type: o.type,
     })),
   );
+}
+
+export function getUpstreamFields(
+  nodes: Node[],
+  edges: Edge[],
+  currentId: string,
+  loopContext?: LoopContext,
+): UpstreamField[] {
+  const localUpstream = getUpstreamNodes(nodes, edges, currentId);
+  const base = nodesToFields(localUpstream);
+
+  if (!loopContext) return base;
+
+  const external = nodesToFields(loopContext.externalNodes);
+
+  const extra: UpstreamField[] = [
+    {
+      ref: `${loopContext.loopId}.index`,
+      nodeId: loopContext.loopId,
+      field: 'index',
+      nodeLabel: '循环',
+      type: 'number',
+    },
+  ];
+  if (loopContext.mode === 'array') {
+    extra.unshift({
+      ref: `${loopContext.loopId}.item`,
+      nodeId: loopContext.loopId,
+      field: 'item',
+      nodeLabel: '循环',
+      type: 'string',
+    });
+  }
+  return [...base, ...external, ...extra];
 }

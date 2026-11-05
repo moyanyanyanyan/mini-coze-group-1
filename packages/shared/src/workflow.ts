@@ -1,8 +1,13 @@
 // Workflow HTTP contract, mirrors docs/workflows/README.md.
 
 export type WorkflowStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
-export type WorkflowFieldType = 'string' | 'number' | 'boolean';
-export type WorkflowNodeType = 'start' | 'llm' | 'end';
+export type WorkflowScalarType = 'string' | 'number' | 'boolean';
+export type WorkflowArrayType = `array<${WorkflowScalarType}>`;
+export type WorkflowFieldType = WorkflowScalarType | WorkflowArrayType;
+export type WorkflowNodeType = 'start' | 'llm' | 'end' | 'condition' | 'loop';
+
+/** `nodeId.field`, no braces; a list means "first executed candidate wins". */
+export type WorkflowValueFrom = string | string[];
 
 export interface WorkflowStartInput {
   name: string;
@@ -14,8 +19,7 @@ export interface WorkflowStartInput {
 export interface WorkflowEndOutput {
   name: string;
   type: WorkflowFieldType;
-  /** `nodeId.field`, no braces. */
-  valueFrom: string;
+  valueFrom: WorkflowValueFrom;
 }
 
 export interface WorkflowStartData {
@@ -39,6 +43,60 @@ export interface WorkflowEndData {
   [uiField: string]: unknown;
 }
 
+export type WorkflowConditionOperator =
+  | 'eq'
+  | 'ne'
+  | 'contains'
+  | 'not_contains'
+  | 'empty'
+  | 'not_empty'
+  | 'gt'
+  | 'gte'
+  | 'lt'
+  | 'lte';
+
+export interface WorkflowCondition {
+  /** `nodeId.field`; its type decides the allowed operators. */
+  left: string;
+  op: WorkflowConditionOperator;
+  /** Omitted for empty / not_empty. */
+  right?:
+    | { type: 'literal'; value: string | number | boolean }
+    | { type: 'ref'; value: string };
+}
+
+export interface WorkflowConditionBranch {
+  /** Identifier, unique in the node, not `else`; equals the edge sourceHandle. */
+  id: string;
+  logic?: 'and' | 'or';
+  conditions: WorkflowCondition[];
+}
+
+/** Output `{ branch }`; exits are every branch id plus the implicit `else`. */
+export interface WorkflowConditionData {
+  branches: WorkflowConditionBranch[];
+  [uiField: string]: unknown;
+}
+
+export interface WorkflowLoopOutput {
+  name: string;
+  type: WorkflowArrayType;
+  /** References body nodes; one element per iteration, null if not executed. */
+  valueFrom: WorkflowValueFrom;
+}
+
+/** Body may reference `<loopId>.item` (array mode) and `<loopId>.index`. */
+export interface WorkflowLoopData {
+  mode: 'array' | 'count';
+  /** Array mode: `nodeId.field` of an array type. */
+  items?: string;
+  /** Count mode: 1-50. */
+  count?: number;
+  body: { nodes: WorkflowNode[]; edges: WorkflowEdge[] };
+  outputs?: WorkflowLoopOutput[];
+  [uiField: string]: unknown;
+}
+
 interface WorkflowNodeBase<T extends WorkflowNodeType, D> {
   id: string;
   type: T;
@@ -50,7 +108,9 @@ interface WorkflowNodeBase<T extends WorkflowNodeType, D> {
 export type WorkflowNode =
   | WorkflowNodeBase<'start', WorkflowStartData>
   | WorkflowNodeBase<'llm', WorkflowLlmData>
-  | WorkflowNodeBase<'end', WorkflowEndData>;
+  | WorkflowNodeBase<'end', WorkflowEndData>
+  | WorkflowNodeBase<'condition', WorkflowConditionData>
+  | WorkflowNodeBase<'loop', WorkflowLoopData>;
 
 export interface WorkflowEdge {
   id: string;
@@ -138,9 +198,13 @@ export interface WorkflowValidationResult {
 }
 
 export interface RunWorkflowRequest {
-  input: Record<string, string | number | boolean>;
+  input: Record<
+    string,
+    string | number | boolean | string[] | number[] | boolean[]
+  >;
 }
 
+/** SKIPPED: not executed (untaken branch, or after a failure). */
 export type WorkflowNodeRunStatus = 'SUCCEEDED' | 'FAILED' | 'SKIPPED';
 
 export interface WorkflowNodeResult {
@@ -149,9 +213,15 @@ export interface WorkflowNodeResult {
   status: WorkflowNodeRunStatus;
   input: Record<string, unknown>;
   output: Record<string, unknown> | null;
-  /** LLM_TIMEOUT | LLM_UNAVAILABLE | NODE_EXECUTION_FAILED */
+  /**
+   * LLM_TIMEOUT | LLM_UNAVAILABLE | NODE_EXECUTION_FAILED | REFERENCE_NOT_EXECUTED
+   * | WORKFLOW_STEP_LIMIT_EXCEEDED | WORKFLOW_TIMEOUT
+   */
   error: WorkflowError | null;
   durationMs: number;
+  /** Set on loop body records: the loop node id and 0-based iteration. */
+  parentId?: string;
+  iteration?: number;
 }
 
 export interface WorkflowRunResult {

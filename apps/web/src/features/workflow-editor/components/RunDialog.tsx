@@ -3,7 +3,11 @@ import React from 'react';
 import { useState } from 'react';
 import type { Node } from '@xyflow/react';
 import { runWorkflow } from '../services/workflow';
-import type { WorkflowRunResult, StartNodeData } from '../types/workflow';
+import type {
+  WorkflowRunResult,
+  StartNodeData,
+  StartInput,
+} from '../types/workflow';
 
 interface Props {
   workflowId: string;
@@ -12,8 +16,65 @@ interface Props {
   onComplete: (result: WorkflowRunResult) => void;
 }
 
+/** 数组字段输入校验：JSON.parse 后检查类型 / 长度 / null */
+function validateArrayInput(raw: string, fieldType: string): string | null {
+  let arr: unknown;
+  try {
+    arr = JSON.parse(raw);
+  } catch {
+    return 'JSON 格式错误';
+  }
+  if (!Array.isArray(arr)) return '必须是 JSON 数组';
+  if (arr.length > 50) return '最多 50 个元素';
+  if (arr.some((x) => x === null)) return '元素不能为 null';
+
+  const expect = fieldType.replace('array<', '').replace('>', '');
+  const typeOk = arr.every((x) => {
+    if (expect === 'string') return typeof x === 'string';
+    if (expect === 'number') return typeof x === 'number';
+    if (expect === 'boolean') return typeof x === 'boolean';
+    return false;
+  });
+  if (!typeOk) return `元素必须是 ${expect} 类型`;
+  return null;
+}
+
+/** 把表单里的字符串值按 type 转成后端要求的类型；返回错误消息或 payload */
+function buildPayload(
+  inputs: StartInput[],
+  values: Record<string, string>,
+): { payload?: Record<string, unknown>; error?: string } {
+  const payload: Record<string, unknown> = {};
+  for (const inp of inputs) {
+    const raw = (values[inp.name] ?? '').trim();
+
+    if (raw === '') {
+      if (inp.required) return { error: `请填写「${inp.name}」` };
+      continue;
+    }
+
+    if (inp.type === 'string') {
+      payload[inp.name] = raw;
+    } else if (inp.type === 'number') {
+      const n = Number(raw);
+      if (Number.isNaN(n)) return { error: `「${inp.name}」必须是数字` };
+      payload[inp.name] = n;
+    } else if (inp.type === 'boolean') {
+      if (raw !== 'true' && raw !== 'false') {
+        return { error: `「${inp.name}」必须是 true 或 false` };
+      }
+      payload[inp.name] = raw === 'true';
+    } else if (inp.type.startsWith('array<')) {
+      const err = validateArrayInput(raw, inp.type);
+      if (err) return { error: `「${inp.name}」${err}` };
+      payload[inp.name] = JSON.parse(raw);
+    }
+  }
+  return { payload };
+}
+
 export function RunDialog({ workflowId, startNode, onClose, onComplete }: Props) {
-    const inputs = startNode
+  const inputs = startNode
     ? ((startNode.data as unknown as StartNodeData).inputs || [])
     : [];
 
@@ -28,17 +89,20 @@ export function RunDialog({ workflowId, startNode, onClose, onComplete }: Props)
   const [result, setResult] = useState<WorkflowRunResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const setValue = (name: string, v: string) => {
+    setValues((prev) => ({ ...prev, [name]: v }));
+  };
+
   const handleRun = async () => {
-    for (const inp of inputs) {
-      if (inp.required && !values[inp.name]) {
-        alert(`请填写「${inp.name}」`);
-        return;
-      }
+    const { payload, error: err } = buildPayload(inputs, values);
+    if (err || !payload) {
+      setError(err || '输入有误');
+      return;
     }
-    setRunning(true);
     setError(null);
+    setRunning(true);
     try {
-      const res = await runWorkflow(workflowId, values);
+      const res = await runWorkflow(workflowId, payload);
       setResult(res);
       onComplete(res);
     } catch (e: any) {
@@ -51,6 +115,53 @@ export function RunDialog({ workflowId, startNode, onClose, onComplete }: Props)
   const handleReset = () => {
     setResult(null);
     setError(null);
+  };
+
+  const renderInput = (inp: StartInput) => {
+    const v = values[inp.name] ?? '';
+
+    if (inp.type === 'boolean') {
+      return (
+        <select
+          className="wf-input"
+          value={v}
+          onChange={(e) => setValue(inp.name, e.target.value)}
+        >
+          <option value="">请选择</option>
+          <option value="true">true</option>
+          <option value="false">false</option>
+        </select>
+      );
+    }
+
+    if (inp.type.startsWith('array<')) {
+      return (
+        <textarea
+          className="wf-textarea"
+          rows={3}
+          value={v}
+          onChange={(e) => setValue(inp.name, e.target.value)}
+          placeholder='JSON 数组，如 ["a", "b", "c"]'
+        />
+      );
+    }
+
+    // string / number 都用 input
+    return (
+      <input
+        className="wf-input"
+        type={inp.type === 'number' ? 'number' : 'text'}
+        value={v}
+        onChange={(e) => setValue(inp.name, e.target.value)}
+        placeholder={inp.description || `输入 ${inp.name}`}
+      />
+    );
+  };
+
+  const typeHint = (inp: StartInput) => {
+    if (inp.type.startsWith('array<')) return 'JSON 数组，长度 ≤ 50，元素类型统一';
+    if (inp.type === 'boolean') return 'true / false';
+    return inp.type;
   };
 
   return (
@@ -73,18 +184,17 @@ export function RunDialog({ workflowId, startNode, onClose, onComplete }: Props)
                     <span>
                       {inp.name}
                       {inp.required && <em>*</em>}
-                      <small style={{ color: '#86909c', marginLeft: 6, fontWeight: 400 }}>
-                        {inp.type}
+                      <small
+                        style={{
+                          color: '#86909c',
+                          marginLeft: 6,
+                          fontWeight: 400,
+                        }}
+                      >
+                        {typeHint(inp)}
                       </small>
                     </span>
-                    <input
-                      className="wf-input"
-                      value={values[inp.name] || ''}
-                      onChange={(e) =>
-                        setValues({ ...values, [inp.name]: e.target.value })
-                      }
-                      placeholder={inp.description || `输入 ${inp.name}`}
-                    />
+                    {renderInput(inp)}
                   </label>
                 ))}
               </div>
@@ -118,12 +228,19 @@ export function RunDialog({ workflowId, startNode, onClose, onComplete }: Props)
             <div className="wf-form-field">
               <span>节点执行</span>
               <div className="wf-node-results">
-                {result.nodeResults.map((nr) => (
-                  <div key={nr.nodeId} className="wf-node-result-item">
+                {result.nodeResults.map((nr, idx) => (
+                  <div key={`${nr.nodeId}-${idx}`} className="wf-node-result-item">
                     <span
                       className={`wf-node-result-dot wf-dot-${nr.status.toLowerCase()}`}
                     />
-                    <span className="wf-node-result-id">{nr.nodeId}</span>
+                    <span className="wf-node-result-id">
+                      {nr.nodeId}
+                      {nr.parentId && (
+                        <small style={{ color: '#86909c', marginLeft: 6 }}>
+                          ({nr.parentId} 第 {nr.iteration ?? 0} 轮)
+                        </small>
+                      )}
+                    </span>
                     <span className="wf-node-result-status">{nr.status}</span>
                     {nr.durationMs != null && (
                       <span className="wf-node-result-duration">

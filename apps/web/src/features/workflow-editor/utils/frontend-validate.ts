@@ -85,10 +85,17 @@ export function frontendValidate(
       });
     }
     (data.outputs || []).forEach((o, idx) => {
-      if (!o.valueFrom || !o.valueFrom.trim()) {
+      const raw = o.valueFrom as unknown;
+      const arr: string[] = Array.isArray(raw)
+        ? raw
+        : typeof raw === 'string' && raw.trim()
+          ? [raw.trim()]
+          : [];
+
+      if (arr.length === 0) {
         errors.push({
           code: 'INVALID_REFERENCE',
-          message: `输出「${o.name}」未指定来源`,
+          message: `输出「${o.name}」至少需要勾选一个来源`,
           nodeId: n.id,
           field: `data.outputs[${idx}].valueFrom`,
         });

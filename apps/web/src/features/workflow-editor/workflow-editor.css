@@ -358,13 +358,6 @@
 }
 
 /* ---------- 编辑器两栏布局 ---------- */
-.wf-editor-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-  flex: none;
-}
 .wf-editor-title {
   font-size: 16px;
   font-weight: 600;
@@ -966,4 +959,264 @@
 .wf-var-chip-node {
   font-size: 11px;
   color: #86909c;
+}
+
+/* ---------- 新节点卡片颜色 ---------- */
+.wf-node-condition { border-left: 3px solid #f59e0b; }
+.wf-node-loop      { border-left: 3px solid #0ea5e9; }
+
+/* ---------- 条件分支面板 ---------- */
+.wf-branch-card {
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #fff;
+}
+.wf-branch-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.wf-branch-id {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: #fef3e2;
+  color: #f59e0b;
+  font-size: 11px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  flex: none;
+  text-transform: uppercase;
+}
+.wf-branch-head .wf-input {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+.wf-branch-head .wf-icon-btn {
+  flex: none;
+}
+
+/* ---------- 条件节点多出口 ---------- */
+.wf-node-condition {
+  min-height: 130px;
+}
+
+/* ---------- 条件面板 ---------- */
+.wf-cond-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 0;
+}
+.wf-cond-row .wf-input {
+  padding: 6px 8px;
+  font-size: 12px;
+}
+.wf-branch-else {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: #f7f8fa;
+  border: 1px dashed #d9dce3;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #86909c;
+  margin-top: 4px;
+}
+
+/* ---------- 多选变量 ---------- */
+.wf-end-output-card {
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #fff;
+}
+.wf-end-output-head {
+  display: grid;
+  grid-template-columns: 1fr 130px 24px;
+  gap: 6px;
+  align-items: center;
+}
+.wf-end-output-head .wf-input {
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.wf-multi-var {
+  position: relative;
+}
+.wf-multi-var-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  border: 1px solid #d9dce3;
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: #fff;
+  min-height: 40px;
+}
+.wf-multi-var-placeholder {
+  font-size: 12px;
+  color: #86909c;
+}
+.wf-multi-var-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #eef0fe;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 11px;
+}
+.wf-multi-var-idx {
+  background: #4d53e8;
+  color: #fff;
+  border-radius: 4px;
+  padding: 0 4px;
+  font-weight: 600;
+  font-size: 10px;
+}
+.wf-multi-var-name {
+  font-family: monospace;
+  color: #4d53e8;
+}
+.wf-multi-var-remove {
+  border: none;
+  background: transparent;
+  color: #86909c;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 2px;
+}
+.wf-multi-var-remove:hover {
+  color: #f53f3f;
+}
+.wf-multi-var-toggle {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: #4d53e8;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+}
+.wf-multi-var-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #d9dce3;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  z-index: 100;
+  padding: 4px;
+}
+.wf-multi-var-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.wf-multi-var-item:hover,
+.wf-multi-var-item.is-checked {
+  background: #eef0fe;
+}
+.wf-multi-var-order {
+  background: #4d53e8;
+  color: #fff;
+  border-radius: 4px;
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 600;
+  min-width: 16px;
+  text-align: center;
+}
+
+/* ---------- 子画布（循环体编辑器） ---------- */
+.wf-loop-editor-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: grid;
+  place-items: center;
+  z-index: 1000;
+}
+.wf-loop-editor {
+  width: 92vw;
+  height: 90vh;
+  background: #f7f8fa;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.wf-loop-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: #fff;
+  border-bottom: 1px solid #e5e6eb;
+}
+.wf-loop-editor-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+}
+
+/* ---------- 侧边栏折叠按钮 ---------- */
+.wf-side-toggle {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 15;
+  width: 20px;
+  height: 56px;
+  background: #ffffff;
+  border: 1px solid #d9dce3;
+  color: #4e5969;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  transition: background 0.12s, color 0.12s;
+}
+.wf-side-toggle:hover {
+  background: #eef0fe;
+  color: #4d53e8;
+  border-color: #4d53e8;
+}
+
+.wf-side-toggle-left {
+  left: 0;
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+}
+.wf-side-toggle-right {
+  right: 0;
+  border-right: none;
+  border-radius: 6px 0 0 6px;
 }

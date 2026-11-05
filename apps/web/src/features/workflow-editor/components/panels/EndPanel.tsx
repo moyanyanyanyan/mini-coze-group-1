@@ -1,9 +1,12 @@
 // src/features/workflow-editor/components/panels/EndPanel.tsx
 import React from 'react';
-import type { Node } from '@xyflow/react';
-import type { Edge } from '@xyflow/react';
-import type { EndNodeData, EndOutput } from '../../types/workflow';
-import { VariableSelect } from '../VariableSelect';
+import type { Node, Edge } from '@xyflow/react';
+import type {
+  EndNodeData,
+  EndOutput,
+  FieldType,
+} from '../../types/workflow';
+import { MultiVariableSelect } from '../MultiVariableSelect';
 import { getUpstreamFields } from '../../utils/upstream';
 
 interface Props {
@@ -16,8 +19,8 @@ interface Props {
 
 export function EndPanel({ data, nodeId, nodes, edges, onChange }: Props) {
   const outputs = data.outputs || [];
-  const upstream = getUpstreamFields(nodes, edges, nodeId);
-  
+  const upstreamAll = getUpstreamFields(nodes, edges, nodeId);
+
   const updateOutput = (idx: number, patch: Partial<EndOutput>) => {
     onChange({
       ...data,
@@ -30,7 +33,7 @@ export function EndPanel({ data, nodeId, nodes, edges, onChange }: Props) {
       ...data,
       outputs: [
         ...outputs,
-        { name: `result_${outputs.length + 1}`, type: 'string', valueFrom: '' },
+        { name: `result_${outputs.length + 1}`, type: 'string', valueFrom: [] },
       ],
     });
   };
@@ -41,7 +44,14 @@ export function EndPanel({ data, nodeId, nodes, edges, onChange }: Props) {
 
   return (
     <div className="wf-form">
-      {/* 节点名称不变 */}
+      <label className="wf-form-field">
+        <span>节点名称</span>
+        <input
+          className="wf-input"
+          value={data.label || ''}
+          onChange={(e) => onChange({ ...data, label: e.target.value })}
+        />
+      </label>
 
       <div className="wf-form-field">
         <div className="wf-form-label-row">
@@ -50,33 +60,70 @@ export function EndPanel({ data, nodeId, nodes, edges, onChange }: Props) {
             + 添加
           </button>
         </div>
-        {outputs.map((it, idx) => (
-          <div className="wf-output-row" key={idx}>
-            <input
-              className="wf-input"
-              value={it.name}
-              onChange={(e) => updateOutput(idx, { name: e.target.value })}
-              placeholder="输出名"
-            />
-            <VariableSelect
-              value={it.valueFrom}
-              options={upstream}
-              placeholder="选择上游字段"
-              onChange={(v) => updateOutput(idx, { valueFrom: v })}
-            />
-            <button
-              className="wf-icon-btn wf-btn-danger"
-              onClick={() => removeOutput(idx)}
-              type="button"
-              title="删除"
-            >
-              ×
-            </button>
-          </div>
-        ))}
-        <small className="wf-form-help">
-          值来源格式：节点ID.字段名，不带花括号
-        </small>
+
+        {outputs.length === 0 && (
+          <div className="wf-form-empty">至少需要 1 个输出参数</div>
+        )}
+
+        {outputs.map((it, idx) => {
+          // 旧数据兼容：string → [string]
+          const valueArr: string[] = Array.isArray(it.valueFrom)
+            ? it.valueFrom
+            : it.valueFrom
+            ? [it.valueFrom]
+            : [];
+
+          // 类型严格匹配
+          const typeMatched = upstreamAll.filter((f) => f.type === it.type);
+
+          return (
+            <div key={idx} className="wf-end-output-card">
+              <div className="wf-end-output-head">
+                <input
+                  className="wf-input"
+                  value={it.name}
+                  onChange={(e) => updateOutput(idx, { name: e.target.value })}
+                  placeholder="输出名"
+                />
+                <select
+                  className="wf-input"
+                  value={it.type}
+                  onChange={(e) =>
+                    updateOutput(idx, {
+                      type: e.target.value as FieldType,
+                      valueFrom: [], // 改类型清空候选
+                    })
+                  }
+                >
+                  <option value="string">string</option>
+                  <option value="number">number</option>
+                  <option value="boolean">boolean</option>
+                  <option value="array<string>">array&lt;string&gt;</option>
+                  <option value="array<number>">array&lt;number&gt;</option>
+                  <option value="array<boolean>">array&lt;boolean&gt;</option>
+                </select>
+                <button
+                  className="wf-icon-btn wf-btn-danger"
+                  onClick={() => removeOutput(idx)}
+                  type="button"
+                  title="删除"
+                >
+                  ×
+                </button>
+              </div>
+
+              <MultiVariableSelect
+                value={valueArr}
+                options={typeMatched}
+                onChange={(v) => updateOutput(idx, { valueFrom: v })}
+              />
+
+              <small className="wf-form-help">
+                按优先级勾选，分支内的节点放前面；运行时取第一个已执行成功的候选
+              </small>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

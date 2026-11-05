@@ -29,7 +29,11 @@ export class WorkflowAgentError extends Error {
 @Injectable()
 export class WorkflowAgentClient {
   constructor(private readonly config: ConfigService) {}
-  private async post(path: string, body: unknown): Promise<unknown> {
+  private async post(
+    path: string,
+    body: unknown,
+    timeoutMs = 75_000,
+  ): Promise<unknown> {
     let response: Response;
     try {
       response = await fetch(
@@ -38,7 +42,7 @@ export class WorkflowAgentClient {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
-          signal: AbortSignal.timeout(75_000),
+          signal: AbortSignal.timeout(timeoutMs),
         },
       );
     } catch {
@@ -77,10 +81,15 @@ export class WorkflowAgentClient {
     return value;
   }
   async run(definition: unknown, input: unknown): Promise<ExecutionResult> {
-    const value = (await this.post('run', {
-      definition,
-      input,
-    })) as ExecutionResult;
+    // 与 Agent 共用 WORKFLOW_RUN_TIMEOUT_SECONDS（启动时已校验），多等 30 秒让 Agent 先返回超时结果。
+    const seconds = Number(
+      this.config.get('WORKFLOW_RUN_TIMEOUT_SECONDS') ?? 270,
+    );
+    const value = (await this.post(
+      'run',
+      { definition, input },
+      ((Number.isFinite(seconds) && seconds > 0 ? seconds : 270) + 30) * 1000,
+    )) as ExecutionResult;
     if (
       !value ||
       !['SUCCEEDED', 'FAILED'].includes(value.status) ||

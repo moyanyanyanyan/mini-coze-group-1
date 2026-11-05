@@ -54,9 +54,9 @@ Workflow 公共字段：id、workspaceId、creatorId、name、description、stat
 
 ### Definition 和草稿
 
-完整可复制示例见 [example.workflow.json](example.workflow.json)。顶层 `{version:"1.0",nodes:[],edges:[]}`，仅一个 Start、一个 LLM、一个 End，最多 50 节点的通用上限仍保留校验。执行顺序由边决定，不依赖数组顺序。
+完整可复制示例见 [example.workflow.json](example.workflow.json)，条件分支与循环样例见 [example.condition.workflow.json](example.condition.workflow.json)、[example.loop.workflow.json](example.loop.workflow.json)。顶层 `{version:"1.0",nodes:[],edges:[]}`，Start、End 各一个，LLM、condition、loop 数量不限，最多 50 节点（含循环体）。执行顺序由边决定，不依赖数组顺序。Week3 新增的条件节点、循环节点、数组类型、候选 valueFrom、新错误码和运行结果字段以 [week3-workflow-nodes-spec.md](week3-workflow-nodes-spec.md) 为准，本节只描述原有节点。
 
-- Start：inputs 至少一个，name 唯一且符合标识符规则，type 为 string/number/boolean，required 为布尔值。未提供的可选输入不会生成输出字段；若后续引用该缺失值，会报告节点失败。defaultValue 是 UI 元数据，本轮不由服务端补值。
+- Start：inputs 至少一个，name 唯一且符合标识符规则，type 为 string/number/boolean，required 为布尔值。未提供的可选输入不会生成输出字段；后续引用该缺失值时取 null（插入 prompt 为空串，条件 `empty` 为真，End 输出 null）。defaultValue 是 UI 元数据，本轮不由服务端补值。
 - LLM：model 非空，且必须在 Runtime 允许列表内（`DEEPSEEK_MODEL` 与 `DEEPSEEK_ALLOWED_MODELS`），否则节点失败为 LLM_UNAVAILABLE；团队默认 deepseek-flash（不再使用 deepseek-chat）；temperature 默认 0.7、范围 0–2；maxTokens 默认 2048、整数 1–8192。systemPrompt 默认空；userPromptTemplate 必填且非空，两者均支持 `{{nodeId.field}}`。若提供 outputs 必须是 `[{"name":"text","type":"string"}]`。输出允许额外 usage 和 finishReason（`length` 表示被截断），但变量只允许引用 text。
 - End：outputs 至少一个，name 合法且唯一；type 为上述三种；valueFrom 是 `nodeId.field`，不带花括号，引用字段类型必须与声明一致。
 - 节点 id 允许英文、数字、下划线、连字符；引用只允许上游已声明字段。不支持表达式、嵌套属性、默认值或花括号内空白。
@@ -72,7 +72,7 @@ Workflow 公共字段：id、workspaceId、creatorId、name、description、stat
 {"valid":false,"errors":[{"code":"INVALID_REFERENCE","message":"INVALID_REFERENCE: data.userPromptTemplate","nodeId":"node-llm-1","edgeId":null,"field":"data.userPromptTemplate"}]}
 ```
 
-前端按 code 识别错误、nodeId/edgeId 高亮、field 定位表单；不要解析 message。校验覆盖 R01–R24，并增加 LLM 数量固定为一、字段类型、required 布尔类型和 End 输出类型匹配检查。非法引用示例：把样例中 userPromptTemplate 改为 `{{node-end-1.result}}`。
+前端按 code 识别错误、nodeId/edgeId 高亮、field 定位表单；不要解析 message。校验覆盖 R01–R24，并增加字段类型、required 布尔类型和 End 输出类型匹配检查；Week3 起不再限制 LLM 数量，`GRAPH_NOT_SINGLE_CHAIN` 不再产生。非法引用示例：把样例中 userPromptTemplate 改为 `{{node-end-1.result}}`。
 
 `/run` 在创建运行记录前验证 Definition 和 input：图非法返回 422 + WORKFLOW_INVALID；输入缺失/类型错误返回 400 + INVALID_INPUT。两者使用现有全局异常格式并保留 details：
 
@@ -100,7 +100,7 @@ Workflow 公共字段：id、workspaceId、creatorId、name、description、stat
 }
 ```
 
-已开始执行后的节点失败返回 HTTP 200 + FAILED，保留前序结果；失败节点 error.code 为 LLM_TIMEOUT、LLM_UNAVAILABLE 或 NODE_EXECUTION_FAILED；顶层 error 为 NODE_EXECUTION_FAILED 并含 nodeId。后续节点 SKIPPED，output=null。LLM 超时 60 秒，NestJS 每次内部请求超时 75 秒，不自动重试。
+已开始执行后的节点失败返回 HTTP 200 + FAILED，保留前序结果；失败节点 error.code 为 LLM_TIMEOUT、LLM_UNAVAILABLE、NODE_EXECUTION_FAILED，或 Week3 新增的 REFERENCE_NOT_EXECUTED、WORKFLOW_STEP_LIMIT_EXCEEDED、WORKFLOW_TIMEOUT；顶层 error 为 NODE_EXECUTION_FAILED 并含 nodeId。未执行的节点（失败之后或未走到的分支）为 SKIPPED，output=null。单次 LLM 超时 60 秒；单次运行总时长上限 `WORKFLOW_RUN_TIMEOUT_SECONDS`（默认 270，Agent 与 NestJS 共用）；NestJS 调 `/run` 的超时为该值加 30 秒，其他内部请求 75 秒，不自动重试。节点记录中 condition 的比较值和 loop 的 items 超过 500 字符会截断展示，不影响实际执行。
 
 Python 不可达、超时或响应异常发生在创建记录之后：返回 FAILED、顶层 WORKFLOW_SERVICE_UNAVAILABLE，nodeResults=[]（服务端无法确认执行到哪个节点，不伪造结果）。每个正常返回的终态先更新数据库再返回。数据库故障可能导致写入终态失败并返回 500；进程被强制停止可能留下 RUNNING，自动恢复任务属于后续工作。
 
