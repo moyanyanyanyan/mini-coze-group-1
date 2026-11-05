@@ -167,8 +167,7 @@ export function RunDialog({ workflowId, startNode, onClose, onComplete }: Props)
   return (
     <div className="wf-modal-mask" onClick={onClose}>
       <div
-        className="wf-modal"
-        style={{ width: 580, maxHeight: '85vh', overflowY: 'auto' }}
+        className="wf-modal wf-run-modal"
         onClick={(e) => e.stopPropagation()}
       >
         <h3>运行工作流</h3>

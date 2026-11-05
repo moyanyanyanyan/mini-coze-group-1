@@ -2,28 +2,167 @@
   position: relative;
   z-index: 1;
   display: grid;
-  /* 头部和输入区固定，中间消息区自己滚 */
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-columns: 260px minmax(0, 1fr);
   height: 100vh;
   padding: 0;
+  background: var(--surface-raised);
 }
 
-/* 三个区域共用一条 860px 的中轴，聊天像文档一样立起来 */
+.chatMain {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background: #fbfbfd;
+}
+
+/* 消息内容保持舒适阅读宽度，工作区本身铺满。 */
 .header,
 .stream,
 .footer {
-  width: min(860px, calc(100% - 48px));
+  width: min(920px, calc(100% - 56px));
   margin-inline: auto;
+}
+
+.conversationPanel {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--line);
+  background: #f6f5fa;
+}
+
+.conversationHeader {
+  min-height: 82px;
+  padding: 20px 16px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.conversationHeader > div {
+  display: grid;
+  gap: 3px;
+}
+
+.conversationHeader strong {
+  color: var(--ink-900);
+  font-size: 16px;
+}
+
+.conversationHeader span {
+  color: var(--ink-500);
+  font-size: 12px;
+}
+
+.newConversation {
+  min-height: var(--control-sm);
+  padding: 0 12px;
+  border: 1px solid var(--violet-200);
+  border-radius: var(--radius-sm);
+  color: var(--violet-700);
+  background: var(--surface-raised);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.newConversation:hover:not(:disabled) {
+  border-color: var(--violet-400);
+  background: var(--violet-50);
+}
+
+.newConversation:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.conversationList {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px;
+}
+
+.conversationItem {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px;
+  align-items: center;
+  margin-bottom: 4px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+}
+
+.conversationItem:hover,
+.conversationItemActive {
+  border-color: var(--line);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-xs);
+}
+
+.conversationItemActive {
+  border-color: var(--violet-200);
+}
+
+.conversationSelect {
+  min-width: 0;
+  min-height: 54px;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  padding: 8px 6px 8px 10px;
+  border: 0;
+  color: var(--ink-800);
+  background: transparent;
+  text-align: left;
+}
+
+.conversationSelect span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.conversationSelect small {
+  color: var(--ink-400);
+  font-size: 12px;
+}
+
+.conversationDelete {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--ink-400);
+  background: transparent;
+  font-size: 18px;
+  opacity: 0;
+}
+
+.conversationItem:hover .conversationDelete,
+.conversationDelete:focus-visible {
+  opacity: 1;
+}
+
+.conversationDelete:hover {
+  color: var(--danger-600);
+  background: var(--danger-100);
 }
 
 /* —— 头部 —— */
 .header {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
+  align-items: center;
   gap: 16px;
-  padding: 24px 0 16px;
+  min-height: 82px;
+  padding: 14px 0;
   border-bottom: 1px solid var(--line);
+}
+
+.header > div:first-child {
+  margin-right: auto;
 }
 
 .title {
@@ -37,6 +176,24 @@
 .subtitle {
   margin: 5px 0 0;
   color: var(--ink-500);
+  font-size: 13px;
+}
+
+.agentPicker {
+  display: grid;
+  gap: 4px;
+  color: var(--ink-500);
+  font-size: 12px;
+}
+
+.agentPicker select {
+  min-width: 180px;
+  height: var(--control-sm);
+  padding: 0 32px 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--ink-800);
+  background: var(--surface-raised);
   font-size: 13px;
 }
 
@@ -73,7 +230,7 @@
   display: grid;
   align-content: start;
   gap: 20px;
-  padding: 26px 0 20px;
+  padding: 28px 0 24px;
   scrollbar-width: thin;
   scrollbar-color: var(--line-strong) transparent;
 }
@@ -117,6 +274,34 @@
   line-height: 1.8;
 }
 
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.suggestions button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  color: var(--ink-700);
+  background: var(--surface-raised);
+  font-size: 13px;
+}
+
+.suggestions button:hover:not(:disabled) {
+  border-color: var(--violet-300);
+  color: var(--violet-700);
+  background: var(--violet-50);
+}
+
+.suggestions button:disabled {
+  opacity: 0.5;
+}
+
 /* —— 消息行 —— */
 .row {
   display: flex;
@@ -152,7 +337,7 @@
 }
 
 .bubble {
-  max-width: min(560px, 78%);
+  max-width: min(680px, 82%);
   padding: 11px 15px;
   border: 1px solid transparent;
   font-size: 14px;
@@ -177,6 +362,13 @@
   color: var(--ink-800);
   background: var(--surface-raised);
   box-shadow: var(--shadow-xs);
+}
+
+.citations {
+  margin: 8px 0 0 40px;
+  color: var(--ink-500);
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .bubblePending {
@@ -217,7 +409,7 @@
 .footer {
   display: grid;
   gap: 12px;
-  padding: 4px 0 26px;
+  padding: 8px 0 20px;
 }
 
 /* 输入区：一张浮在页面上的纸 */
@@ -354,6 +546,14 @@
 }
 
 @media (max-width: 760px) {
+  .page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .conversationPanel {
+    display: none;
+  }
+
   .header,
   .stream,
   .footer {
@@ -366,6 +566,30 @@
 
   .bubble {
     max-width: 88%;
+  }
+
+  .badge {
+    display: none;
+  }
+
+  .agentPicker span {
+    display: none;
+  }
+
+  .agentPicker select {
+    min-width: 140px;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 1100px) {
+  .page {
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+
+  .header,
+  .stream,
+  .footer {
+    width: calc(100% - 40px);
   }
 
   .badge {

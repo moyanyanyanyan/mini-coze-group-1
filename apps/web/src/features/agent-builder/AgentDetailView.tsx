@@ -212,7 +212,7 @@ export function AgentDetailView({
       <header className="ab-detail-header">
         <button className="ab-btn ab-btn-ghost" onClick={onBack} disabled={pluginSaving}>← 返回列表</button>
         <div className="ab-detail-title-row">
-          <h2 className="ab-detail-title">{form.name || '未命名 Agent'}</h2>
+          <h2 className="ab-detail-title">{form.name || '未命名智能体'}</h2>
           <span className={`ab-status-badge status-${agent.status.toLowerCase()}`}>{statusLabel[agent.status]}</span>
         </div>
         <div className="ab-detail-actions">
@@ -518,7 +518,7 @@ export function AgentDetailView({
       {pickerOpen === 'plugin' && (
         <BindingPickerModal
           title="添加插件"
-          subtitle="选择要绑定到此 Agent 的插件"
+          subtitle="选择要绑定到此智能体的插件"
           items={pluginPickerItems}
           selectedIds={boundPluginIds}
           saving={pluginSaving}
@@ -537,7 +537,7 @@ export function AgentDetailView({
       {pickerOpen === 'knowledge' && (
         <BindingPickerModal
           title="添加知识库"
-          subtitle="选择要绑定到此 Agent 的知识库"
+          subtitle="选择要绑定到此智能体的知识库"
           items={knowledgePickerItems}
           selectedIds={boundKnowledgeIds}
           onConfirm={(ids) => {

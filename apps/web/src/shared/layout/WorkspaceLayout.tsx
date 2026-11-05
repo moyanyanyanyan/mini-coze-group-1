@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { workspaceNavigation } from '../../app/feature-registry';
 import { getMe, logout } from '../../features/auth/api/auth-api';
+import { ApiError } from '../api/http';
 import type { AuthUser } from '../../features/auth/types';
 import { AppLink } from '../routing/AppLink';
 import { navigate } from '../routing/navigation';
@@ -14,6 +15,7 @@ interface WorkspaceLayoutProps {
 }
 
 export function WorkspaceLayout({ pathname, children }: WorkspaceLayoutProps) {
+  const editorMode = pathname.startsWith('/workspace/workflows/');
   // 底部头像区：me 为 null = 还没问到 / 问失败，显示「未登录」兜底
   const [me, setMe] = useState<AuthUser | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -27,8 +29,10 @@ export function WorkspaceLayout({ pathname, children }: WorkspaceLayoutProps) {
           setMe(user);
         }
       })
-      .catch(() => {
-        // cookie 过期等情况：不弹错，底部显示兜底文案
+      .catch((caught) => {
+        if (caught instanceof ApiError && caught.status === 401) {
+          navigate('/login');
+        }
       });
     return () => {
       alive = false;
@@ -63,7 +67,7 @@ export function WorkspaceLayout({ pathname, children }: WorkspaceLayoutProps) {
   const displayName = me ? me.displayName || me.email : '未登录';
 
   return (
-    <div className="workspace-shell">
+    <div className={`workspace-shell${editorMode ? ' is-editor-mode' : ''}`}>
       <aside className="workspace-sidebar" aria-label="功能导航">
         <AppLink className="workspace-brand" to="/" aria-label="返回 MiniCoze 首页">
           <span className="workspace-brand-mark" aria-hidden="true">M</span>

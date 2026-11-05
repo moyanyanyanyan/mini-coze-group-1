@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ChatMessage } from '@minicoze/shared';
+import type { ChatMessage, ConversationSummary } from '@minicoze/shared';
 import { ApiError } from '../../shared/api/http';
 import { listAgents, type Agent } from '../agent-builder/agent.api';
 import {
   createConversation,
+  deleteConversation,
   listConversations,
   listMessages,
   streamMessage,
@@ -14,8 +15,15 @@ import { MessageComposer } from './components/MessageComposer';
 import { Icon } from '../../shared/ui/Icon';
 import styles from './agent-chat.module.css';
 
+const SUGGESTED_PROMPTS = [
+  '介绍一下你能帮我做什么',
+  '根据知识库总结重点',
+  '帮我规划下一步任务',
+];
+
 export function AgentChatPage() {
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -44,6 +52,9 @@ export function AgentChatPage() {
       const conversation = existing.find((item) => available.some((agent) => agent.id === item.agentId))
         ?? (await createConversation(available[0].id));
 
+      setConversations(existing.some((item) => item.id === conversation.id)
+        ? existing
+        : [conversation, ...existing]);
       setSelectedAgentId(conversation.agentId ?? available[0].id);
       setConversationId(conversation.id);
       setMessages(await listMessages(conversation.id));
@@ -61,10 +72,70 @@ export function AgentChatPage() {
       const history = await listMessages(conversation.id);
       setSelectedAgentId(agentId);
       setConversationId(conversation.id);
+      setConversations(existing.some((item) => item.id === conversation.id)
+        ? existing
+        : [conversation, ...existing]);
       setMessages(history);
       setCitationsByMessage({});
     } catch (caught) {
       setBootError(caught instanceof Error ? caught.message : '切换智能体失败');
+    }
+  };
+
+  const handleConversationChange = async (conversation: ConversationSummary) => {
+    if (streamingId || conversation.id === conversationId) {
+      return;
+    }
+    setBootError('');
+    setSendError('');
+    try {
+      const history = await listMessages(conversation.id);
+      setConversationId(conversation.id);
+      setSelectedAgentId(conversation.agentId ?? '');
+      setMessages(history);
+      setCitationsByMessage({});
+    } catch (caught) {
+      setBootError(caught instanceof Error ? caught.message : '会话加载失败');
+    }
+  };
+
+  const handleNewConversation = async () => {
+    if (!selectedAgentId || streamingId) {
+      return;
+    }
+    setBootError('');
+    try {
+      const conversation = await createConversation(selectedAgentId);
+      setConversations((items) => [conversation, ...items]);
+      setConversationId(conversation.id);
+      setMessages([]);
+      setCitationsByMessage({});
+    } catch (caught) {
+      setBootError(caught instanceof Error ? caught.message : '新建会话失败');
+    }
+  };
+
+  const handleDeleteConversation = async (conversation: ConversationSummary) => {
+    if (streamingId) {
+      return;
+    }
+    if (!window.confirm(`确定删除“${conversation.title || '新对话'}”吗？`)) {
+      return;
+    }
+    try {
+      await deleteConversation(conversation.id);
+      const next = conversations.filter((item) => item.id !== conversation.id);
+      setConversations(next);
+      if (conversation.id === conversationId) {
+        const fallback = next[0];
+        if (fallback) {
+          await handleConversationChange(fallback);
+        } else {
+          await handleNewConversation();
+        }
+      }
+    } catch (caught) {
+      setBootError(caught instanceof Error ? caught.message : '删除会话失败');
     }
   };
 
@@ -142,6 +213,7 @@ export function AgentChatPage() {
                   : m,
               ),
             );
+            void listConversations().then(setConversations).catch(() => undefined);
           },
           onFailed: (_code, message) => {
             setSendError(message);
@@ -177,31 +249,74 @@ export function AgentChatPage() {
 
   return (
     <section className={styles.page} aria-label="智能体聊天">
-      <header className={styles.header}>
-        <div>
-          <h1 className={styles.title}>智能体对话</h1>
-          <p className={styles.subtitle}>
-            {conversationId ? '消息存在你的账号下，刷新不丢' : '正在准备会话…'}
-          </p>
-        </div>
-        <label>
-          选择智能体{' '}
-          <select
-            value={selectedAgentId}
-            disabled={streamingId !== null || agents.length === 0}
-            onChange={(event) => void handleAgentChange(event.target.value)}
+      <aside className={styles.conversationPanel} aria-label="会话列表">
+        <div className={styles.conversationHeader}>
+          <div>
+            <strong>对话</strong>
+            <span>{conversations.length} 个会话</span>
+          </div>
+          <button
+            type="button"
+            className={styles.newConversation}
+            disabled={!selectedAgentId || streamingId !== null}
+            onClick={() => void handleNewConversation()}
           >
-            {agents.length === 0 ? <option value="">暂无智能体</option> : null}
-            {agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
-          </select>
-        </label>
-        <span className={styles.badge}>
-          <span className={styles.badgeDot} aria-hidden="true" />
-          流式输出
-        </span>
-      </header>
+            新建
+          </button>
+        </div>
+        <div className={styles.conversationList}>
+          {conversations.map((conversation) => (
+            <div
+              key={conversation.id}
+              className={`${styles.conversationItem}${conversation.id === conversationId ? ` ${styles.conversationItemActive}` : ''}`}
+            >
+              <button
+                type="button"
+                className={styles.conversationSelect}
+                onClick={() => void handleConversationChange(conversation)}
+              >
+                <span>{conversation.title || '新对话'}</span>
+                <small>{new Date(conversation.updatedAt).toLocaleDateString('zh-CN')}</small>
+              </button>
+              <button
+                type="button"
+                className={styles.conversationDelete}
+                aria-label={`删除会话 ${conversation.title || '新对话'}`}
+                onClick={() => void handleDeleteConversation(conversation)}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      </aside>
 
-      <div className={styles.stream}>
+      <div className={styles.chatMain}>
+        <header className={styles.header}>
+          <div>
+            <h1 className={styles.title}>智能体对话</h1>
+            <p className={styles.subtitle}>
+              {conversationId ? '消息已自动保存' : '正在准备会话…'}
+            </p>
+          </div>
+          <label className={styles.agentPicker}>
+            <span>当前智能体</span>
+            <select
+              value={selectedAgentId}
+              disabled={streamingId !== null || agents.length === 0}
+              onChange={(event) => void handleAgentChange(event.target.value)}
+            >
+              {agents.length === 0 ? <option value="">暂无智能体</option> : null}
+              {agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
+            </select>
+          </label>
+          <span className={styles.badge}>
+            <span className={styles.badgeDot} aria-hidden="true" />
+            流式输出
+          </span>
+        </header>
+
+        <div className={styles.stream}>
         {messages.length === 0 ? (
           <div className={styles.empty}>
             <span className={styles.emptyIcon} aria-hidden="true">
@@ -209,6 +324,18 @@ export function AgentChatPage() {
             </span>
             <strong>开始你的第一段对话</strong>
             <p>发送一条消息，回答会一个字一个字地流出来。</p>
+            <div className={styles.suggestions}>
+              {SUGGESTED_PROMPTS.map((prompt) => (
+                <button
+                  type="button"
+                  key={prompt}
+                  disabled={!conversationId || streamingId !== null}
+                  onClick={() => void handleSend(prompt)}
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
           </div>
         ) : null}
 
@@ -216,7 +343,7 @@ export function AgentChatPage() {
           <div key={message.id}>
             <ChatBubble message={message} />
             {citationsByMessage[message.id]?.length ? (
-              <div aria-label="本次检索来源">
+              <div className={styles.citations} aria-label="本次检索来源">
                 来源：{citationsByMessage[message.id].map((source) => source.title).join('、')}
               </div>
             ) : null}
@@ -224,9 +351,9 @@ export function AgentChatPage() {
         ))}
 
         <div ref={bottomRef} />
-      </div>
+        </div>
 
-      <div className={styles.footer}>
+        <div className={styles.footer}>
         {bootError ? <p className={styles.alert} role="alert">{bootError}</p> : null}
         {sendError ? <p className={styles.alert} role="alert">{sendError}</p> : null}
 
@@ -242,6 +369,7 @@ export function AgentChatPage() {
           disabled={!conversationId || streamingId !== null}
           onSend={(content) => void handleSend(content)}
         />
+        </div>
       </div>
     </section>
   );

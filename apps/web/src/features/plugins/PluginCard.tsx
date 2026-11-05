@@ -1,4 +1,5 @@
 import type { PluginToolDefinition } from "./plugins.api";
+import { getPluginIcon } from './plugin-icons';
 
 export type PluginCategory = "coding" | "office" | "information";
 
@@ -27,30 +28,30 @@ export const CATEGORY_META: Record<PluginCategory, string> = {
   information: "信息获取",
 };
 
-const PLUGIN_ICONS: Record<string, string> = {
-  echo: "🔊",
-  time: "🕐",
-  calculator: "🧮",
-  web: "🌐",
-};
-
 type PluginCardProps = {
   plugin: MarketPlugin;
 };
 
 export function PluginCard({ plugin }: PluginCardProps) {
+  const PluginIcon = getPluginIcon(plugin.iconKind);
   return (
     <article className="pm-card">
-      <div className="pm-card-header">
+      <div className="pm-card-head">
         <span className="pm-card-icon">
-          {PLUGIN_ICONS[plugin.iconKind] ?? "🧩"}
+          <PluginIcon />
         </span>
-        <div className="pm-card-title-group">
-          <h3>{plugin.name}</h3>
+        <div className="pm-card-copy">
+          <div className="pm-card-title-row">
+            <h3 className="pm-card-name">{plugin.name}</h3>
+          </div>
           <span className="pm-card-meta">{plugin.pluginId}</span>
         </div>
       </div>
       <p className="pm-card-desc">{plugin.description}</p>
+      <footer className="pm-card-foot">
+        <span className="pm-cap">工具 <b>{plugin.tools.length}</b></span>
+        <span className="pm-plugin-kind">内置插件</span>
+      </footer>
     </article>
   );
 }

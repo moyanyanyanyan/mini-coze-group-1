@@ -60,6 +60,20 @@
   --danger-100: #fdf3f2;
   --success-600: #2e7d5b;
   --success-100: #eff7f2;
+
+  /* —— 产品工作区尺寸 —— */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --control-sm: 32px;
+  --control-md: 40px;
+  --control-lg: 44px;
+  --page-gutter: clamp(20px, 3vw, 40px);
+  --page-max: 1280px;
+  --editor-header: 56px;
 }
 
 * { box-sizing: border-box; }
@@ -72,7 +86,19 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
 button, a { -webkit-tap-highlight-color: transparent; }
+
+button:not(:disabled),
+select:not(:disabled) {
+  cursor: pointer;
+}
 
 a:focus-visible, button:focus-visible {
   outline: 3px solid rgba(111, 86, 217, 0.34);

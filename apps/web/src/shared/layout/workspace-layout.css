@@ -5,6 +5,38 @@
   background: var(--surface);
 }
 
+.workspace-shell.is-editor-mode {
+  grid-template-columns: 74px minmax(0, 1fr);
+}
+
+.workspace-shell.is-editor-mode .workspace-sidebar {
+  padding-inline: 12px;
+}
+
+.workspace-shell.is-editor-mode .workspace-sidebar::after,
+.workspace-shell.is-editor-mode .workspace-brand > span:last-child,
+.workspace-shell.is-editor-mode .workspace-nav-item span,
+.workspace-shell.is-editor-mode .workspace-user-name,
+.workspace-shell.is-editor-mode .workspace-caret {
+  display: none;
+}
+
+.workspace-shell.is-editor-mode .workspace-brand {
+  justify-content: center;
+  margin-inline: 0;
+}
+
+.workspace-shell.is-editor-mode .workspace-nav-item,
+.workspace-shell.is-editor-mode .workspace-user-trigger {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.workspace-shell.is-editor-mode .workspace-user-menu {
+  right: auto;
+  width: 210px;
+}
+
 .workspace-sidebar,
 .workspace-content {
   min-height: 100vh;
@@ -238,32 +270,15 @@
 .workspace-content {
   position: relative;
   overflow: hidden;
-  background:
-    linear-gradient(var(--line-soft) 1px, transparent 1px),
-    linear-gradient(90deg, var(--line-soft) 1px, transparent 1px),
-    var(--surface);
-  background-size: 72px 72px;
+  background: #f8f8fb;
 }
 
 .workspace-content::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.35));
-  pointer-events: none;
+  display: none;
 }
 
 .workspace-content::after {
-  content: '';
-  position: absolute;
-  right: -120px;
-  bottom: 15%;
-  width: 420px;
-  height: 180px;
-  border-top: 1px solid rgba(111, 86, 217, 0.12);
-  border-radius: 50%;
-  transform: rotate(-12deg);
-  pointer-events: none;
+  display: none;
 }
 
 .feature-page {

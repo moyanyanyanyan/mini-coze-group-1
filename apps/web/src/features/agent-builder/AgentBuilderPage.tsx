@@ -56,7 +56,7 @@ export function AgentBuilderPage() {
         setError(
           agentsRes.reason instanceof Error
             ? agentsRes.reason.message
-            : '加载 Agent 列表失败',
+            : '加载智能体列表失败',
         );
       }
 
@@ -87,7 +87,7 @@ export function AgentBuilderPage() {
       setError(null);
       setView({ type: 'detail', agentId: created.id });
     } catch (err) {
-      setError(err instanceof Error ? err.message : '创建 Agent 失败');
+      setError(err instanceof Error ? err.message : '创建智能体失败');
     }
   };
 

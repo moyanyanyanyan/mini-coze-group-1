@@ -13,7 +13,7 @@ export function CreateAgentModal({ onClose, onSubmit }: Props) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      setError('请填写 Agent 名称');
+      setError('请填写智能体名称');
       return;
     }
     if (name.length > 50) {
@@ -28,10 +28,10 @@ export function CreateAgentModal({ onClose, onSubmit }: Props) {
   };
 
   return (
-    <div className="ab-modal-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-label="新建 Agent">
+    <div className="ab-modal-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-label="新建智能体">
       <div className="ab-modal" onClick={(e) => e.stopPropagation()}>
         <header className="ab-modal-header">
-          <h3 className="ab-modal-title">新建 Agent</h3>
+          <h3 className="ab-modal-title">新建智能体</h3>
           <button className="ab-modal-close" onClick={onClose} aria-label="关闭">×</button>
         </header>
 

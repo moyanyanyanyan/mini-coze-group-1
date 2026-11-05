@@ -10,6 +10,8 @@ it('MVP 插件卡片保留信息，不提供直接测试入口', () => {
     tools: [{ pluginId: 'plugin_echo', name: 'echo_text', description: 'echo', parameters: {} }],
   }} />);
   expect(markup).toContain('文本回显');
+  expect(markup).toContain('工具');
+  expect(markup).toContain('<svg');
   expect(markup).not.toContain('<button');
   expect(markup).not.toContain('测试');
 });

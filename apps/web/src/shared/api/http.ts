@@ -5,7 +5,15 @@
  *   2. 非 2xx 统一转成 ApiError，业务代码只管 try/catch
  *   3. 走 vite 的 /api 代理，同源请求
  */
-export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '';
+const configuredApiBase = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+
+/**
+ * 认证、智能体和聊天接口的 path 已自带 /api；环境变量按项目约定填写到 /api，
+ * 这里统一还原成服务 origin，避免拼成 /api/api/...。
+ */
+export const API_BASE = configuredApiBase.endsWith('/api')
+  ? configuredApiBase.slice(0, -4)
+  : configuredApiBase;
 
 export class ApiError extends Error {
   constructor(

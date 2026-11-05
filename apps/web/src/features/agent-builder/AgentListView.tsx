@@ -50,9 +50,9 @@ export function AgentListView({ agents, onSelect, onCreate, onDelete }: Props) {
     <div className="ab-list">
       <header className="ab-list-header">
         <div className="ab-list-title-row">
-          <h2 className="ab-list-title">Agent 列表</h2>
+          <h2 className="ab-list-title">智能体</h2>
           <button className="ab-btn ab-btn-primary" onClick={onCreate}>
-            新建 Agent
+            新建智能体
           </button>
         </div>
 
@@ -60,7 +60,7 @@ export function AgentListView({ agents, onSelect, onCreate, onDelete }: Props) {
           <input
             className="ab-search"
             type="search"
-            placeholder="搜索 Agent 名称或描述"
+            placeholder="搜索智能体名称或描述"
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
           />
@@ -120,13 +120,13 @@ export function AgentListView({ agents, onSelect, onCreate, onDelete }: Props) {
           </button>
         ))}
 
-        <button className="ab-card ab-card-create" onClick={onCreate} aria-label="新建 Agent">
+        <button className="ab-card ab-card-create" onClick={onCreate} aria-label="新建智能体">
           <div className="ab-card-create-plus" aria-hidden="true">+</div>
-          <div className="ab-card-create-label">新建 Agent</div>
+          <div className="ab-card-create-label">新建智能体</div>
         </button>
 
         {filtered.length === 0 && (
-          <div className="ab-empty">没有找到匹配的 Agent</div>
+          <div className="ab-empty">没有找到匹配的智能体</div>
         )}
       </div>
     </div>

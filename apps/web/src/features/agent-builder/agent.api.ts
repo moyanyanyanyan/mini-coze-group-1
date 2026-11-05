@@ -1,3 +1,5 @@
+import { API_BASE } from '../../shared/api/http';
+
 export type AgentStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
 
 export const modelOptions = [
@@ -124,8 +126,6 @@ interface ApiEnvelope<T> {
   message: string;
   data: T;
 }
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '';
 
 async function getCurrentUserId(): Promise<string> {
   const response = await fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' });
