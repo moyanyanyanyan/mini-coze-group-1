@@ -36,10 +36,14 @@ export class MessagesService {
     return rows.map((row) => this.toChatMessage(row));
   }
 
-  async send(conversationId: string, content: string): Promise<SendMessageResult> {
+  async send(
+    conversationId: string, 
+    content: string
+  ): Promise<SendMessageResult> {
     // 整段放进事务：用户消息和助手回复要么都进库，要么都不进。
     // 不然网络一断就留下「问了但没答」的半截对话
     return this.prisma.$transaction(async (tx) => {
+      // 读取上一条消息
       const last = await tx.message.findFirst({
         where: { conversationId },
         orderBy: { seq: 'desc' },

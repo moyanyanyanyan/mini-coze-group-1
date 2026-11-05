@@ -1,42 +1,131 @@
 .page {
   min-height: 100vh;
   display: grid;
+  grid-template-columns: minmax(340px, 44%) minmax(0, 1fr);
+}
+
+/* —— 左侧品牌面板 —— */
+.panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 44px 48px;
+  overflow: hidden;
+  color: #fff;
+  background:
+    radial-gradient(1100px 480px at -12% -8%, rgba(111, 86, 217, 0.55), transparent 62%),
+    radial-gradient(720px 420px at 112% 108%, rgba(111, 86, 217, 0.38), transparent 58%),
+    var(--violet-950);
+}
+
+/* 细网格：给深底一点「图纸」质感 */
+.panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 56px 56px;
+  pointer-events: none;
+}
+
+.panelBrand {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.brandMark {
+  display: grid;
+  width: 30px;
+  height: 30px;
   place-items: center;
-  padding: 24px;
+  border-radius: var(--radius-sm);
+  background: var(--violet-600);
+  box-shadow: inset 0 0 0 1px var(--on-brand-border), var(--shadow-xs);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.panelBody {
+  position: relative;
+  max-width: 420px;
+  margin: auto 0;
+}
+
+.panelEyebrow {
+  margin: 0 0 18px;
+  color: var(--violet-300);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+}
+
+.panelTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(30px, 3.2vw, 42px);
+  font-weight: 400;
+  line-height: 1.34;
+}
+
+/* 「能跑」用斜体点色，衬线斜体是编辑感的经典手法 */
+.panelTitle em {
+  font-style: italic;
+  color: var(--violet-300);
+}
+
+.panelText {
+  margin: 18px 0 0;
+  max-width: 34em;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 14px;
+  line-height: 1.9;
+}
+
+.panelFoot {
+  position: relative;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.4);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+}
+
+/* —— 右侧表单区 —— */
+.main {
+  display: grid;
+  place-items: center;
+  padding: 40px 24px;
   background: var(--surface);
 }
 
 .card {
   width: 100%;
-  max-width: 380px;
-  padding: 32px;
+  max-width: 400px;
+  padding: 36px 36px 32px;
   border: 1px solid var(--line);
-  border-radius: 14px;
-  background: #fff;
-}
-
-
-.brandMark {
-  display: grid;
-  width: 26px;
-  height: 26px;
-  place-items: center;
-  border-radius: 7px;
-  color: #fff;
-  background: var(--violet-600);
-  font-size: 12px;
-  font-weight: 700;
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-sm);
 }
 
 .title {
   margin: 0;
-  font-size: 22px;
-  font-weight: 650;
+  font-size: 24px;
+  font-weight: 600;
   letter-spacing: -0.02em;
 }
 
 .description {
-  margin: 6px 0 24px;
+  margin: 8px 0 26px;
   color: var(--ink-500);
   font-size: 13px;
   line-height: 1.7;
@@ -44,12 +133,12 @@
 
 .form {
   display: grid;
-  gap: 14px;
+  gap: 15px;
 }
 
 .field {
   display: grid;
-  gap: 6px;
+  gap: 7px;
 }
 
 .label {
@@ -60,77 +149,167 @@
 
 .input {
   height: 42px;
-  padding: 0 12px;
+  padding: 0 13px;
   border: 1px solid var(--line-strong);
-  border-radius: 9px;
+  border-radius: var(--radius-md);
   color: var(--ink-900);
   font-size: 14px;
-  background: #fff;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-xs);
   transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.input:hover {
+  border-color: var(--ink-500);
 }
 
 .input:focus {
   outline: none;
-  border-color: var(--violet-400);
-  box-shadow: 0 0 0 3px rgba(111, 86, 217, 0.14);
+  border-color: var(--violet-500);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.input::placeholder {
+  color: var(--ink-400);
 }
 
 .fieldError {
-  color: #b4372a;
+  color: var(--danger-600);
   font-size: 12px;
 }
 
 .alert {
   margin: 0;
-  padding: 10px 12px;
-  border: 1px solid #f0c9c4;
-  border-radius: 9px;
-  color: #b4372a;
-  background: #fdf3f2;
+  padding: 10px 13px;
+  border: 1px solid var(--danger-200);
+  border-left: 3px solid var(--danger-600);
+  border-radius: var(--radius-sm);
+  color: var(--danger-600);
+  background: var(--danger-100);
   font-size: 13px;
+  line-height: 1.6;
 }
 
+/* 主按钮用墨色而不是品牌紫：把彩色留给点缀，按钮回归工具感 */
 .submit {
   height: 44px;
   margin-top: 4px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-md);
   color: #fff;
-  background: var(--violet-600);
+  background: var(--ink-900);
   font-size: 14px;
-  font-weight: 620;
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color 180ms ease;
+  box-shadow: var(--shadow-xs);
+  transition: background-color 160ms ease, box-shadow 160ms ease, transform 120ms ease;
 }
 
 .submit:hover:not(:disabled) {
-  background: var(--violet-700);
+  background: var(--ink-800);
+  box-shadow: var(--shadow-sm);
+}
+
+.submit:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 .submit:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
+/* —— 第三方登录 —— */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--ink-400);
+  font-size: 12px;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.dividerText {
+  flex: none;
+}
+
+.googleButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 44px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  color: var(--ink-800);
+  background: var(--surface-raised);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow-xs);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.googleButton:hover {
+  border-color: var(--ink-500);
+  box-shadow: var(--shadow-sm);
+}
+
+.googleIcon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+/* —— 卡片底部 —— */
 .footer {
-  margin: 20px 0 0;
+  margin: 22px 0 0;
   color: var(--ink-500);
   font-size: 13px;
   text-align: center;
 }
 
 .footerLink {
-  color: var(--violet-700);
+  margin-left: 4px;
+  color: var(--ink-900);
   font-weight: 600;
   text-decoration: none;
+  border-bottom: 1px solid var(--violet-300);
+  padding-bottom: 1px;
+  transition: border-color 140ms ease;
 }
 
 .footerLink:hover {
-  text-decoration: underline;
+  border-color: var(--violet-600);
+}
+
+@media (max-width: 880px) {
+  .page {
+    grid-template-columns: 1fr;
+  }
+
+  .panel {
+    display: none;
+  }
+
+  .main {
+    padding: 32px 20px;
+  }
 }
 
 @media (max-width: 480px) {
   .card {
-    padding: 24px 20px;
+    padding: 28px 22px 26px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
   }
 }

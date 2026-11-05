@@ -12,12 +12,14 @@ datasource db {
 model User {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
-  passwordHash String
+  passwordHash String?                    // ← 可空：Google 用户没有密码
+  googleId     String?  @unique           // ← Google 账号的 sub，一个 Google 账号最多绑一个用户
   displayName  String
   avatarUrl    String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   conversations Conversation[]
+  apiKeys       ApiKey[]
 }
 
 enum AgentStatus {
@@ -49,9 +51,28 @@ model Agent {
   pluginBindings        AgentPluginBinding[]
   knowledgeBaseBindings KnowledgeBaseAgentBinding[]
   workflowBindings      AgentWorkflow[]
+  apiKeys               ApiKey[]
 
   @@index([workspaceId])
   @@index([status])
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  agentId     String
+  createdById String    @db.Uuid
+  name        String
+  keyPrefix   String
+  keyHash     String    @unique
+  createdAt   DateTime  @default(now())
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+
+  agent     Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  createdBy User  @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([createdById, revokedAt, createdAt])
+  @@index([agentId, revokedAt])
 }
 
 model AgentVersion {

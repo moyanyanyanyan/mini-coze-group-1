@@ -6,10 +6,14 @@ import { AuthService } from './auth.service';
 import { UsersModule } from '../users/users.module';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { AuthController } from './auth.controller';
+import { GoogleAuthController } from './google-auth.controller';
+import { OAUTH_PROVIDER } from './oauth/oauth-provider';
+import { GoogleOAuthProvider } from './oauth/google-oauth.provider';
 
 
 @Module({
-  controllers: [AuthController],
+  // AuthController 管密码注册/登录；GoogleAuthController 管 Google 那两个 302 路由
+  controllers: [AuthController, GoogleAuthController],
   imports: [
     PassportModule.register({}),
     UsersModule,
@@ -27,8 +31,14 @@ import { AuthController } from './auth.controller';
       }),
     }),
   ],
-  //登记AuthService，它constructor里的UsersService / JwtService才有人提供
-  providers: [AuthService,JwtStrategy],
+  // 登记 AuthService，它 constructor 里的 UsersService / JwtService 才有人提供
+  providers: [
+    AuthService,
+    JwtStrategy,
+    // 关键一行：把「接口」和「实现」绑起来。
+    // 以后 Mock 上场，只改这一处按环境挑实现，别的文件一行不动
+    { provide: OAUTH_PROVIDER, useClass: GoogleOAuthProvider },
+  ],
   exports: [AuthService],
 })
 export class AuthModule {}

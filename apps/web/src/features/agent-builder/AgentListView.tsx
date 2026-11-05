@@ -41,7 +41,7 @@ export function AgentListView({ agents, onSelect, onCreate, onDelete }: Props) {
 
   const handleDelete = (e: React.MouseEvent, agentId: string, name: string) => {
     e.stopPropagation();
-    if (confirm(`确定要删除 "${name}" 吗？此操作将软删除 Agent。`)) {
+    if (confirm(`确定要删除 "${name}" 吗？`)) {
       onDelete(agentId);
     }
   };

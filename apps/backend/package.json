@@ -9,6 +9,7 @@
     "start:prod": "node dist/main.js",
     "typecheck": "tsc --noEmit",
     "test": "jest --runInBand",
+    "mock:runtime": "node scripts/mock-runtime.mjs",
     "prisma": "node --env-file=../../.env ./node_modules/prisma/build/index.js",
     "db:generate": "pnpm prisma generate",
     "db:migrate": "pnpm prisma migrate dev",

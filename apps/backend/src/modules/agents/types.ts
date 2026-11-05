@@ -16,6 +16,13 @@ export interface RuntimeAgentConfig {
   pluginIds: string[];
 }
 
+export interface PublicAgentConfig {
+  agentId: string;
+  ownerId: string;
+  status: AgentStatus;
+  config: RuntimeAgentConfig;
+}
+
 export interface AgentPluginBindingView {
   id: string;
   pluginId: string;
