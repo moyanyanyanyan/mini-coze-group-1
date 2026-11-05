@@ -28,6 +28,7 @@
     "@nestjs/platform-express": "^11.1.6",
     "@prisma/client": "6.19.3",
     "bcryptjs": "^3.0.3",
+    "cheerio": "^1.2.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
     "cookie-parser": "1.4.7",

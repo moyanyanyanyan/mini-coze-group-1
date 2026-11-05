@@ -1,7 +1,9 @@
 import type { PluginCatalogItem } from '../types/plugin-tool';
+import { createCalculatorExecutors } from '../executors/calculator.executors';
 import { EchoExecutor } from '../executors/echo.executor';
 import { TimeExecutor } from '../executors/time.executor';
 import type { ToolExecutor } from '../executors/tool-executor.interface';
+import { createWebReaderExecutors } from '../executors/web-reader.executors';
 
 /**
  * 内置插件的单一注册源。目录中的工具定义统一从执行器派生，避免目录、
@@ -36,5 +38,27 @@ export const BUILTIN_PLUGINS: BuiltinPluginRegistration[] = [
       configSchema: {},
     },
     executors: [new TimeExecutor()],
+  },
+  {
+    catalog: {
+      pluginId: 'plugin_calculator',
+      title: '计算器',
+      content: '提供加减乘除、百分比和小数取整等确定性计算能力。',
+      icon: 'calculator',
+      tags: ['内置', '计算', '办公'],
+      configSchema: {},
+    },
+    executors: createCalculatorExecutors(),
+  },
+  {
+    catalog: {
+      pluginId: 'plugin_web_reader',
+      title: '网页内容抓取',
+      content: '安全读取公开静态网页，提取主要正文、链接和基础元数据。',
+      icon: 'web',
+      tags: ['内置', '网页', '信息获取'],
+      configSchema: {},
+    },
+    executors: createWebReaderExecutors(),
   },
 ];
