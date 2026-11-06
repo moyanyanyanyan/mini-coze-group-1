@@ -44,6 +44,7 @@ export function CreateAgentModal({ onClose, onSubmit }: Props) {
               id="ab-create-name"
               className="ab-input"
               type="text"
+              maxLength={50}
               value={name}
               onChange={(e) => {
                 setName(e.target.value);
@@ -60,6 +61,7 @@ export function CreateAgentModal({ onClose, onSubmit }: Props) {
             <textarea
               id="ab-create-desc"
               className="ab-textarea"
+              maxLength={200}
               value={description}
               onChange={(e) => {
                 setDescription(e.target.value);
@@ -78,7 +80,7 @@ export function CreateAgentModal({ onClose, onSubmit }: Props) {
               取消
             </button>
             <button type="submit" className="ab-btn ab-btn-primary" disabled={!name.trim()}>
-              确定
+              创建智能体
             </button>
           </footer>
         </form>

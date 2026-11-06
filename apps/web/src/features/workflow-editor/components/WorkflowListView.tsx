@@ -1,7 +1,7 @@
 // src/features/workflow-editor/components/WorkflowListView.tsx
 import React from 'react';
 import { useConfirm } from '../../../shared/ui/useConfirm';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { navigate } from '../../../shared/routing/navigation';
 import {
   listWorkflows,
@@ -24,6 +24,8 @@ export function WorkflowListView() {
   const { confirm, confirmation } = useConfirm();
   const [data, setData] = useState<Workflow[]>([]);
   const [loading, setLoading] = useState(false);
+  const latestLoad = useRef(0);
+  const [appliedKeyword, setAppliedKeyword] = useState('');
   const [keyword, setKeyword] = useState('');
   const [createOpen, setCreateOpen] = useState(() => new URLSearchParams(window.location.search).get('action') === 'new');
   const [form, setForm] = useState({ name: '', description: '' });
@@ -34,15 +36,18 @@ export function WorkflowListView() {
   const [renameName, setRenameName] = useState('');
   const [renaming, setRenaming] = useState(false);
 
-  const load = async () => {
+  const load = async (query = appliedKeyword) => {
+    const request = ++latestLoad.current;
     setLoading(true);
     try {
-      const res = await listWorkflows({ keyword });
+      const res = await listWorkflows({ keyword: query });
+      if (request !== latestLoad.current) return;
+      setAppliedKeyword(query);
       setData(res.items);
     } catch (e) {
-      setNotice(getErrorMessage(e, '加载失败'));
+      if (request === latestLoad.current) setNotice(getErrorMessage(e, '加载失败'));
     } finally {
-      setLoading(false);
+      if (request === latestLoad.current) setLoading(false);
     }
   };
 
@@ -139,7 +144,7 @@ export function WorkflowListView() {
             placeholder="搜索工作流名称"
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && load()}
+            onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && load(keyword.trim())}
           />
           <button className="wf-btn wf-btn-primary" onClick={() => setCreateOpen(true)}>
             + 新建工作流
@@ -151,10 +156,22 @@ export function WorkflowListView() {
         <div className="wf-empty">加载中...</div>
       ) : data.length === 0 ? (
         <div className="wf-empty">
-          <p>还没有工作流</p>
-          <button className="wf-btn wf-btn-primary" onClick={() => setCreateOpen(true)}>
-            新建第一个工作流
-          </button>
+          {appliedKeyword ? (
+            <>
+              <p>未找到“{appliedKeyword}”</p>
+              <button className="wf-btn wf-btn-outline" onClick={() => {
+                setKeyword('');
+                void load('');
+              }}>清除搜索</button>
+            </>
+          ) : (
+            <>
+              <p>还没有工作流</p>
+              <button className="wf-btn wf-btn-primary" onClick={() => setCreateOpen(true)}>
+                新建第一个工作流
+              </button>
+            </>
+          )}
         </div>
       ) : (
         <div className="wf-grid">

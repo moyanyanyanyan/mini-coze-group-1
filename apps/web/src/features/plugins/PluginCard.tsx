@@ -48,10 +48,15 @@ export function PluginCard({ plugin }: PluginCardProps) {
       </div>
       <p className="pm-card-desc">{plugin.description}</p>
       <footer className="pm-card-foot">
-        <span className="pm-cap">工具 <b>{plugin.tools.length}</b></span>
+        <details className="pm-technical">
+          <summary>查看 {plugin.tools.length} 个工具</summary>
+          {plugin.tools.length > 0 ? (
+            <ul>{plugin.tools.map(tool => <li key={tool.name}>{tool.name}</li>)}</ul>
+          ) : <p>暂无工具</p>}
+          <code>插件 ID：{plugin.pluginId}</code>
+        </details>
         <span className="pm-plugin-kind">{CATEGORY_META[plugin.category]}</span>
       </footer>
-      <details className="pm-technical"><summary>技术信息</summary><code>{plugin.pluginId}</code></details>
     </article>
   );
 }

@@ -12,6 +12,7 @@ import {
 } from './api/chat-api';
 import { ChatBubble } from './components/ChatBubble';
 import { MessageComposer } from './components/MessageComposer';
+import { AppLink } from '../../shared/routing/AppLink';
 import { Icon } from '../../shared/ui/Icon';
 import { ActionMenu } from '../../shared/ui/ActionMenu';
 import { useConfirm } from '../../shared/ui/useConfirm';
@@ -36,6 +37,7 @@ export function AgentChatPage() {
   /** 非空 = 这一轮还在生成。同时也用作「禁止再发」的闸门 */
   const [streamingId, setStreamingId] = useState<string | null>(null);
   const [sendError, setSendError] = useState('');
+  const [needsAgent, setNeedsAgent] = useState(false);
   const [bootError, setBootError] = useState('');
   const selectedAgent = agents.find(agent => agent.id === selectedAgentId);
   const suggestedPrompts = selectedAgent?.knowledgeBaseBindings.some(binding => binding.enabled)
@@ -69,11 +71,10 @@ export function AgentChatPage() {
       const available = agentPage.items.filter((agent) => agent.status !== 'ARCHIVED');
       const target = new URLSearchParams(window.location.search).get('agentId');
       if (target && !available.some(agent => agent.id === target)) available.push(await getAgent(target));
+      if (request !== requestId.current) return;
       setAgents(available);
-      if (available.length === 0) {
-        setBootError('请先在智能体页面创建一个智能体');
-        return;
-      }
+      setNeedsAgent(available.length === 0);
+      if (available.length === 0) return;
       const conversation = existing.find((item) => target ? item.agentId === target : available.some((agent) => agent.id === item.agentId))
         ?? (await createConversation(target ?? available[0].id));
       const history = await listMessages(conversation.id);
@@ -361,7 +362,13 @@ export function AgentChatPage() {
           following.current = el.scrollHeight - el.scrollTop - el.clientHeight <= 80;
           setAwayFromBottom(!following.current);
         }}>
-        {messages.length === 0 ? (
+        {needsAgent && (
+          <div className={styles.empty}>
+            <strong>创建智能体，开始对话</strong>
+            <AppLink className={styles.createAgent} to="/workspace/agents/create?action=new">创建智能体</AppLink>
+          </div>
+        )}
+        {conversationId && messages.length === 0 ? (
           <div className={styles.empty}>
             <span className={styles.emptyIcon} aria-hidden="true">
               <Icon name="chat" />
@@ -397,19 +404,22 @@ export function AgentChatPage() {
         </div>
 
         <div className={styles.footer}>
-        {bootError ? <div className={styles.alert} role="alert">{bootError} <button onClick={() => { setBootError(''); void boot(); }}>重试</button> <a href="/workspace/agents/create">创建智能体</a></div> : null}
+        {bootError ? <div className={styles.alert} role="alert">{bootError} <button onClick={() => { setBootError(''); void boot(); }}>重试</button></div> : null}
         {sendError ? <p className={styles.alert} role="alert">{sendError}</p> : null}
 
           {awayFromBottom && <button className={styles.latestButton} onClick={jumpToLatest}><Icon name="arrowDown" />回到最新消息</button>}
 
-        <MessageComposer
-          disabled={!conversationId || streamingId !== null || switching}
-          streaming={streamingId !== null}
-          unavailable={!conversationId && !switching}
-          onStop={handleStop}
-          onSend={(content) => void handleSend(content)}
-        />
-        <span className={styles.composerHint}>Enter 发送 · Shift + Enter 换行</span>
+        {conversationId && (
+          <>
+            <MessageComposer
+              disabled={streamingId !== null || switching}
+              streaming={streamingId !== null}
+              onStop={handleStop}
+              onSend={(content) => void handleSend(content)}
+            />
+            <span className={styles.composerHint}>Enter 发送 · Shift + Enter 换行</span>
+          </>
+        )}
         </div>
       </div>
     </section>

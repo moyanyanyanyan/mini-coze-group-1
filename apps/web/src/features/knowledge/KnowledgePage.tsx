@@ -37,6 +37,7 @@ export function KnowledgePage() {
   const [searchResult, setSearchResult] = useState<KnowledgeSearchResult | null>(null);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const searchGenerationRef = useRef(0);
   const selectedBaseStatus = items.find((item) => item.id === selectedId)?.status;
@@ -60,7 +61,7 @@ export function KnowledgePage() {
         const selected = target ? result.find(item => item.id === target) : result[0];
         setSelectedId(selected?.id ?? null);
         if (target && !selected) setError('知识库不存在或无权访问');
-        setCreatingBase(params.get('action') === 'new' || (!target && result.length === 0)); })
+        setCreatingBase(params.get('action') === 'new'); })
       .catch((cause: unknown) => { if (active) setError(getMessage(cause)); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -271,7 +272,7 @@ export function KnowledgePage() {
               <div className="knowledge-list-heading"><h2>我的资料库</h2><span>{items.length} 个</span></div>
               {error && <p className="knowledge-error" role="alert">{error}</p>}
               {loading ? <p className="knowledge-empty">正在加载…</p> : items.length === 0 ? (
-                <p className="knowledge-empty">还没有知识库，先在下方创建一个。</p>
+                <p className="knowledge-empty">还没有知识库。</p>
               ) : <ul>{items.map((item) => (
                 <li key={item.id}>
                   <button type="button" className={`knowledge-catalog-item ${selectedId === item.id ? 'is-selected' : ''}`} disabled={deletingBase || updatingBaseStatus || deletingDocumentId !== null} onClick={() => setSelectedId(item.id)} aria-current={selectedId === item.id ? 'page' : undefined}>
@@ -285,7 +286,7 @@ export function KnowledgePage() {
             {creatingBase && <form className="knowledge-card knowledge-form knowledge-create-form" onSubmit={handleCreate}>
               <h2>新建知识库</h2>
               <label htmlFor="knowledge-name">名称</label>
-              <input id="knowledge-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={50} required placeholder="例如：报销制度" />
+              <input ref={nameInputRef} autoFocus id="knowledge-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={50} required placeholder="例如：报销制度" />
               <label htmlFor="knowledge-description">说明</label>
               <textarea id="knowledge-description" value={description} onChange={(event) => setDescription(event.target.value)} maxLength={200} rows={3} placeholder="这份知识库用于什么？" />
               <button type="submit" disabled={saving || !name.trim()}>{saving ? '创建中…' : '创建知识库'}</button>
@@ -392,7 +393,17 @@ export function KnowledgePage() {
                 </div>}
               </section>}
               </>}
-            </> : <div className="knowledge-card knowledge-empty-workbench"><h2>选择知识库</h2><p>从左侧选择一个知识库，开始管理文档、查看切片或预览检索。</p></div>}
+            </> : items.length > 0 ? (
+              <div className="knowledge-card knowledge-empty-workbench"><h2>选择知识库</h2><p>从列表选择一个知识库，开始管理文档、查看切片或预览检索。</p></div>
+            ) : !loading && !error ? (
+              <div className="knowledge-card knowledge-empty-workbench">
+                <h2>创建第一个知识库</h2>
+                <button type="button" className="knowledge-first-create" onClick={() => {
+                  setCreatingBase(true);
+                  nameInputRef.current?.focus();
+                }}>创建第一个知识库</button>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
