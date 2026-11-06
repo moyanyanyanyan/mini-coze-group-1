@@ -145,8 +145,9 @@ async function readResponse<T>(response: Response): Promise<T> {
   return body.data;
 }
 
-export async function listAgents(): Promise<AgentListResponse> {
-  const response = await fetch(`${API_BASE}/api/agents`, { credentials: 'include' });
+export async function listAgents(params = new URLSearchParams()): Promise<AgentListResponse> {
+  const query = params.toString();
+  const response = await fetch(`${API_BASE}/api/agents${query ? '?' + query : ''}`, { credentials: 'include' });
   return readResponse<AgentListResponse>(response);
 }
 

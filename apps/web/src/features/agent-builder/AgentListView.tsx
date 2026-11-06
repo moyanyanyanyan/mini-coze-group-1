@@ -1,11 +1,9 @@
-import { useMemo, useState } from 'react';
-import type { Agent, AgentStatus } from './agent.api';
+import { useEffect, useState } from 'react';
+import { deleteAgent, listAgents, type Agent, type AgentStatus, type AgentListResponse } from './agent.api';
 
 interface Props {
-  agents: Agent[];
-  onSelect: (agentId: string) => void;
+  onSelect: (agent: Agent) => void;
   onCreate: () => void;
-  onDelete: (agentId: string) => void;
 }
 
 const statusFilters: Array<{ value: 'ALL' | AgentStatus; label: string }> = [
@@ -26,23 +24,41 @@ const statusClass: Record<AgentStatus, string> = {
   ARCHIVED: 'status-archived',
 };
 
-export function AgentListView({ agents, onSelect, onCreate, onDelete }: Props) {
+export function AgentListView({ onSelect, onCreate }: Props) {
   const [keyword, setKeyword] = useState('');
   const [statusFilter, setStatusFilter] = useState<(typeof statusFilters)[number]['value']>('ALL');
 
-  const filtered = useMemo(() => {
-    return agents.filter((a) => {
-      if (statusFilter !== 'ALL' && a.status !== statusFilter) return false;
-      const hay = `${a.name} ${a.description ?? ''}`.toLowerCase();
-      if (keyword && !hay.includes(keyword.toLowerCase())) return false;
-      return true;
-    });
-  }, [agents, keyword, statusFilter]);
+  const [page, setPage] = useState(1);
+  const [revision, setRevision] = useState(0);
+  const [result, setResult] = useState<AgentListResponse | null>(null);
+  const [error, setError] = useState('');
 
-  const handleDelete = (e: React.MouseEvent, agentId: string, name: string) => {
+  useEffect(() => {
+    let active = true;
+    setResult(null);
+    setError('');
+    const params = new URLSearchParams({ page: String(page) });
+    if (keyword) params.set('keyword', keyword);
+    if (statusFilter !== 'ALL') params.set('status', statusFilter);
+    listAgents(params).then((data) => {
+      if (!active) return;
+      const lastPage = Math.max(1, Math.ceil(data.total / data.pageSize));
+      if (page > lastPage) setPage(lastPage);
+      else setResult(data);
+    }).catch((cause: unknown) => {
+      if (active) setError(cause instanceof Error ? cause.message : '加载智能体列表失败');
+    });
+    return () => { active = false; };
+  }, [keyword, statusFilter, page, revision]);
+
+  const handleDelete = async (e: React.SyntheticEvent, agentId: string, name: string) => {
     e.stopPropagation();
-    if (confirm(`确定要删除 "${name}" 吗？`)) {
-      onDelete(agentId);
+    if (!confirm(`确定要删除 "${name}" 吗？`)) return;
+    try {
+      await deleteAgent(agentId);
+      setRevision((value) => value + 1);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '删除失败');
     }
   };
 
@@ -62,7 +78,7 @@ export function AgentListView({ agents, onSelect, onCreate, onDelete }: Props) {
             type="search"
             placeholder="搜索智能体名称或描述"
             value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
+            onChange={(e) => { setKeyword(e.target.value); setPage(1); }}
           />
           <div className="ab-status-tabs" role="tablist">
             {statusFilters.map((tab) => (
@@ -71,7 +87,7 @@ export function AgentListView({ agents, onSelect, onCreate, onDelete }: Props) {
                 role="tab"
                 aria-selected={statusFilter === tab.value}
                 className={`ab-status-tab${statusFilter === tab.value ? ' is-active' : ''}`}
-                onClick={() => setStatusFilter(tab.value)}
+                onClick={() => { setStatusFilter(tab.value); setPage(1); }}
               >
                 {tab.label}
               </button>
@@ -80,12 +96,21 @@ export function AgentListView({ agents, onSelect, onCreate, onDelete }: Props) {
         </div>
       </header>
 
+      {error && <div role="alert">{error} <button onClick={() => setRevision((value) => value + 1)}>重试</button></div>}
+      {!result && !error && <p role="status">正在加载智能体…</p>}
+      {result && result.total > result.pageSize && (
+        <nav aria-label="智能体分页">
+          <button disabled={page === 1} onClick={() => setPage(page - 1)}>上一页</button>
+          <span> 第 {page} / {Math.ceil(result.total / result.pageSize)} 页 </span>
+          <button disabled={page * result.pageSize >= result.total} onClick={() => setPage(page + 1)}>下一页</button>
+        </nav>
+      )}
       <div className="ab-card-grid">
-        {filtered.map((agent) => (
+        {result?.items.map((agent) => (
           <button
             key={agent.id}
             className="ab-card"
-            onClick={() => onSelect(agent.id)}
+            onClick={() => onSelect(agent)}
             aria-label={`${agent.name}，${statusLabel[agent.status]}`}
           >
             <div className="ab-card-top">
@@ -111,7 +136,7 @@ export function AgentListView({ agents, onSelect, onCreate, onDelete }: Props) {
                 tabIndex={0}
                 onClick={(e) => handleDelete(e, agent.id, agent.name)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') handleDelete(e as unknown as React.MouseEvent, agent.id, agent.name);
+                  if (e.key === 'Enter' || e.key === ' ') handleDelete(e, agent.id, agent.name);
                 }}
               >
                 删除
@@ -125,7 +150,7 @@ export function AgentListView({ agents, onSelect, onCreate, onDelete }: Props) {
           <div className="ab-card-create-label">新建智能体</div>
         </button>
 
-        {filtered.length === 0 && (
+        {result?.items.length === 0 && (
           <div className="ab-empty">没有找到匹配的智能体</div>
         )}
       </div>

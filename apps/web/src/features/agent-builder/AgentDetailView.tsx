@@ -15,6 +15,7 @@ import {
   type Agent,
   type AgentStatus,
   type KnowledgeBaseSummary,
+  type KnowledgeBindingItemInput,
   type PluginSummary,
   type UpdateAgentInput,
 } from './agent.api';
@@ -30,9 +31,9 @@ interface Props {
   saveMessage: string;
   onBack: () => void;
   onSave: (updates: UpdateAgentInput) => void;
-  onStatusTransition: (nextStatus: AgentStatus) => void;
+  onStatusTransition: (nextStatus: AgentStatus, updates?: UpdateAgentInput) => void;
   onUpdateKnowledgeBindings: (
-    bindings: Array<{ knowledgeBaseId: string; enabled: boolean }>,
+    bindings: KnowledgeBindingItemInput[],
   ) => void;
   onUpdatePluginBindings: (
     bindings: Array<{ pluginId: string; enabled: boolean }>,
@@ -82,7 +83,7 @@ export function AgentDetailView({
 
   useEffect(() => {
     fetchVersions();
-  }, [fetchVersions, agent.updatedAt, agent.pluginBindings]);
+  }, [fetchVersions, agent.updatedAt, agent.pluginBindings, agent.knowledgeBaseBindings]);
 
   const closeVersionDetail = () => {
     // 关闭后忽略未完成的请求，避免旧结果覆盖下一次打开的版本。
@@ -149,22 +150,10 @@ export function AgentDetailView({
     setForm((f) => ({ ...f, [key]: value }));
   };
 
-  const commit = () => {
-    onSave({
-      name: form.name,
-      description: form.description,
-      systemPrompt: form.systemPrompt,
-      model: form.model,
-      temperature: form.temperature,
-      maxTokens: form.maxTokens,
-      contextLimit: form.contextLimit,
-      openingMessage: form.openingMessage || undefined,
-    });
-  };
-
   const toggleKb = (kbId: string) => {
     const bindings = agent.knowledgeBaseBindings.map((b) => ({
       knowledgeBaseId: b.knowledgeBaseId,
+      config: b.config,
       enabled: b.knowledgeBaseId === kbId ? !b.enabled : b.enabled,
     }));
     onUpdateKnowledgeBindings(bindings);
@@ -225,7 +214,7 @@ export function AgentDetailView({
           {agent.status === 'DRAFT' && (
             <button
               className="ab-btn ab-btn-ghost"
-              onClick={() => onStatusTransition('ACTIVE')}
+              onClick={() => onStatusTransition('ACTIVE', form)}
               disabled={busy}
             >
               发布
@@ -242,7 +231,7 @@ export function AgentDetailView({
           )}
           <button
             className="ab-btn ab-btn-primary"
-            onClick={commit}
+            onClick={() => onSave(form)}
             disabled={busy}
           >
             {busy && <span className="ab-spinner" aria-hidden />}
@@ -556,7 +545,10 @@ export function AgentDetailView({
           selectedIds={boundKnowledgeIds}
           onConfirm={(ids) => {
             onUpdateKnowledgeBindings(
-              ids.map((knowledgeBaseId) => ({ knowledgeBaseId, enabled: true })),
+              ids.map((knowledgeBaseId) => {
+                const existing = agent.knowledgeBaseBindings.find((binding) => binding.knowledgeBaseId === knowledgeBaseId);
+                return { knowledgeBaseId, enabled: existing?.enabled ?? true, config: existing?.config };
+              }),
             );
             setPickerOpen(null);
           }}

@@ -1,3 +1,7 @@
+import 'reflect-metadata';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import { ListAgentsQueryDto } from './dto/list-agents.query.dto';
 import {
   ForbiddenException,
   NotFoundException,
@@ -129,4 +133,18 @@ describe('AgentsService.getPublicAgent', () => {
     await expect(createService(prisma).getPublicAgent('agent-1'))
       .rejects.toBeInstanceOf(NotFoundException);
   });
+});
+
+it('列表查询把页码转为数字，并在分页前按用户、状态及关键词搜索', async () => {
+  const query = plainToInstance(ListAgentsQueryDto, { page: '2', keyword: 'Agent', status: 'ACTIVE' });
+  expect(await validate(query)).toEqual([]);
+  const agent = { findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(21) };
+  const page = await createService({ agent }).list(query, { id: 'owner' });
+  const where = { ownerId: 'owner', status: 'ACTIVE', OR: [
+    { name: { contains: 'Agent', mode: 'insensitive' } },
+    { description: { contains: 'Agent', mode: 'insensitive' } },
+  ] };
+  expect(agent.findMany).toHaveBeenCalledWith(expect.objectContaining({ where, skip: 20, take: 20 }));
+  expect(agent.count).toHaveBeenCalledWith({ where });
+  expect(page).toMatchObject({ page: 2, total: 21 });
 });
