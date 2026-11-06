@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChatMessage, ConversationSummary } from '@minicoze/shared';
 import { ApiError } from '../../shared/api/http';
-import { listAgents, type Agent } from '../agent-builder/agent.api';
+import { getAgent, listAgents, type Agent } from '../agent-builder/agent.api';
 import {
   createConversation,
   deleteConversation,
@@ -67,13 +67,15 @@ export function AgentChatPage() {
     try {
       const [agentPage, existing] = await Promise.all([listAgents(), listConversations()]);
       const available = agentPage.items.filter((agent) => agent.status !== 'ARCHIVED');
+      const target = new URLSearchParams(window.location.search).get('agentId');
+      if (target && !available.some(agent => agent.id === target)) available.push(await getAgent(target));
       setAgents(available);
       if (available.length === 0) {
         setBootError('请先在智能体页面创建一个智能体');
         return;
       }
-      const conversation = existing.find((item) => available.some((agent) => agent.id === item.agentId))
-        ?? (await createConversation(available[0].id));
+      const conversation = existing.find((item) => target ? item.agentId === target : available.some((agent) => agent.id === item.agentId))
+        ?? (await createConversation(target ?? available[0].id));
       const history = await listMessages(conversation.id);
       if (request !== requestId.current) return;
       following.current = true;

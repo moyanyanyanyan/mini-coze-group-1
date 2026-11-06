@@ -5,6 +5,7 @@ import { AgentDetailView } from './AgentDetailView';
 import {
   createAgent,
   deleteAgent,
+  getAgent,
   listAgents,
   listKnowledgeBases,
   listPlugins,
@@ -26,8 +27,9 @@ export function AgentBuilderPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBaseSummary[]>([]);
   const [plugins, setPlugins] = useState<PluginSummary[]>([]);
-  const [view, setView] = useState<View>({ type: 'list' });
-  const [createOpen, setCreateOpen] = useState(false);
+  const target = new URLSearchParams(window.location.search).get('id');
+  const [view, setView] = useState<View>(target ? { type: 'detail', agentId: target } : { type: 'list' });
+  const [createOpen, setCreateOpen] = useState(() => new URLSearchParams(window.location.search).get('action') === 'new');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [knowledgeError, setKnowledgeError] = useState(false);
@@ -37,8 +39,13 @@ export function AgentBuilderPage() {
 
   const refreshAgents = useCallback(async () => {
     const res = await listAgents();
-    setAgents(res.items);
-  }, []);
+    if (target && !res.items.some(agent => agent.id === target)) {
+      const selected = await getAgent(target);
+      setAgents([selected, ...res.items]);
+    } else {
+      setAgents(res.items);
+    }
+  }, [target]);
 
   useEffect(() => {
     (async () => {

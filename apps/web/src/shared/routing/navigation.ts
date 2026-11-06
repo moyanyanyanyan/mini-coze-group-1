@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 const routeChangeEvent = 'minicoze:route-change';
 
 export function navigate(to: string) {
-  if (window.location.pathname === to) {
+  if (window.location.pathname + window.location.search === to) {
     return;
   }
 
@@ -12,11 +12,11 @@ export function navigate(to: string) {
   window.scrollTo({ top: 0, behavior: 'auto' });
 }
 
-export function usePathname() {
-  const [pathname, setPathname] = useState(() => window.location.pathname);
+export function useRouteLocation() {
+  const [pathname, setPathname] = useState(() => window.location.pathname + window.location.search);
 
   useEffect(() => {
-    const updatePathname = () => setPathname(window.location.pathname);
+    const updatePathname = () => setPathname(window.location.pathname + window.location.search);
 
     window.addEventListener('popstate', updatePathname);
     window.addEventListener(routeChangeEvent, updatePathname);
@@ -28,4 +28,8 @@ export function usePathname() {
   }, []);
 
   return pathname;
+}
+
+export function usePathname() {
+  return useRouteLocation().split('?')[0];
 }

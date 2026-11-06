@@ -53,7 +53,14 @@ export function KnowledgePage() {
     if (!workspaceId) return;
     let active = true;
     listKnowledgeBases(workspaceId)
-      .then((result) => { if (active) { setItems(result); setSelectedId(result[0]?.id ?? null); setCreatingBase(result.length === 0); } })
+      .then((result) => { if (!active) return;
+        const params = new URLSearchParams(window.location.search);
+        const target = params.get('id');
+        setItems(result);
+        const selected = target ? result.find(item => item.id === target) : result[0];
+        setSelectedId(selected?.id ?? null);
+        if (target && !selected) setError('知识库不存在或无权访问');
+        setCreatingBase(params.get('action') === 'new' || (!target && result.length === 0)); })
       .catch((cause: unknown) => { if (active) setError(getMessage(cause)); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };

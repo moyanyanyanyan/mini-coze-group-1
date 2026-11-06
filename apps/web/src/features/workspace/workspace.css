@@ -1,0 +1,15 @@
+.workspace-home { max-width: 1040px; margin-inline: auto; padding: var(--page-gutter); }
+.workspace-home h1 { font: bold clamp(30px, 4vw, 44px) var(--font-display); margin: 0 0 20px; }
+.workspace-home h2 { font-size: 21px; margin: 0 0 16px; }
+.home-actions, .home-links { display: flex; flex-wrap: wrap; gap: 12px; }
+.workspace-home a { color: var(--violet-700); text-underline-offset: 4px; }
+.home-actions a { display: inline-flex; align-items: center; min-height: 44px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); padding: 0 16px; background: var(--surface-raised); text-decoration: none; }
+.home-actions a:first-child { background: var(--violet-700); color: white; border-color: var(--violet-700); }
+.home-actions a:hover { box-shadow: var(--shadow-sm); }
+.home-panel { margin-top: 28px; padding: clamp(18px, 3vw, 32px); background: var(--surface-raised); border: 1px solid var(--line); border-radius: var(--radius-lg); }
+.home-panel ol { padding-left: 1.6em; line-height: 1.8; color: var(--ink-700); }
+.home-panel ul { list-style: none; padding: 0; margin: 0; }
+.home-panel ul li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line); }
+.home-panel .home-name { color: var(--ink-900); font-weight: 600; overflow-wrap: anywhere; }
+.home-panel small { display: block; margin-top: 4px; color: var(--ink-600); }
+.home-links a { padding-block: 10px; }
