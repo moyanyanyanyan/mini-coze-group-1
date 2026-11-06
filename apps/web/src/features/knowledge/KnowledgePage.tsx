@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { ActionMenu } from '../../shared/ui/ActionMenu';
 import { useConfirm } from '../../shared/ui/useConfirm';
 import { createKnowledgeBase, createTextDocument, getKnowledgeWorkspaceId, deleteKnowledgeBase, deleteKnowledgeDocument, listDocumentChunks, listKnowledgeBases, listKnowledgeDocuments, previewKnowledgeSearch, retryKnowledgeDocument, updateKnowledgeBaseStatus, uploadDocumentFile, type KnowledgeBase, type KnowledgeChunkPage, type KnowledgeDocument, type KnowledgeSearchResult } from './knowledge.api';
 import './knowledge.css';
@@ -24,6 +25,7 @@ export function KnowledgePage() {
   const [deletingBase, setDeletingBase] = useState(false);
   const [updatingBaseStatus, setUpdatingBaseStatus] = useState(false);
   const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
+  const [addingDocument, setAddingDocument] = useState(false);
   const [sourceMode, setSourceMode] = useState<'text' | 'file'>('text');
   const [documentTitle, setDocumentTitle] = useState('');
   const [documentText, setDocumentText] = useState('');
@@ -71,6 +73,7 @@ export function KnowledgePage() {
   useEffect(() => {
     searchGenerationRef.current += 1;
     setActiveTab('documents');
+    setAddingDocument(false);
     setSelectedDocumentId(null);
     setChunkPage(1);
     setChunks(null);
@@ -258,12 +261,7 @@ export function KnowledgePage() {
       {confirmation}
       <div className="knowledge-content">
         <header className="knowledge-heading">
-          <div>
-            <p className="knowledge-eyebrow">KNOWLEDGE / 01</p>
-            <h1>知识库</h1>
-            <p>创建知识库、录入资料，并查看切片与检索结果。</p>
-          </div>
-          <span className="knowledge-workspace">{workspaceId === 'ws-local-demo' ? '本地测试工作空间' : '个人工作空间'}：{workspaceId}</span>
+          <h1>知识库</h1>
         </header>
 
         <div className="knowledge-shell">
@@ -276,8 +274,7 @@ export function KnowledgePage() {
               ) : <ul>{items.map((item) => (
                 <li key={item.id}>
                   <button type="button" className={`knowledge-catalog-item ${selectedId === item.id ? 'is-selected' : ''}`} disabled={deletingBase || updatingBaseStatus || deletingDocumentId !== null} onClick={() => setSelectedId(item.id)} aria-current={selectedId === item.id ? 'page' : undefined}>
-                    <span><strong>{item.name}</strong><span className={`knowledge-status ${item.status === 'DISABLED' ? 'is-disabled' : ''}`}>{item.status === 'ACTIVE' ? '可用' : '已停用'}</span></span>
-                    <small>{item.description || '暂无说明'}</small>
+                    <span><strong>{item.name}</strong>{item.status === 'DISABLED' && <span className="knowledge-status is-disabled">已停用</span>}</span>
                   </button>
                 </li>
               ))}</ul>}
@@ -296,14 +293,15 @@ export function KnowledgePage() {
           <div className="knowledge-workbench">
             {selectedId ? <>
               <div className="knowledge-workbench-heading">
-                <div><p>当前知识库</p><h2>{selectedBase?.name ?? '知识库'}</h2><span>{selectedBase?.description || '暂无说明'}</span></div>
-                <div className="knowledge-workbench-actions">
+                <div className="knowledge-base-summary">
+                  <h2>{selectedBase?.name ?? '知识库'}</h2>
+                  {selectedBase?.description && <p>{selectedBase.description}</p>}
                   {selectedBaseStatus === 'ACTIVE' ? <div className="knowledge-workbench-stats"><span>{documents.length} 份文档</span><span>{documents.reduce((sum, document) => sum + document.chunkCount, 0)} 个切片</span></div> : <span className="knowledge-status is-disabled">已停用 · 资料保留</span>}
-                  <div className="knowledge-status-actions">
-                    <button className="knowledge-status-toggle" type="button" disabled={updatingBaseStatus || deletingBase} onClick={() => void handleToggleBaseStatus()}>{updatingBaseStatus ? '更新中…' : selectedBaseStatus === 'DISABLED' ? '重新启用' : '停用知识库'}</button>
-                    <button className="knowledge-delete" type="button" disabled={deletingBase || updatingBaseStatus || hasProcessing} title={hasProcessing ? '请等待文档处理完成' : undefined} onClick={() => void handleDeleteBase()}>{deletingBase ? '删除中…' : '删除知识库'}</button>
-                  </div>
                 </div>
+                <ActionMenu key={selectedId} label="管理知识库">
+                  <button className="knowledge-status-toggle" type="button" disabled={updatingBaseStatus || deletingBase} onClick={() => void handleToggleBaseStatus()}>{updatingBaseStatus ? '更新中…' : selectedBaseStatus === 'DISABLED' ? '重新启用' : '停用知识库'}</button>
+                  <button className="knowledge-delete" type="button" disabled={deletingBase || updatingBaseStatus || hasProcessing} title={hasProcessing ? '请等待文档处理完成' : undefined} onClick={() => void handleDeleteBase()}>{deletingBase ? '删除中…' : '删除知识库'}</button>
+                </ActionMenu>
               </div>
               {selectedBaseStatus === 'DISABLED' && <section className="knowledge-card knowledge-disabled-panel" role="status"><h2>知识库已停用</h2><p>资料、切片和向量仍保留。停用期间不能录入资料、查看切片或检索；重新启用后可继续使用。</p></section>}
               {selectedBaseStatus === 'ACTIVE' && <>
@@ -314,24 +312,27 @@ export function KnowledgePage() {
               </div>
 
               {activeTab === 'documents' && <div className="knowledge-documents-view" role="tabpanel">
-                <form className="knowledge-card knowledge-form" onSubmit={handleDocumentSubmit}>
-                  <h2>录入资料</h2>
-                  <p className="knowledge-hint">资料将保存到当前知识库。</p>
-                  <div className="knowledge-mode" role="group" aria-label="录入方式">
-                    <button type="button" className={sourceMode === 'text' ? 'is-active' : ''} onClick={() => setSourceMode('text')}>粘贴文本</button>
-                    <button type="button" className={sourceMode === 'file' ? 'is-active' : ''} onClick={() => setSourceMode('file')}>上传文件</button>
-                  </div>
-                  <label htmlFor="document-title">文档标题{sourceMode === 'file' ? '（可选）' : ''}</label>
-                  <input id="document-title" value={documentTitle} onChange={(event) => setDocumentTitle(event.target.value)} maxLength={100} required={sourceMode === 'text'} placeholder={sourceMode === 'file' ? '留空则使用文件名' : '例如：报销规则'} />
-                  {sourceMode === 'text' ? (
-                    <><label htmlFor="document-text">正文</label><textarea id="document-text" value={documentText} onChange={(event) => setDocumentText(event.target.value)} rows={8} required placeholder="在此粘贴资料正文" /></>
-                  ) : (
-                    <><label htmlFor="document-file">TXT / JSON 文件，最多 1 MB</label><input id="document-file" ref={fileInputRef} type="file" accept=".txt,.json" onChange={(event) => setDocumentFile(event.target.files?.[0] ?? null)} required /></>
-                  )}
-                  <button type="submit" disabled={documentSaving}>{documentSaving ? '提交中…' : '提交资料'}</button>
-                </form>
                 <section className="knowledge-card knowledge-list">
-                  <div className="knowledge-list-heading"><h2>文档处理状态</h2><span>{documents.length} 份</span></div>
+                  <div className="knowledge-doc-toolbar">
+                    <h2>文档列表</h2>
+                    <button type="button" className="knowledge-add-document" aria-expanded={addingDocument} onClick={() => setAddingDocument(!addingDocument)}>
+                      {addingDocument ? '收起表单' : '＋ 录入资料'}
+                    </button>
+                  </div>
+                  <form hidden={!addingDocument} className="knowledge-form knowledge-document-form" onSubmit={handleDocumentSubmit}>
+                    <div className="knowledge-mode" role="group" aria-label="录入方式">
+                      <button type="button" className={sourceMode === 'text' ? 'is-active' : ''} onClick={() => setSourceMode('text')}>粘贴文本</button>
+                      <button type="button" className={sourceMode === 'file' ? 'is-active' : ''} onClick={() => setSourceMode('file')}>上传文件</button>
+                    </div>
+                    <label htmlFor="document-title">文档标题{sourceMode === 'file' ? '（可选）' : ''}</label>
+                    <input id="document-title" value={documentTitle} onChange={(event) => setDocumentTitle(event.target.value)} maxLength={100} required={sourceMode === 'text'} placeholder={sourceMode === 'file' ? '留空则使用文件名' : '例如：报销规则'} />
+                    {sourceMode === 'text' ? (
+                      <><label htmlFor="document-text">正文</label><textarea id="document-text" value={documentText} onChange={(event) => setDocumentText(event.target.value)} rows={8} required placeholder="在此粘贴资料正文" /></>
+                    ) : (
+                      <><label htmlFor="document-file">TXT / JSON 文件，最多 1 MB</label><input id="document-file" ref={fileInputRef} type="file" accept=".txt,.json" onChange={(event) => setDocumentFile(event.target.files?.[0] ?? null)} required /></>
+                    )}
+                    <button type="submit" disabled={documentSaving}>{documentSaving ? '提交中…' : '提交资料'}</button>
+                  </form>
                   {documentError && <p className="knowledge-error" role="alert">{documentError}</p>}
                   {documentLoading && documents.length === 0 ? <p className="knowledge-empty">正在加载…</p> : documents.length === 0 ? (
                     <p className="knowledge-empty">这个知识库还没有资料。</p>

@@ -41,8 +41,7 @@ export function ApiKeyTable({
   return (
     <div className="api-key-table-shell">
       <div className="api-key-table-scroll">
-        <table className="api-key-table" aria-busy={status === 'loading'}>
-          <caption className="visually-hidden">API Keys 列表</caption>
+        <table className="api-key-table" aria-label="API 密钥列表" aria-busy={status === 'loading'}>
           <thead>
             <tr>
               <th scope="col">名称</th>
