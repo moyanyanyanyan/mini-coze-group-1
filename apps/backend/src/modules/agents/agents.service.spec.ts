@@ -25,7 +25,11 @@ const publishedConfig = {
 };
 
 describe('AgentsService.getPublicAgent', () => {
-  it('returns owner and an ACTIVE Agent config from its current snapshot', async () => {
+  it.each([
+    { snapshot: publishedConfig, current: 0, expected: 0 },
+    { snapshot: { ...publishedConfig, contextLimit: 0 }, current: 20, expected: 0 },
+    { snapshot: { ...publishedConfig, contextLimit: 5 }, current: 0, expected: 5 },
+  ])('从发布快照读取历史轮数，旧快照使用 Agent 当前轮数', async ({ snapshot, current, expected }) => {
     const prisma = {
       agent: {
         findUnique: jest.fn().mockResolvedValue({
@@ -33,13 +37,14 @@ describe('AgentsService.getPublicAgent', () => {
           ownerId: 'user-1',
           status: 'ACTIVE',
           currentVersionId: 'version-1',
+          contextLimit: current,
         }),
       },
       agentVersion: {
         findUnique: jest.fn().mockResolvedValue({
           agentId: 'agent-1',
           version: 3,
-          snapshot: publishedConfig,
+          snapshot,
         }),
       },
     };
@@ -48,7 +53,7 @@ describe('AgentsService.getPublicAgent', () => {
       agentId: 'agent-1',
       ownerId: 'user-1',
       status: 'ACTIVE',
-      config: publishedConfig,
+      config: { ...publishedConfig, contextLimit: expected },
     });
   });
 

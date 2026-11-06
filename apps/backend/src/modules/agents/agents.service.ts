@@ -138,6 +138,7 @@ export class AgentsService {
         ownerId: true,
         status: true,
         currentVersionId: true,
+        contextLimit: true,
       },
     });
 
@@ -167,6 +168,7 @@ export class AgentsService {
       version.snapshot,
       agent.id,
       version.version,
+      agent.contextLimit,
     );
 
     if (!config) {

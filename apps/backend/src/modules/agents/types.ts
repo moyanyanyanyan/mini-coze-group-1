@@ -7,6 +7,7 @@ export interface CurrentUserPayload {
 export interface RuntimeAgentConfig {
   id: string;
   revision: number;
+  contextLimit?: number;
   name: string;
   systemPrompt: string;
   model: string;
