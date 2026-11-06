@@ -45,7 +45,7 @@ export function ApiKeyManagementPage() {
         <header className="api-keys-header">
           <div>
             <p className="api-keys-eyebrow">Develop / API</p>
-            <h1 id="api-keys-title">API Keys</h1>
+            <h1 id="api-keys-title">API 密钥</h1>
             <p className="api-keys-description">
               API Keys 用于将 MiniCoze 智能体接入外部应用。请妥善保管，避免泄露。
             </p>

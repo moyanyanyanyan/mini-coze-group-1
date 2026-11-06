@@ -1,5 +1,6 @@
 // src/features/workflow-editor/components/WorkflowListView.tsx
 import React from 'react';
+import { useConfirm } from '../../../shared/ui/useConfirm';
 import { useEffect, useState } from 'react';
 import { navigate } from '../../../shared/routing/navigation';
 import {
@@ -19,6 +20,8 @@ function getErrorMessage(e: unknown, fallback = '未知错误'): string {
 }
 
 export function WorkflowListView() {
+  const [notice, setNotice] = useState('');
+  const { confirm, confirmation } = useConfirm();
   const [data, setData] = useState<Workflow[]>([]);
   const [loading, setLoading] = useState(false);
   const [keyword, setKeyword] = useState('');
@@ -37,7 +40,7 @@ export function WorkflowListView() {
       const res = await listWorkflows({ keyword });
       setData(res.items);
     } catch (e) {
-      alert(getErrorMessage(e, '加载失败'));
+      setNotice(getErrorMessage(e, '加载失败'));
     } finally {
       setLoading(false);
     }
@@ -54,7 +57,7 @@ export function WorkflowListView() {
 
   const handleCreate = async () => {
     if (!form.name.trim()) {
-      alert('请输入名称');
+      setNotice('请输入名称');
       return;
     }
     setSubmitting(true);
@@ -67,19 +70,19 @@ export function WorkflowListView() {
       setForm({ name: '', description: '' });
       handleOpen(wf.id);
     } catch (e) {
-      alert(getErrorMessage(e, '创建失败'));
+      setNotice(getErrorMessage(e, '创建失败'));
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`确定删除「${name}」？`)) return;
+    if (!await confirm(`确定删除「${name}」？删除后无法恢复。`)) return;
     try {
       await deleteWorkflow(id);
       load();
     } catch (e) {
-      alert(getErrorMessage(e, '删除失败'));
+      setNotice(getErrorMessage(e, '删除失败'));
     }
   };
 
@@ -93,7 +96,7 @@ export function WorkflowListView() {
     if (!renameTarget) return;
     const name = renameName.trim();
     if (!name) {
-      alert('请输入名称');
+      setNotice('请输入名称');
       return;
     }
     if (name === renameTarget.name) {
@@ -112,7 +115,7 @@ export function WorkflowListView() {
       );
       setRenameTarget(null);
     } catch (e) {
-      alert(getErrorMessage(e, '重命名失败'));
+      setNotice(getErrorMessage(e, '重命名失败'));
     } finally {
       setRenaming(false);
     }
@@ -123,6 +126,8 @@ export function WorkflowListView() {
 
   return (
     <section className="wf-list-page" aria-label="工作流列表">
+      {confirmation}
+      {notice && <div className="wf-notice wf-feedback-fixed" role="alert"><span>{notice}</span><button className="wf-btn wf-btn-outline" onClick={() => setNotice('')}>关闭提示</button></div>}
       <header className="wf-list-header">
         <div>
           <h1>工作流</h1>

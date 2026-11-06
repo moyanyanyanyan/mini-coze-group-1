@@ -7,6 +7,7 @@ import type { AuthUser } from '../../features/auth/types';
 import { AppLink } from '../routing/AppLink';
 import { navigate } from '../routing/navigation';
 import { Icon } from '../ui/Icon';
+import { useOverlayFocus } from '../ui/useOverlayFocus';
 import './workspace-layout.css';
 
 interface WorkspaceLayoutProps {
@@ -21,6 +22,8 @@ export function WorkspaceLayout({ pathname, children }: WorkspaceLayoutProps) {
     return stored === null ? null : stored === 'true';
   });
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const sidebarRef = useRef<HTMLElement>(null);
+  useOverlayFocus(sidebarRef, mobileNavOpen, () => setMobileNavOpen(false));
   const collapsed = navPreference ?? editorMode;
   useEffect(() => { setMobileNavOpen(false); }, [pathname]);
   // 底部头像区：me 为 null = 还没问到 / 问失败，显示「未登录」兜底
@@ -75,14 +78,14 @@ export function WorkspaceLayout({ pathname, children }: WorkspaceLayoutProps) {
 
   return (
     <div className={`workspace-shell${collapsed ? ' is-editor-mode' : ''}${mobileNavOpen ? ' is-nav-open' : ''}`}>
-      <button className="workspace-mobile-toggle" aria-label="打开导航" onClick={() => setMobileNavOpen(true)}>☰ 菜单</button>
+      <button className="workspace-mobile-toggle" aria-label="打开导航" onClick={() => setMobileNavOpen(true)}><Icon name="menu" /> 菜单</button>
       {mobileNavOpen && <button className="workspace-nav-backdrop" aria-label="关闭导航" onClick={() => setMobileNavOpen(false)} />}
-      <aside className="workspace-sidebar" aria-label="功能导航">
+      <aside ref={sidebarRef} className="workspace-sidebar" aria-label="功能导航" role={mobileNavOpen ? 'dialog' : undefined} aria-modal={mobileNavOpen || undefined}>
         <button className="workspace-collapse" aria-label={collapsed ? '展开导航' : '收起导航'} onClick={() => {
           setNavPreference(!collapsed);
           sessionStorage.setItem('workspace-nav-collapsed', String(!collapsed));
           setMobileNavOpen(false);
-        }}>{collapsed ? '»' : '«'}</button>
+        }}><Icon name="panel" /></button>
         <AppLink className="workspace-brand" to="/" aria-label="返回 MiniCoze 首页">
           <span className="workspace-brand-mark" aria-hidden="true">M</span>
           <span>MiniCoze</span>
@@ -90,7 +93,7 @@ export function WorkspaceLayout({ pathname, children }: WorkspaceLayoutProps) {
 
         <nav className="workspace-nav">
           {workspaceNavigation.map((item) => {
-            const isActive = pathname === item.route;
+            const isActive = pathname === item.route || (item.route !== '/workspace' && pathname.startsWith(`${item.route}/`));
 
             return (
               <AppLink

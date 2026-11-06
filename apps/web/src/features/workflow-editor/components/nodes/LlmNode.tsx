@@ -1,4 +1,5 @@
 import React from 'react';
+import { Icon } from '../../../../shared/ui/Icon';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 
 const STATUS_TEXT: Record<string, string> = {
@@ -33,8 +34,8 @@ export function LlmNode({ data }: NodeProps) {
         </span>
       )}
       <div className="wf-node-head">
-        <span className="wf-node-icon" style={{ background: '#4d53e8' }}>
-          🤖
+        <span className="wf-node-icon" style={{ background: 'var(--violet-600)' }}>
+          <Icon name="chat" />
         </span>
         <div>
           <div className="wf-node-title">{d.label || 'LLM'}</div>

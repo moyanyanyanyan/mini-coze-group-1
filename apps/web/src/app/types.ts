@@ -8,7 +8,7 @@ export type IconName =
   | 'plug'
   | 'workflow'
   | 'send'
-  | 'api';
+  | 'api' | 'chevronDown' | 'close' | 'plus' | 'more' | 'check' | 'menu' | 'panel' | 'stop' | 'arrowDown' | 'play' | 'repeat';
 
 export interface FeatureManifest {
   id: string;

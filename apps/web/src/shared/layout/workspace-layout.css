@@ -280,6 +280,7 @@
 .workspace-nav-item.is-active { box-shadow: none; }
 .workspace-sidebar-footer { padding-bottom: 0; }
 .workspace-collapse { align-self: flex-end; min-width: 40px; min-height: 40px; border: 0; background: transparent; color: var(--ink-600); }
+.workspace-collapse svg, .workspace-mobile-toggle svg { width: 18px; height: 18px; vertical-align: middle; }
 .workspace-mobile-toggle, .workspace-nav-backdrop { display: none; }
 
 .workspace-content::before {

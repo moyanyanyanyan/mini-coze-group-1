@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Icon } from '../../shared/ui/Icon';
+import { useOverlayFocus } from '../../shared/ui/useOverlayFocus';
 import {
   BindingPickerModal,
   type PickerItem,
@@ -51,6 +53,8 @@ export function AgentDetailView({
 }: Props) {
   const [pluginSaving, setPluginSaving] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const previewRef = useRef<HTMLElement>(null);
+  useOverlayFocus(previewRef, previewOpen, () => setPreviewOpen(false));
   const [pluginSaveError, setPluginSaveError] = useState<string | null>(null);
   const pluginSavePending = useRef(false);
   const [pickerOpen, setPickerOpen] = useState<PickerKind | null>(null);
@@ -220,7 +224,7 @@ export function AgentDetailView({
           <button className="ab-btn ab-btn-ghost ab-preview-toggle" onClick={() => setPreviewOpen(true)}>预览与版本</button>
           {agent.status === 'DRAFT' && (
             <button
-              className="ab-btn ab-btn-success"
+              className="ab-btn ab-btn-ghost"
               onClick={() => onStatusTransition('ACTIVE')}
               disabled={busy}
             >
@@ -253,22 +257,23 @@ export function AgentDetailView({
       <div className="ab-detail-body">
         <div className="ab-detail-main">
         <aside className="ab-detail-col ab-detail-col-left">
-          <div className="ab-detail-avatar">{form.name.slice(0, 1) || '?'}</div>
-
+          <div className="ab-identity-row"><div className="ab-detail-avatar">{form.name.slice(0, 1) || '?'}</div>
           <div className="ab-field">
-            <label className="ab-label">名称</label>
+            <label className="ab-label" htmlFor="agent-name">名称</label>
             <input
+              id="agent-name"
               className="ab-input"
               type="text"
               value={form.name}
               onChange={(e) => update('name', e.target.value)}
               maxLength={50}
             />
-          </div>
+          </div></div>
 
           <div className="ab-field">
-            <label className="ab-label">描述</label>
+            <label className="ab-label" htmlFor="agent-description">描述</label>
             <textarea
+              id="agent-description"
               className="ab-textarea"
               value={form.description}
               onChange={(e) => update('description', e.target.value)}
@@ -276,79 +281,26 @@ export function AgentDetailView({
             />
           </div>
 
-          <div className="ab-field">
-            <label className="ab-label">开场白</label>
-            <textarea
-              className="ab-textarea"
-              value={form.openingMessage}
-              onChange={(e) => update('openingMessage', e.target.value)}
-              rows={2}
-              placeholder="用户首次进入对话时看到的消息"
-            />
-          </div>
         </aside>
 
         <section className="ab-detail-col ab-detail-col-center">
-          <div className="ab-section">
-            <h3 className="ab-section-title">模型参数</h3>
-
-            <div className="ab-field-grid">
-              <div className="ab-field">
-                <label className="ab-label">模型</label>
-                <select className="ab-input" value={form.model} onChange={(e) => update('model', e.target.value)}>
-                  {modelOptions.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="ab-field">
-                <label className="ab-label">maxTokens</label>
-                <input
-                  className="ab-input"
-                  type="number"
-                  min={1}
-                  max={8192}
-                  value={form.maxTokens}
-                  onChange={(e) => update('maxTokens', Number(e.target.value))}
-                />
-              </div>
-
-              <div className="ab-field">
-                <label className="ab-label">
-                  temperature <span className="ab-field-value">{form.temperature.toFixed(1)}</span>
-                </label>
-                <input
-                  className="ab-range"
-                  type="range"
-                  min={0}
-                  max={2}
-                  step={0.1}
-                  value={form.temperature}
-                  onChange={(e) => update('temperature', Number(e.target.value))}
-                />
-              </div>
-
-              <div className="ab-field">
-                <label className="ab-label">历史消息轮数</label>
-                <select className="ab-input" value={form.contextLimit} onChange={(e) => update('contextLimit', Number(e.target.value))}>
-                  {contextLimitOptions.map((n) => (
-                    <option key={n} value={n}>{n} 轮</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
 
           <div className="ab-section">
-            <h3 className="ab-section-title">系统提示词</h3>
+            <h3 className="ab-section-title"><label htmlFor="agent-system-prompt">角色与任务</label></h3>
             <textarea
+              id="agent-system-prompt"
               className="ab-textarea ab-textarea-large"
               value={form.systemPrompt}
               onChange={(e) => update('systemPrompt', e.target.value)}
               rows={6}
-              placeholder="你是一个...请..."
+              placeholder="描述智能体的角色、要完成的任务，以及回复时应遵循的规则。"
             />
+          </div>
+
+          <div className="ab-section">
+            <h3 className="ab-section-title">对话设置</h3>
+            <label className="ab-label" htmlFor="agent-opening">开场白</label>
+            <textarea id="agent-opening" className="ab-textarea" value={form.openingMessage} onChange={(e) => update('openingMessage', e.target.value)} rows={2} placeholder="用户首次进入对话时看到的消息" />
           </div>
 
           <div className="ab-section">
@@ -457,12 +409,68 @@ export function AgentDetailView({
               </ul>
             )}
           </div>
+          <div className="ab-section ab-model-settings">
+            <h3 className="ab-section-title">模型设置</h3>
+
+            <div className="ab-field-grid">
+              <div className="ab-field">
+                <label className="ab-label" htmlFor="agent-model">模型</label>
+                <select id="agent-model" className="ab-input" value={form.model} onChange={(e) => update('model', e.target.value)}>
+                  {modelOptions.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="ab-field">
+                <label className="ab-label" htmlFor="agent-max-tokens">最大输出长度</label>
+                <input
+                  id="agent-max-tokens"
+                  aria-describedby="agent-tokens-hint"
+                  className="ab-input"
+                  type="number"
+                  min={1}
+                  max={8192}
+                  value={form.maxTokens}
+                  onChange={(e) => update('maxTokens', Number(e.target.value))}
+                />
+                <small id="agent-tokens-hint" className="ab-field-hint">每次回复的 Token 上限，不等同于字数。</small>
+              </div>
+
+              <div className="ab-field">
+                <label className="ab-label" htmlFor="agent-temperature">
+                  回答随机性 <span className="ab-field-value">{form.temperature.toFixed(1)}</span>
+                </label>
+                <input
+                  id="agent-temperature"
+                  aria-describedby="agent-temperature-hint"
+                  className="ab-range"
+                  type="range"
+                  min={0}
+                  max={2}
+                  step={0.1}
+                  value={form.temperature}
+                  onChange={(e) => update('temperature', Number(e.target.value))}
+                />
+                <small id="agent-temperature-hint" className="ab-field-hint">数值越低越稳定，越高越多样。</small>
+              </div>
+
+              <div className="ab-field">
+                <label className="ab-label" htmlFor="agent-context">历史消息轮数</label>
+                <select id="agent-context" className="ab-input" value={form.contextLimit} onChange={(e) => update('contextLimit', Number(e.target.value))}>
+                  {contextLimitOptions.map((n) => (
+                    <option key={n} value={n}>{n} 轮</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
         </section>
 
         </div>
         {previewOpen && <button className="ab-preview-backdrop" aria-label="关闭预览与版本" onClick={() => setPreviewOpen(false)} />}
-        <aside className={`ab-detail-col ab-detail-col-right${previewOpen ? ' is-open' : ''}`} aria-label="预览与版本">
-          <button className="ab-btn ab-btn-ghost ab-preview-close" onClick={() => setPreviewOpen(false)}>关闭预览与版本</button>
+        <aside ref={previewRef} role={previewOpen ? 'dialog' : undefined} aria-modal={previewOpen || undefined} className={`ab-detail-col ab-detail-col-right${previewOpen ? ' is-open' : ''}`} aria-label="预览与版本">
+          <div className="ab-preview-heading"><strong>预览与版本</strong><button className="ui-icon-button ab-preview-close" aria-label="关闭预览与版本" onClick={() => setPreviewOpen(false)}><Icon name="close" /></button></div>
           <div className="ab-section ab-preview">
             <h3 className="ab-section-title">开场白预览</h3>
             <div className="ab-preview-bubble">
@@ -600,11 +608,11 @@ function VersionSnapshot({ snapshot, plugins, knowledgeBases }: VersionSnapshotP
         <span className="ab-snapshot-value">{model || '—'}</span>
       </div>
       <div className="ab-snapshot-row">
-        <span className="ab-snapshot-label">temperature</span>
+        <span className="ab-snapshot-label">回答随机性</span>
         <span className="ab-snapshot-value">{temperature}</span>
       </div>
       <div className="ab-snapshot-row">
-        <span className="ab-snapshot-label">maxTokens</span>
+        <span className="ab-snapshot-label">最大输出长度</span>
         <span className="ab-snapshot-value">{maxTokens}</span>
       </div>
 

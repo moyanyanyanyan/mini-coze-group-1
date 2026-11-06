@@ -409,6 +409,14 @@
   gap: 12px;
   padding: 12px;
 }
+.wf-notice { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 20px; border-bottom: 1px solid var(--line); background: var(--violet-50); color: var(--ink-800); font-size: 14px; }
+.wf-panel-close { float: right; align-self: flex-end; flex: none; }
+.wf-danger-zone { margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--line); }
+.wf-prop-sub summary { cursor: pointer; padding-block: 8px; }
+.wf-palette-icon svg, .wf-node-icon svg, .wf-side-toggle svg { width: 18px; height: 18px; }
+.wf-editor-body .wf-side-toggle { display: flex; align-items: center; width: auto; height: 40px; padding: 8px; gap: 6px; font-size: 12px; top: 12px; transform: none; }
+.wf-toggle-label { white-space: nowrap; }
+.wf-feedback-fixed { position: fixed; top: 16px; right: 16px; z-index: 200; max-width: calc(100vw - 32px); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow-sm); }
 
 /* 右侧配置面板 */
 .wf-prop-panel {

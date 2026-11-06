@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useConfirm } from '../../shared/ui/useConfirm';
 import { createKnowledgeBase, createTextDocument, getKnowledgeWorkspaceId, deleteKnowledgeBase, deleteKnowledgeDocument, listDocumentChunks, listKnowledgeBases, listKnowledgeDocuments, previewKnowledgeSearch, retryKnowledgeDocument, updateKnowledgeBaseStatus, uploadDocumentFile, type KnowledgeBase, type KnowledgeChunkPage, type KnowledgeDocument, type KnowledgeSearchResult } from './knowledge.api';
 import './knowledge.css';
 
 
 
 export function KnowledgePage() {
+  const { confirm, confirmation } = useConfirm();
   const [workspaceId, setWorkspaceId] = useState('');
   const [items, setItems] = useState<KnowledgeBase[]>([]);
   const [name, setName] = useState('');
@@ -183,7 +185,7 @@ export function KnowledgePage() {
     if (!selectedId || deletingBase || updatingBaseStatus) return;
     const baseId = selectedId;
     const base = items.find((item) => item.id === baseId);
-    if (!window.confirm(`确定删除知识库「${base?.name ?? '当前知识库'}」吗？其中的 ${documents.length} 份文档、切片和向量也会永久删除，无法恢复。`)) return;
+    if (!await confirm(`确定删除知识库「${base?.name ?? '当前知识库'}」吗？其中的 ${documents.length} 份文档、切片和向量也会永久删除，无法恢复。`)) return;
     setDeletingBase(true);
     setError('');
     try {
@@ -201,7 +203,7 @@ export function KnowledgePage() {
 
   async function handleDeleteDocument(document: KnowledgeDocument) {
     if (deletingDocumentId || document.status === 'PROCESSING') return;
-    if (!window.confirm(`确定删除文档「${document.title}」吗？其 ${document.chunkCount} 个切片和向量也会永久删除，无法恢复。`)) return;
+    if (!await confirm(`确定删除文档「${document.title}」吗？其 ${document.chunkCount} 个切片和向量也会永久删除，无法恢复。`)) return;
     setDeletingDocumentId(document.id);
     setDocumentError('');
     try {
@@ -245,6 +247,7 @@ export function KnowledgePage() {
 
   return (
     <section className="feature-page knowledge-page" aria-label="知识库">
+      {confirmation}
       <div className="knowledge-content">
         <header className="knowledge-heading">
           <div>
@@ -258,7 +261,7 @@ export function KnowledgePage() {
         <div className="knowledge-shell">
           <aside className="knowledge-sidebar" aria-label="知识库列表">
             <div className="knowledge-card knowledge-catalog">
-              <div className="knowledge-list-heading"><h2>知识库</h2><span>{items.length} 个</span></div>
+              <div className="knowledge-list-heading"><h2>我的资料库</h2><span>{items.length} 个</span></div>
               {error && <p className="knowledge-error" role="alert">{error}</p>}
               {loading ? <p className="knowledge-empty">正在加载…</p> : items.length === 0 ? (
                 <p className="knowledge-empty">还没有知识库，先在下方创建一个。</p>

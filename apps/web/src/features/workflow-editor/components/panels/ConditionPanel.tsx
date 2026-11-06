@@ -1,5 +1,5 @@
 // src/features/workflow-editor/components/panels/ConditionPanel.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import type { Node, Edge } from '@xyflow/react';
 import type {
   ConditionNodeData,
@@ -50,6 +50,7 @@ function needsRight(op: ConditionOperator): boolean {
 }
 
 export function ConditionPanel({ data, nodeId, nodes, edges, loopContext,  onChange }: Props) {
+  const [notice, setNotice] = useState('');
   const branches = data.branches || [];
   const upstream = getUpstreamFields(nodes, edges, nodeId, loopContext);
 
@@ -62,7 +63,7 @@ export function ConditionPanel({ data, nodeId, nodes, edges, loopContext,  onCha
 
   const addBranch = () => {
     if (branches.length >= 10) {
-      alert('最多 10 个分支');
+      setNotice('最多 10 个分支');
       return;
     }
     const ids = new Set(branches.map((b) => b.id));
@@ -85,7 +86,7 @@ export function ConditionPanel({ data, nodeId, nodes, edges, loopContext,  onCha
   const addCondition = (bIdx: number) => {
     const b = branches[bIdx];
     if (b.conditions.length >= 10) {
-      alert('每个分支最多 10 条条件');
+      setNotice('每个分支最多 10 条条件');
       return;
     }
     const next: ConditionItem[] = [
@@ -116,6 +117,7 @@ export function ConditionPanel({ data, nodeId, nodes, edges, loopContext,  onCha
 
   return (
     <div className="wf-form">
+      {notice && <div className="wf-notice" role="alert"><span>{notice}</span><button type="button" className="wf-link-btn" onClick={() => setNotice('')}>关闭提示</button></div>}
       <label className="wf-form-field">
         <span>节点名称</span>
         <input

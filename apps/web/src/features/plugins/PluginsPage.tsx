@@ -90,7 +90,7 @@ export function PluginsPage() {
         <div className="pm-header-inner">
           <div>
             <h1>插件</h1>
-            <p>为智能体连接计算、时间和信息获取能力。</p>
+            <p>浏览内置能力，在智能体编辑页选择并绑定使用。</p>
           </div>
         </div>
       </header>

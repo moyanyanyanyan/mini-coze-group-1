@@ -44,14 +44,14 @@ export function PluginCard({ plugin }: PluginCardProps) {
           <div className="pm-card-title-row">
             <h3 className="pm-card-name">{plugin.name}</h3>
           </div>
-          <span className="pm-card-meta">{plugin.pluginId}</span>
         </div>
       </div>
       <p className="pm-card-desc">{plugin.description}</p>
       <footer className="pm-card-foot">
         <span className="pm-cap">工具 <b>{plugin.tools.length}</b></span>
-        <span className="pm-plugin-kind">{CATEGORY_META[plugin.category]} · 内置插件</span>
+        <span className="pm-plugin-kind">{CATEGORY_META[plugin.category]}</span>
       </footer>
+      <details className="pm-technical"><summary>技术信息</summary><code>{plugin.pluginId}</code></details>
     </article>
   );
 }

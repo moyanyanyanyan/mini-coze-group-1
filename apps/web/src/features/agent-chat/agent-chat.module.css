@@ -10,10 +10,30 @@
   background: var(--surface-raised);
 }
 
+.header .agentSwitcher { position: relative; min-width: 0; flex: 1; max-width: 440px; margin-right: auto; }
+.agentTrigger { display: flex; align-items: center; gap: 10px; max-width: min(440px, 100%); min-height: 44px; padding: 5px 10px; border: 1px solid transparent; border-radius: 10px; color: var(--ink-900); background: transparent; text-align: left; }
+.agentTrigger:hover:not(:disabled) { background: var(--violet-50); }
+.agentTrigger > svg { width: 16px; height: 16px; flex: none; color: var(--ink-500); }
+.agentName { min-width: 0; flex: 1; font-size: 18px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agentSwitcher .agentTrigger { max-width: 100%; }
+.page .header { flex-wrap: nowrap; }
+.identityAvatar { display: grid; place-items: center; width: 32px; height: 32px; flex: none; border-radius: 9px; background: var(--violet-100); color: var(--violet-700); font-size: 15px; }
+.identityAvatar img, .avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+.agentOptions { position: absolute; top: calc(100% + 8px); left: 0; z-index: 40; width: min(320px, calc(100vw - 100px)); max-height: 300px; overflow-y: auto; padding: 6px; border: 1px solid var(--line); border-radius: 12px; background: white; box-shadow: var(--shadow-md); }
+.agentOption { display: flex; align-items: center; gap: 12px; padding: 10px; min-height: 44px; border-radius: 7px; cursor: pointer; }
+.agentOption span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.agentOption svg { width: 18px; height: 18px; flex: none; color: var(--violet-600); }
+.agentOptionActive { background: var(--violet-50); }
+.activity { flex: none; color: var(--ink-500); font-size: 12px; }
+.latestButton { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 6px; white-space: nowrap; padding: 8px 12px; border: 1px solid var(--line); border-radius: 20px; color: var(--ink-700); background: white; box-shadow: var(--shadow-sm); }
+.latestButton svg { width: 16px; height: 16px; }
+.composerHint { text-align: center; font-size: 12px; color: var(--ink-500); }
+
 .chatMain {
   min-height: 0;
   min-width: 0;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr) auto;
   background: #fbfbfd;
 }
@@ -36,7 +56,7 @@
 }
 
 .conversationHeader {
-  min-height: 82px;
+  min-height: 64px;
   padding: 20px 16px 16px;
   display: flex;
   align-items: center;
@@ -61,6 +81,11 @@
 }
 
 .newConversation {
+  margin: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   min-height: var(--control-sm);
   padding: 0 12px;
   border: 1px solid var(--violet-200);
@@ -90,7 +115,7 @@
 
 .conversationItem {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 32px;
+  grid-template-columns: minmax(0, 1fr) 40px;
   align-items: center;
   margin-bottom: 4px;
   border: 1px solid transparent;
@@ -135,14 +160,14 @@
 }
 
 .conversationDelete {
-  width: 28px;
-  height: 28px;
+  width: 100%;
+  min-height: 40px;
   border: 0;
   border-radius: 7px;
   color: var(--ink-400);
   background: transparent;
-  font-size: 18px;
-  opacity: 0;
+  font-size: 13px;
+  opacity: 1;
 }
 
 .conversationItem:hover .conversationDelete,
@@ -386,6 +411,8 @@
 
 /* 三点波纹打字指示器 */
 .dot {
+  display: inline-block;
+  margin-right: 4px;
   width: 5px;
   height: 5px;
   border-radius: 50%;
@@ -412,6 +439,8 @@
 
 /* —— 底部：错误条 + 停止按钮 + 输入区 —— */
 .footer {
+  position: relative;
+  min-width: 0;
   display: grid;
   gap: 12px;
   padding: 8px 0 20px;
@@ -514,6 +543,8 @@
 .page.panelClosed { grid-template-columns: minmax(0, 1fr); }
 .panelClosed .conversationPanel { display: none; }
 .panelToggle, .panelClose { min-height: 40px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: white; color: var(--ink-700); }
+.panelToggle svg, .panelClose svg, .newConversation svg { width: 18px; height: 18px; }
+.panelToggle, .panelClose { display: grid; place-items: center; flex: none; width: 40px; border-color: transparent; background: transparent; }
 .panelBackdrop { display: none; }
 .header { min-height: 64px; gap: 10px; }
 .header > div { min-width: 0; margin-right: auto; }
