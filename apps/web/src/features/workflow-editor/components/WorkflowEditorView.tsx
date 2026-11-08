@@ -46,6 +46,11 @@ interface Props {
   workflowId: string;
 }
 
+const miniMapColors: Record<string, string> = {
+  start: '#10b981', llm: '#8066d9', condition: '#e8a632', loop: '#329dcc', end: '#8792a4',
+};
+const miniMapNodeColor = (node: Node) => miniMapColors[node.type ?? ''] ?? '#8792a4';
+
 const BASE = '/workspace/workflows';
 
 const nodeTypes = {
@@ -133,7 +138,7 @@ function WorkflowEditorInner({ workflowId }: Props) {
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
 
-  const [showRunDialog, setShowRunDialog] = useState(false);
+  const [runDialog, setRunDialog] = useState<'input' | 'result' | null>(null);
   const [runStatusMap, setRunStatusMap] = useState<Record<string, string>>({});
   const [runResult, setRunResult] = useState<WorkflowRunResult | null>(null);
 
@@ -434,7 +439,7 @@ function WorkflowEditorInner({ workflowId }: Props) {
       return;
     }
 
-    setShowRunDialog(true);
+    setRunDialog('input');
   };
 
   const handleRunComplete = (result: WorkflowRunResult) => {
@@ -510,7 +515,7 @@ function WorkflowEditorInner({ workflowId }: Props) {
           {runResult && (
             <button
               className="wf-btn wf-btn-outline"
-              onClick={() => setShowRunDialog(true)}
+              onClick={() => setRunDialog('result')}
               title="查看上次运行结果"
             >
               查看运行结果
@@ -575,7 +580,16 @@ function WorkflowEditorInner({ workflowId }: Props) {
           >
             <Background gap={22} size={1} color="#dcdee5" />
             <Controls />
-            <MiniMap />
+            <MiniMap
+              className="wf-minimap"
+              ariaLabel="工作流缩略图"
+              style={{ width: 156, height: 94 }}
+              nodeColor={miniMapNodeColor}
+              maskColor="rgba(111, 101, 161, 0.12)"
+              maskStrokeColor="#c6bfdf"
+              maskStrokeWidth={1}
+              pannable
+            />
           </ReactFlow>
         </div>
 
@@ -592,11 +606,12 @@ function WorkflowEditorInner({ workflowId }: Props) {
         )}
       </div>
 
-      {showRunDialog && (
+      {runDialog && (
         <RunDialog
           workflowId={workflowId}
           startNode={nodes.find((n) => n.type === 'start') || null}
-          onClose={() => setShowRunDialog(false)}
+          initialResult={runDialog === 'result' ? runResult : null}
+          onClose={() => setRunDialog(null)}
           onComplete={handleRunComplete}
         />
       )}
@@ -643,7 +658,7 @@ function WorkflowEditorInner({ workflowId }: Props) {
 
 export function WorkflowEditorView({ workflowId }: Props) {
   return (
-    <ReactFlowProvider>
+    <ReactFlowProvider key={workflowId}>
       <WorkflowEditorInner workflowId={workflowId} />
     </ReactFlowProvider>
   );

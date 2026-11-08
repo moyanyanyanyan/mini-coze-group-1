@@ -145,20 +145,19 @@ export function ConditionPanel({ data, nodeId, nodes, edges, loopContext,  onCha
               <span className="wf-branch-id">{b.id}</span>
               <select
                 className="wf-input"
+                aria-label="分支逻辑"
                 value={b.logic}
                 onChange={(e) =>
                   updateBranch(bIdx, { logic: e.target.value as ConditionLogic })
                 }
-                style={{ width: 80 }}
               >
-                <option value="and">AND</option>
-                <option value="or">OR</option>
+                <option value="and">满足全部条件</option>
+                <option value="or">满足任一条件</option>
               </select>
               <button
                 className="wf-link-btn"
                 onClick={() => addCondition(bIdx)}
                 type="button"
-                style={{ marginLeft: 'auto' }}
               >
                 + 条件
               </button>
@@ -179,16 +178,32 @@ export function ConditionPanel({ data, nodeId, nodes, edges, loopContext,  onCha
             {b.conditions.map((c, cIdx) => {
               const leftField = upstream.find((f) => f.ref === c.left);
               const ops = opsForFieldType(leftField?.type);
+              const booleanValue = leftField?.type === 'boolean' || leftField?.type === 'array<boolean>';
               const opValid = ops.includes(c.op);
+              const simpleBoolean = leftField?.type === 'boolean' && opValid;
+              const literal = c.right?.value;
+              const booleanChoice = c.right?.type === 'ref' ? c.op
+                : typeof literal === 'boolean' ? `${c.op}-${literal}` : '';
               return (
-                <div className="wf-cond-row" key={cIdx}>
+                <div className={`wf-cond-row${simpleBoolean ? ' wf-cond-boolean' : ''}`} key={cIdx}>
+                  <div className="wf-cond-heading">
+                    <span>条件 {cIdx + 1}</span>
+                    <button
+                      className="wf-icon-btn wf-btn-danger"
+                      onClick={() => removeCondition(bIdx, cIdx)}
+                      type="button"
+                      title="删除条件"
+                    >
+                      ×
+                    </button>
+                  </div>
                   <select
                     className="wf-input"
+                    aria-label="判断变量"
                     value={c.left}
                     onChange={(e) =>
                       updateCondition(bIdx, cIdx, { left: e.target.value })
                     }
-                    style={{ flex: 1.2 }}
                   >
                     <option value="">选择左值</option>
                     {upstream.map((f) => (
@@ -198,15 +213,44 @@ export function ConditionPanel({ data, nodeId, nodes, edges, loopContext,  onCha
                     ))}
                   </select>
 
+                  {simpleBoolean ? (
+                    <select
+                      className="wf-input wf-boolean-choice"
+                      aria-label="布尔判断"
+                      value={booleanChoice}
+                      onChange={(e) => {
+                        const choice = e.target.value;
+                        if (choice === 'eq' || choice === 'ne') {
+                          updateCondition(bIdx, cIdx, {
+                            op: choice,
+                            right: { type: 'ref', value: c.right?.type === 'ref' ? c.right.value : '' },
+                          });
+                        } else {
+                          updateCondition(bIdx, cIdx, {
+                            op: 'eq', right: { type: 'literal', value: choice === 'eq-true' },
+                          });
+                        }
+                      }}
+                    >
+                      <option value="" disabled>选择判断</option>
+                      <option value="eq-true">为真</option>
+                      <option value="eq-false">为假</option>
+                      {c.op === 'ne' && typeof literal === 'boolean' && (
+                        <option value={booleanChoice}>{literal ? '不等于真' : '不等于假'}</option>
+                      )}
+                      <option value="eq">等于变量</option>
+                      <option value="ne">不等于变量</option>
+                    </select>
+                  ) : (
                   <select
                     className="wf-input"
+                    aria-label="比较方式"
                     value={c.op}
                     onChange={(e) =>
                       updateCondition(bIdx, cIdx, {
                         op: e.target.value as ConditionOperator,
                       })
                     }
-                    style={{ flex: 0.9 }}
                   >
                     {ops.map((op) => (
                       <option key={op} value={op}>
@@ -217,10 +261,12 @@ export function ConditionPanel({ data, nodeId, nodes, edges, loopContext,  onCha
                       <option value={c.op}>{OP_LABEL[c.op]} (不适用)</option>
                     )}
                   </select>
+                  )}
 
-                  {needsRight(c.op) ? (
+                  {!simpleBoolean && needsRight(c.op) ? (
                     <select
                       className="wf-input"
+                      aria-label="比较值类型"
                       value={c.right?.type || 'literal'}
                       onChange={(e) => {
                         const t = e.target.value as 'literal' | 'ref';
@@ -231,16 +277,33 @@ export function ConditionPanel({ data, nodeId, nodes, edges, loopContext,  onCha
                               : { type: 'ref', value: '' },
                         });
                       }}
-                      style={{ flex: 0.7 }}
                     >
                       <option value="literal">固定值</option>
                       <option value="ref">变量</option>
                     </select>
                   ) : null}
 
-                  {needsRight(c.op) && c.right?.type === 'literal' && (
+                  {!simpleBoolean && needsRight(c.op) && c.right?.type === 'literal' && booleanValue && (
+                    <select
+                      className="wf-input"
+                      aria-label="比较值"
+                      value={typeof c.right.value === 'boolean' ? String(c.right.value) : ''}
+                      onChange={(e) =>
+                        updateCondition(bIdx, cIdx, {
+                          right: { type: 'literal', value: e.target.value === 'true' },
+                        })
+                      }
+                    >
+                      <option value="" disabled>选择布尔值</option>
+                      <option value="true">true</option>
+                      <option value="false">false</option>
+                    </select>
+                  )}
+
+                  {needsRight(c.op) && c.right?.type === 'literal' && !booleanValue && (
                     <input
                       className="wf-input"
+                      aria-label="比较值"
                       value={String(c.right.value ?? '')}
                       onChange={(e) =>
                         updateCondition(bIdx, cIdx, {
@@ -248,20 +311,19 @@ export function ConditionPanel({ data, nodeId, nodes, edges, loopContext,  onCha
                         })
                       }
                       placeholder="值"
-                      style={{ flex: 1 }}
                     />
                   )}
 
                   {needsRight(c.op) && c.right?.type === 'ref' && (
                     <select
                       className="wf-input"
+                      aria-label="比较变量"
                       value={c.right.value}
                       onChange={(e) =>
                         updateCondition(bIdx, cIdx, {
                           right: { type: 'ref', value: e.target.value },
                         })
                       }
-                      style={{ flex: 1 }}
                     >
                       <option value="">选择变量</option>
                       {upstream.map((f) => (
@@ -271,15 +333,6 @@ export function ConditionPanel({ data, nodeId, nodes, edges, loopContext,  onCha
                       ))}
                     </select>
                   )}
-
-                  <button
-                    className="wf-icon-btn wf-btn-danger"
-                    onClick={() => removeCondition(bIdx, cIdx)}
-                    type="button"
-                    title="删除条件"
-                  >
-                    ×
-                  </button>
                 </div>
               );
             })}
@@ -288,7 +341,7 @@ export function ConditionPanel({ data, nodeId, nodes, edges, loopContext,  onCha
 
         <div className="wf-branch-else">
           <span className="wf-branch-id">else</span>
-          <span>都不命中时走 else（固定出口，不需要配置）</span>
+          <span>所有分支均未命中时，走此出口。</span>
         </div>
       </div>
     </div>

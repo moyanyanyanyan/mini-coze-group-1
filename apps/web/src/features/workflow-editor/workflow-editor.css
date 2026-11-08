@@ -33,13 +33,13 @@
 
 @media (max-width: 1199px) {
   .wf-editor-body > .wf-node-palette { position: absolute; inset: 12px auto 12px 12px; width: min(260px, calc(100% - 24px)); z-index: 20; box-shadow: var(--shadow-md); }
-  .wf-editor-body > .wf-prop-panel { position: absolute; inset: 12px 12px 12px auto; width: min(320px, calc(100% - 24px)); z-index: 21; box-shadow: var(--shadow-md); }
+  .wf-editor-body > .wf-prop-panel { position: absolute; inset: 12px 12px 12px auto; width: min(404px, calc(100% - 24px)); z-index: 21; box-shadow: var(--shadow-md); }
 }
 @media (max-width: 767px) {
   .wf-editor-header { padding: 8px 12px !important; gap: 8px !important; }
   .wf-editor-actions { flex-wrap: wrap; }
   .wf-editor-title { min-width: 0; overflow-wrap: anywhere; }
-  .wf-input-row, .wf-output-row { grid-template-columns: minmax(0, 1fr) !important; }
+  .wf-output-row { grid-template-columns: minmax(0, 1fr) !important; }
 }
 
 /* ---------- 共用控件 ---------- */
@@ -373,6 +373,13 @@
   flex-wrap: wrap;
   gap: 6px;
 }
+.wf-model-output {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
 .wf-node-chip {
   font-size: 11px;
   color: #4e5969;
@@ -420,7 +427,9 @@
 
 /* 右侧配置面板 */
 .wf-prop-panel {
-  width: 320px;
+  container-type: inline-size;
+  width: clamp(360px, 28vw, 404px);
+  box-shadow: 0 4px 18px rgb(41 32 75 / 8%);
   min-height: 0;
   flex: none;
   background: #ffffff;
@@ -442,6 +451,8 @@
 }
 
 .wf-prop-head {
+  background: linear-gradient(110deg, #f5f3ff, #fff 78%);
+  overflow-wrap: anywhere;
   padding: 16px;
   border-bottom: 1px solid #e5e6eb;
   flex: none;
@@ -522,15 +533,71 @@
   cursor: pointer;
   font-family: inherit;
 }
+.wf-prop-panel .wf-link-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 30px;
+  padding: 3px 10px;
+  white-space: nowrap;
+  font-weight: 600;
+  border: 1px solid #dcd6f4;
+  border-radius: 8px;
+  background: #f8f6ff;
+  box-shadow: 0 1px 2px rgb(49 31 88 / 8%);
+}
+.wf-prop-panel .wf-link-btn:hover {
+  background: #ede8ff;
+  border-color: #b7a6eb;
+  text-decoration: none;
+}
+.wf-prop-panel :is(.wf-panel-close, .wf-icon-btn, .wf-btn-outline) {
+  border: 1px solid #dedce8;
+  border-radius: 9px;
+  box-shadow: 0 2px 4px rgb(49 31 88 / 7%);
+  background: #fff;
+}
+.wf-prop-panel .wf-btn-danger:hover {
+  background: #fff3f3;
+  color: #b32738;
+  border-color: #ebaeb4;
+}
+.wf-prop-panel button:focus-visible {
+  outline: 2px solid var(--violet-600);
+  outline-offset: 2px;
+}
+.wf-prop-panel button:active:not(:disabled) { box-shadow: inset 0 1px 3px rgb(49 31 88 / 16%); }
 .wf-link-btn:hover {
   text-decoration: underline;
 }
 
 .wf-input-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 70px auto 32px;
-  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "name remove" "type required";
+  gap: 8px;
+  padding: 10px;
+  background: #f8f8fc;
+  border: 1px solid #e4e3ed;
+  border-radius: 12px;
   align-items: center;
+}
+.wf-input-row > input { grid-area: name; }
+.wf-input-row > select:first-of-type { grid-area: type; }
+.wf-input-row > .wf-checkbox { grid-area: required; }
+.wf-input-row > .wf-icon-btn { grid-area: remove; justify-self: end; }
+.wf-input-row > .wf-input { min-width: 0; }
+.wf-loop-output {
+  grid-template-columns: minmax(0, 1fr) 156px auto;
+  grid-template-areas: "name type remove" "source source source";
+}
+.wf-loop-output > select:last-of-type { grid-area: source; }
+@container (max-width: 380px) {
+  .wf-loop-output {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "name remove" "type type" "source source";
+  }
 }
 .wf-output-row {
   display: grid;
@@ -573,6 +640,24 @@
 .wf-editor-body .wf-canvas-wrap {
   flex: 1;
   min-width: 0;
+}
+.wf-canvas-wrap .wf-minimap {
+  margin: 0 14px 26px 0;
+  border: 1px solid #d5d0e5;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgb(45 35 76 / 13%);
+  cursor: grab;
+}
+.wf-canvas-wrap .wf-minimap:hover {
+  border-color: #a999d6;
+  box-shadow: 0 6px 20px rgb(45 35 76 / 19%);
+}
+.wf-canvas-wrap .wf-minimap:active { cursor: grabbing; }
+@media (prefers-reduced-motion: no-preference) {
+  .wf-minimap, .wf-prop-panel button {
+    transition: background-color 150ms, border-color 150ms, box-shadow 150ms;
+  }
 }
 /* ---------- 左侧节点库 ---------- */
 .wf-node-palette {
@@ -720,6 +805,22 @@
   font-family: monospace;
 }
 
+.wf-run-text {
+  padding: 14px 16px;
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
+  font-size: 15px;
+  line-height: 1.85;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.wf-run-details summary {
+  cursor: pointer;
+}
+.wf-run-details .wf-run-id {
+  margin: 8px 0;
+  overflow-wrap: anywhere;
+}
 .wf-run-output {
   margin: 0;
   padding: 12px;
@@ -975,9 +1076,13 @@
   align-items: center;
   gap: 5px;
   padding: 4px 9px;
-  background: #eef0fe;
-  border: 1px solid transparent;
-  border-radius: 6px;
+  max-width: 100%;
+  min-height: 30px;
+  overflow-wrap: anywhere;
+  background: #faf9ff;
+  border: 1px solid #ded8f3;
+  border-radius: 9px;
+  box-shadow: 0 1px 3px rgb(49 31 88 / 9%);
   cursor: pointer;
   font-family: inherit;
   transition: border-color 0.12s, background 0.12s;
@@ -993,8 +1098,10 @@
   font-weight: 500;
 }
 .wf-var-chip-node {
-  font-size: 11px;
-  color: #86909c;
+  padding-left: 6px;
+  border-left: 1px solid #ded8f3;
+  font-size: 12px;
+  color: #605b70;
 }
 
 /* ---------- 新节点卡片颜色 ---------- */
@@ -1014,29 +1121,25 @@
 .wf-branch-head {
   display: flex;
   align-items: center;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .wf-branch-id {
-  width: 22px;
-  height: 22px;
+  max-width: 100%;
+  padding: 4px 8px;
   border-radius: 6px;
   background: #fef3e2;
-  color: #f59e0b;
-  font-size: 11px;
+  color: #945509;
+  font-size: 12px;
   font-weight: 700;
-  display: grid;
-  place-items: center;
-  flex: none;
+  overflow-wrap: anywhere;
   text-transform: uppercase;
 }
 .wf-branch-head .wf-input {
-  flex: 1;
+  width: auto;
   padding: 6px 8px;
-  font-size: 12px;
 }
-.wf-branch-head .wf-icon-btn {
-  flex: none;
-}
+.wf-branch-head .wf-link-btn { margin-left: auto; }
 
 /* ---------- 条件节点多出口 ---------- */
 .wf-node-condition {
@@ -1045,15 +1148,40 @@
 
 /* ---------- 条件面板 ---------- */
 .wf-cond-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.wf-cond-heading {
   display: flex;
-  gap: 6px;
   align-items: center;
-  padding: 6px 0;
-}
-.wf-cond-row .wf-input {
-  padding: 6px 8px;
+  justify-content: space-between;
+  color: #596375;
   font-size: 12px;
+  font-weight: 600;
 }
+.wf-cond-heading,
+.wf-cond-row > select:first-of-type,
+.wf-cond-row > :last-child {
+  grid-column: 1 / -1;
+}
+.wf-cond-row > .wf-input {
+  min-width: 0;
+  padding-inline: 8px;
+}
+.wf-cond-row.wf-cond-boolean {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.wf-cond-boolean > select:first-of-type,
+.wf-cond-boolean > select.wf-boolean-choice {
+  grid-column: auto;
+}
+@container (max-width: 310px) {
+  .wf-cond-row, .wf-cond-row.wf-cond-boolean { grid-template-columns: minmax(0, 1fr); }
+}
+.wf-branch-else .wf-branch-id { flex: none; }
 .wf-branch-else {
   display: flex;
   align-items: center;

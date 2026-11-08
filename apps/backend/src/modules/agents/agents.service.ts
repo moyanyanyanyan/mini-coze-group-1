@@ -175,6 +175,13 @@ export class AgentsService {
       throw new InternalServerErrorException('Agent 发布配置无效');
     }
 
+    // 发布快照保留历史配置，运行时跳过已删除的库，其他库仍由检索入口校验权限。
+    if (config.knowledgeBaseIds.length) {
+      const bases = await this.knowledgeCatalog.findByIds(config.knowledgeBaseIds);
+      const existingIds = new Set(bases.map((base) => base.id));
+      config.knowledgeBaseIds = config.knowledgeBaseIds.filter((id) => existingIds.has(id));
+    }
+
     return {
       agentId: agent.id,
       ownerId: agent.ownerId,

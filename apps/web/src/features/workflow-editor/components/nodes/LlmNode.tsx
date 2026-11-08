@@ -1,6 +1,7 @@
 import React from 'react';
 import { Icon } from '../../../../shared/ui/Icon';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { getNodeOutputs } from '../../utils/upstream';
 
 const STATUS_TEXT: Record<string, string> = {
   PENDING: '待运行',
@@ -10,7 +11,7 @@ const STATUS_TEXT: Record<string, string> = {
   SKIPPED: '跳过',
 };
 
-export function LlmNode({ data }: NodeProps) {
+export function LlmNode({ id, data }: NodeProps) {
   const d = data as {
     label?: string;
     model?: string;
@@ -46,6 +47,12 @@ export function LlmNode({ data }: NodeProps) {
         <span className="wf-node-chip">T {d.temperature ?? 0.7}</span>
         <span className="wf-node-chip">Max {d.maxTokens ?? 2048}</span>
       </div>
+      {getNodeOutputs({ type: 'llm', data }).map((field) => (
+        <div className="wf-model-output" key={field.name}>
+          <div>{field.name === 'text' ? '输出 · 模型回答' : '输出'}（{field.type}）</div>
+          <code>{id}.{field.name}</code>
+        </div>
+      ))}
     </div>
   );
 }

@@ -8,8 +8,8 @@ import {
 } from '@nestjs/common';
 import { AgentsService } from './agents.service';
 
-function createService(prisma: Record<string, unknown>) {
-  return new AgentsService(prisma as never, {} as never, {} as never);
+function createService(prisma: Record<string, unknown>, knowledgeIds: string[] = []) {
+  return new AgentsService(prisma as never, { findByIds: async () => knowledgeIds.map((id) => ({ id })) } as never, {} as never);
 }
 
 const publishedConfig = {
@@ -27,6 +27,7 @@ const publishedConfig = {
 describe('AgentsService.getPublicAgent', () => {
   it.each([
     { snapshot: publishedConfig, current: 0, expected: 0 },
+    { snapshot: { ...publishedConfig, knowledgeBaseIds: ['kb-1', 'deleted'] }, current: 0, expected: 0 },
     { snapshot: { ...publishedConfig, contextLimit: 0 }, current: 20, expected: 0 },
     { snapshot: { ...publishedConfig, contextLimit: 5 }, current: 0, expected: 5 },
   ])('从发布快照读取历史轮数，旧快照使用 Agent 当前轮数', async ({ snapshot, current, expected }) => {
@@ -49,7 +50,7 @@ describe('AgentsService.getPublicAgent', () => {
       },
     };
 
-    await expect(createService(prisma).getPublicAgent('agent-1')).resolves.toEqual({
+    await expect(createService(prisma, ['kb-1']).getPublicAgent('agent-1')).resolves.toEqual({
       agentId: 'agent-1',
       ownerId: 'user-1',
       status: 'ACTIVE',

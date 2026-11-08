@@ -12,6 +12,7 @@ import type {
 interface Props {
   workflowId: string;
   startNode: Node | null;
+  initialResult: WorkflowRunResult | null;
   onClose: () => void;
   onComplete: (result: WorkflowRunResult) => void;
 }
@@ -73,7 +74,7 @@ function buildPayload(
   return { payload };
 }
 
-export function RunDialog({ workflowId, startNode, onClose, onComplete }: Props) {
+export function RunDialog({ workflowId, startNode, initialResult, onClose, onComplete }: Props) {
   const inputs = startNode
     ? ((startNode.data as unknown as StartNodeData).inputs || [])
     : [];
@@ -86,7 +87,7 @@ export function RunDialog({ workflowId, startNode, onClose, onComplete }: Props)
     return init;
   });
   const [running, setRunning] = useState(false);
-  const [result, setResult] = useState<WorkflowRunResult | null>(null);
+  const [result, setResult] = useState<WorkflowRunResult | null>(initialResult);
   const [error, setError] = useState<string | null>(null);
 
   const setValue = (name: string, v: string) => {
@@ -164,13 +165,18 @@ export function RunDialog({ workflowId, startNode, onClose, onComplete }: Props)
     return inp.type;
   };
 
+  const fields = Object.values(result?.output ?? {});
+  const textOutput = fields.length === 1 && typeof fields[0] === 'string'
+    ? fields[0]
+    : null;
+
   return (
     <div className="wf-modal-mask" onClick={onClose}>
       <div
         className="wf-modal wf-run-modal"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3>运行工作流</h3>
+        <h3>{result ? '运行结果' : '运行工作流'}</h3>
 
         {!result && (
           <>
@@ -214,18 +220,20 @@ export function RunDialog({ workflowId, startNode, onClose, onComplete }: Props)
                   ? '✗ 运行失败'
                   : result.status}
               </span>
-              <span className="wf-run-id">Run ID: {result.runId}</span>
             </div>
 
             <div className="wf-form-field">
               <span>最终输出</span>
-              <pre className="wf-run-output">
-                {JSON.stringify(result.output, null, 2)}
-              </pre>
+              {textOutput !== null ? (
+                <div className="wf-run-text">{textOutput || '（空文本）'}</div>
+              ) : (
+                <pre className="wf-run-output">{JSON.stringify(result.output, null, 2)}</pre>
+              )}
             </div>
 
-            <div className="wf-form-field">
-              <span>节点执行</span>
+            <details className="wf-run-details" open={result.status === 'FAILED'}>
+              <summary>执行详情</summary>
+              <div className="wf-run-id">Run ID: {result.runId}</div>
               <div className="wf-node-results">
                 {result.nodeResults.map((nr, idx) => (
                   <div key={`${nr.nodeId}-${idx}`} className="wf-node-result-item">
@@ -249,7 +257,7 @@ export function RunDialog({ workflowId, startNode, onClose, onComplete }: Props)
                   </div>
                 ))}
               </div>
-            </div>
+            </details>
 
             {result.error && (
               <div className="wf-form-error">
