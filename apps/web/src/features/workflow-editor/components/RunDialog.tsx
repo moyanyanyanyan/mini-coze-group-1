@@ -74,6 +74,15 @@ function buildPayload(
   return { payload };
 }
 
+/** 将输出值按原有顺序展开成正文，保留文本中的换行。 */
+function formatOutput(value: unknown): string {
+  if (value == null) return '';
+  if (typeof value === 'object') {
+    return Object.values(value).map(formatOutput).filter(Boolean).join('\n\n');
+  }
+  return String(value);
+}
+
 export function RunDialog({ workflowId, startNode, initialResult, onClose, onComplete }: Props) {
   const inputs = startNode
     ? ((startNode.data as unknown as StartNodeData).inputs || [])
@@ -165,10 +174,7 @@ export function RunDialog({ workflowId, startNode, initialResult, onClose, onCom
     return inp.type;
   };
 
-  const fields = Object.values(result?.output ?? {});
-  const textOutput = fields.length === 1 && typeof fields[0] === 'string'
-    ? fields[0]
-    : null;
+  const textOutput = formatOutput(result?.output);
 
   return (
     <div className="wf-modal-mask" onClick={onClose}>
@@ -224,11 +230,7 @@ export function RunDialog({ workflowId, startNode, initialResult, onClose, onCom
 
             <div className="wf-form-field">
               <span>最终输出</span>
-              {textOutput !== null ? (
-                <div className="wf-run-text">{textOutput || '（空文本）'}</div>
-              ) : (
-                <pre className="wf-run-output">{JSON.stringify(result.output, null, 2)}</pre>
-              )}
+              <div className="wf-run-text">{textOutput || '（空文本）'}</div>
             </div>
 
             <details className="wf-run-details" open={result.status === 'FAILED'}>
