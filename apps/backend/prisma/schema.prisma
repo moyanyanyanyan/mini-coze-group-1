@@ -114,6 +114,9 @@ model KnowledgeBaseAgentBinding {
 
   agent Agent @relation(fields: [agentId], references: [id])
 
+  knowledgeBase KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+
+  @@index([knowledgeBaseId])
   @@unique([agentId, knowledgeBaseId])
 }
 

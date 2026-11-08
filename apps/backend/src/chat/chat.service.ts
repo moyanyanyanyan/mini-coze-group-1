@@ -10,12 +10,12 @@ import { ErrorCode } from '../common/errors/error-codes';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConversationsService } from '../modules/conversations/conversations.service';
 import { MessagesService } from '../modules/conversations/messages.service';
+import type { RuntimeAgentConfig } from '../modules/agents/types';
 import { AgentsService } from '../modules/agents/agents.service';
 import {
   RuntimeClientService,
   RuntimeCallError,
   isRuntimeResult,
-  type RuntimeAgentConfig,
   type RuntimeHistoryMessage,
   type RuntimeRequestBody,
   type RuntimeResult,
@@ -23,7 +23,19 @@ import {
 } from './runtime-client.service';
 
 /** 契约规定：history 最多 20 条 = 10 个完整问答对 */
-const HISTORY_LIMIT = 20;
+const MAX_HISTORY_TURNS = 10;
+const MAX_HISTORY_CONTENT = 8000;
+
+function historyExcerpt(content: string): string {
+  if (content.length <= MAX_HISTORY_CONTENT) return content;
+  // Runtime 按 Unicode 码点计数，避免截断表情的代理对。数据库保留完整原文。
+  const chars = Array.from(content);
+  if (chars.length <= MAX_HISTORY_CONTENT) return content;
+  const marker = '…（中间已省略）…';
+  const available = MAX_HISTORY_CONTENT - marker.length;
+  const head = Math.ceil(available / 2);
+  return chars.slice(0, head).join('') + marker + chars.slice(-(available - head)).join('');
+}
 
 export interface RunChatInput {
   conversationId: string;
@@ -481,7 +493,8 @@ export class ChatService {
       return { userMessage, assistantMessage };
     });
 
-    const history = await this.buildHistory(input.conversationId, [
+    const { contextLimit = MAX_HISTORY_TURNS, ...runtimeConfig } = input.agentConfig;
+    const history = await this.buildHistory(input.conversationId, contextLimit, [
       turn.userMessage.id,
       turn.assistantMessage.id,
     ]);
@@ -493,7 +506,7 @@ export class ChatService {
         conversationId: input.conversationId,
         userMessageId: turn.userMessage.id,
         assistantMessageId: turn.assistantMessage.id,
-        agentConfig: input.agentConfig,
+        agentConfig: runtimeConfig,
         history,
         message: input.content,
       },
@@ -510,8 +523,10 @@ export class ChatService {
    */
   private async buildHistory(
     conversationId: string,
+    contextLimit: number,
     excludeIds: string[],
   ): Promise<RuntimeHistoryMessage[]> {
+    if (contextLimit === 0) return [];
     const rows = await this.prisma.message.findMany({
       where: {
         conversationId,
@@ -542,8 +557,10 @@ export class ChatService {
       }
     }
 
-    // 只留最近 10 对 = 20 条
-    return pairs.slice(-HISTORY_LIMIT);
+    const turns = Math.min(contextLimit, MAX_HISTORY_TURNS);
+    return pairs.slice(-2 * turns).map((message) => ({
+      ...message, content: historyExcerpt(message.content),
+    }));
   }
 
   /** 落库。返回 false 表示写失败，调用方据此发 PERSISTENCE_FAILED */

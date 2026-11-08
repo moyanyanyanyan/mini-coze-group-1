@@ -1,8 +1,10 @@
+import { plainToInstance } from 'class-transformer';
+import { UpdateAgentDto } from './dto/update-agent.dto';
 import { AgentsService } from './agents.service';
 
 function setup(status = 'ACTIVE') {
   const agent = {
-    id: 'agent-1', ownerId: 'user-1', status, name: 'Agent',
+    id: 'agent-1', ownerId: 'user-1', workspaceId: 'workspace-1', status, name: 'Agent',
     systemPrompt: '', model: 'deepseek-chat', temperature: 0.7, maxTokens: 1024,
     createdAt: new Date(), updatedAt: new Date(), currentVersionId: 'version-1',
     pluginBindings: [{ id: 'binding-1', pluginId: 'plugin_echo', enabled: true, autoInvoke: false, sortOrder: 7, config: { legacy: 'keep' } }],
@@ -28,6 +30,7 @@ function setup(status = 'ACTIVE') {
       deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
       createMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
+    workflow: { count: jest.fn() },
     agentWorkflow: {
       deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
       createMany: jest.fn().mockResolvedValue({ count: 0 }),
@@ -143,5 +146,28 @@ it('清空绑定只删除该智能体的绑定并生成空插件快照', async (
   expect(tx.agentPluginBinding.upsert).not.toHaveBeenCalled();
   expect(tx.agentVersion.create).toHaveBeenCalledWith({ data: expect.objectContaining({
     snapshot: expect.objectContaining({ pluginIds: [] }),
+  }) });
+});
+
+it('只允许绑定同一创建者和工作区内未归档的工作流，整批校验后才替换', async () => {
+  const { service, tx } = setup('DRAFT');
+  const bindings = [{ workflowId: 'wf-1' }, { workflowId: 'wf-2' }];
+  tx.workflow.count.mockResolvedValueOnce(1).mockResolvedValueOnce(2);
+  await expect(service.replaceWorkflowBindings('agent-1', { bindings }, user)).rejects.toThrow('工作流不存在或无权绑定');
+  expect(tx.workflow.count).toHaveBeenCalledWith({ where: {
+    id: { in: ['wf-1', 'wf-2'] }, creatorId: user.id, workspaceId: 'workspace-1', status: { not: 'ARCHIVED' },
+  } });
+  expect(tx.agentWorkflow.deleteMany).not.toHaveBeenCalled();
+  await service.replaceWorkflowBindings('agent-1', { bindings }, user);
+  expect(tx.agentWorkflow.createMany).toHaveBeenCalledTimes(1);
+});
+
+it('发布事务使用本次编辑的提示词，并保存清空的开场白', async () => {
+  const { service, tx, agent } = setup('DRAFT');
+  Object.assign(agent, { openingMessage: '旧开场白' });
+  await service.update('agent-1', plainToInstance(UpdateAgentDto, { status: 'ACTIVE', systemPrompt: '新提示词', openingMessage: '' }), user);
+  expect(agent).toMatchObject({ openingMessage: '' });
+  expect(tx.agentVersion.create).toHaveBeenCalledWith({ data: expect.objectContaining({
+    snapshot: expect.objectContaining({ systemPrompt: '新提示词' }),
   }) });
 });

@@ -6,7 +6,8 @@
 .plugins-page {
   min-height: 100%;
   color: var(--ink-900);
-  padding-bottom: 48px;
+  padding-bottom: 64px;
+  background: #f8f8fb;
 }
 
 /* ---------- Header（顶部条，样式对齐 landing/workspace 头） ---------- */
@@ -16,8 +17,8 @@
   top: 0;
   z-index: 20;
   border-bottom: 1px solid var(--line);
-  background: rgb(253 252 255 / 0.92);
-  backdrop-filter: blur(8px);
+  background: rgb(248 248 251 / 0.92);
+  backdrop-filter: blur(14px);
 }
 
 .pm-header-inner {
@@ -25,17 +26,24 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  height: 56px;
-  padding: 0 28px;
+  width: min(100%, var(--page-max));
+  min-height: 92px;
+  margin-inline: auto;
+  padding: 18px var(--page-gutter);
 }
 
-.pm-header-brand {
-  border-radius: 8px;
-  padding: 6px 12px;
-  color: var(--violet-600);
-  background: var(--violet-50);
+.pm-header h1 {
+  margin: 0;
+  color: var(--ink-900);
+  font-size: 24px;
+  font-weight: 680;
+  letter-spacing: -0.03em;
+}
+
+.pm-header p {
+  margin: 6px 0 0;
+  color: var(--ink-500);
   font-size: 14px;
-  font-weight: 620;
 }
 
 .pm-header-actions {
@@ -47,7 +55,57 @@
 /* ---------- 主体 ---------- */
 
 .pm-main {
-  padding: 0 28px;
+  width: min(100%, var(--page-max));
+  margin-inline: auto;
+  padding: 0 var(--page-gutter);
+}
+
+.pm-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 0 4px;
+}
+
+.pm-search {
+  width: min(360px, 100%);
+  height: var(--control-md);
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--ink-900);
+  background: var(--surface-raised);
+  font-size: 14px;
+}
+
+.pm-search:focus {
+  outline: 3px solid var(--focus-ring);
+  border-color: var(--violet-400);
+}
+
+.pm-filters {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+
+.pm-filters button {
+  min-height: var(--control-sm);
+  padding: 0 12px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--ink-600);
+  background: transparent;
+  font-size: 13px;
+}
+
+.pm-filters button.is-active {
+  color: var(--violet-700);
+  background: var(--violet-50);
+  font-weight: 650;
 }
 
 .pm-status {
@@ -61,7 +119,7 @@
 }
 
 .pm-section {
-  margin-top: 28px;
+  margin-top: 24px;
 }
 
 .pm-section h2 {
@@ -73,27 +131,27 @@
 
 .pm-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
   gap: 16px;
 }
 
 /* ---------- 插件卡片 ---------- */
 
 .pm-card {
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: #fff;
-  padding: 16px;
-  box-shadow: 0 1px 2px rgb(37 34 50 / 0.04);
-  transition: border-color 180ms ease, box-shadow 180ms ease;
+  min-height: 0;
+  padding: 18px;
 }
+.pm-technical { min-width: 0; overflow-wrap: anywhere; font-size: 12px; color: var(--ink-500); }
+.pm-technical summary { cursor: pointer; padding-block: 6px; }
+.pm-technical ul { margin: 6px 0; padding-inline-start: 18px; }
+.pm-technical code { display: block; padding: 8px 0; overflow-wrap: anywhere; }
 
-.pm-card:hover {
-  border-color: var(--violet-300);
-  box-shadow: 0 4px 16px rgb(111 86 217 / 0.08);
-}
 
 .pm-card-head {
   display: flex;
@@ -163,20 +221,72 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
-  margin: 6px 0 0;
+  margin: 14px 0 0;
   color: var(--ink-500);
   font-size: 13px;
   line-height: 1.625;
 }
 
+.pm-card-meta {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--ink-400);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .pm-card-foot {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
   gap: 8px;
-  margin-top: 14px;
+  margin-top: auto;
   border-top: 1px solid var(--line-soft);
   padding-top: 12px;
+}
+
+.pm-plugin-kind {
+  color: var(--ink-500);
+  font-size: 12px;
+}
+
+.pm-skeleton-grid {
+  margin-top: 24px;
+}
+
+.pm-skeleton {
+  min-height: 196px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: linear-gradient(90deg, #f2f1f5 25%, #fafafd 40%, #f2f1f5 65%);
+  background-size: 300% 100%;
+  animation: pm-shimmer 1.4s ease infinite;
+}
+
+@keyframes pm-shimmer {
+  to { background-position: -100% 0; }
+}
+
+.pm-empty {
+  min-height: 240px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 6px;
+  color: var(--ink-500);
+  text-align: center;
+}
+
+.pm-empty strong {
+  color: var(--ink-800);
+  font-size: 15px;
+}
+
+.pm-empty span {
+  font-size: 13px;
 }
 
 .pm-cap-list {
@@ -485,11 +595,24 @@
 
 @media (max-width: 900px) {
   .pm-grid {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
   }
 }
 
 @media (max-width: 720px) {
+  .pm-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .pm-filters {
+    overflow-x: auto;
+  }
+
+  .pm-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .pm-header-inner,
   .pm-main {
     padding-right: 20px;

@@ -2,28 +2,196 @@
   position: relative;
   z-index: 1;
   display: grid;
-  /* 头部和输入区固定，中间消息区自己滚 */
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  height: 100vh;
+  grid-template-columns: 224px minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
   padding: 0;
+  background: var(--surface-raised);
 }
 
-/* 三个区域共用一条 860px 的中轴，聊天像文档一样立起来 */
+.header .agentSwitcher { position: relative; min-width: 0; flex: 1; max-width: 440px; margin-right: auto; }
+.agentTrigger { display: flex; align-items: center; gap: 10px; max-width: min(440px, 100%); min-height: 44px; padding: 5px 10px; border: 1px solid transparent; border-radius: 10px; color: var(--ink-900); background: transparent; text-align: left; }
+.agentTrigger:hover:not(:disabled) { background: var(--violet-50); }
+.agentTrigger > svg { width: 16px; height: 16px; flex: none; color: var(--ink-500); }
+.agentName { min-width: 0; flex: 1; font-size: 18px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agentSwitcher .agentTrigger { max-width: 100%; }
+.page .header { flex-wrap: nowrap; }
+.identityAvatar { display: grid; place-items: center; width: 32px; height: 32px; flex: none; border-radius: 9px; background: var(--violet-100); color: var(--violet-700); font-size: 15px; }
+.identityAvatar img, .avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+.agentOptions { position: absolute; top: calc(100% + 8px); left: 0; z-index: 40; width: min(320px, calc(100vw - 100px)); max-height: 300px; overflow-y: auto; padding: 6px; border: 1px solid var(--line); border-radius: 12px; background: white; box-shadow: var(--shadow-md); }
+.agentOption { display: flex; align-items: center; gap: 12px; padding: 10px; min-height: 44px; border-radius: 7px; cursor: pointer; }
+.agentOption span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.agentOption svg { width: 18px; height: 18px; flex: none; color: var(--violet-600); }
+.agentOptionActive { background: var(--violet-50); }
+.activity { flex: none; color: var(--ink-500); font-size: 12px; }
+.latestButton { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 6px; white-space: nowrap; padding: 8px 12px; border: 1px solid var(--line); border-radius: 20px; color: var(--ink-700); background: white; box-shadow: var(--shadow-sm); }
+.latestButton svg { width: 16px; height: 16px; }
+.composerHint { text-align: center; font-size: 12px; color: var(--ink-500); }
+
+.chatMain {
+  min-height: 0;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background: #fbfbfd;
+}
+
+/* 消息内容保持舒适阅读宽度，工作区本身铺满。 */
 .header,
 .stream,
 .footer {
-  width: min(860px, calc(100% - 48px));
+  width: min(800px, calc(100% - 40px));
   margin-inline: auto;
+}
+
+.conversationPanel {
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--line);
+  background: #f6f5fa;
+}
+
+.conversationHeader {
+  min-height: 64px;
+  padding: 20px 16px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.conversationHeader > div {
+  display: grid;
+  gap: 3px;
+}
+
+.conversationHeader strong {
+  color: var(--ink-900);
+  font-size: 16px;
+}
+
+.conversationHeader span {
+  color: var(--ink-500);
+  font-size: 12px;
+}
+
+.newConversation {
+  margin: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: var(--control-sm);
+  padding: 0 12px;
+  border: 1px solid var(--violet-200);
+  border-radius: var(--radius-sm);
+  color: var(--violet-700);
+  background: var(--surface-raised);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.newConversation:hover:not(:disabled) {
+  border-color: var(--violet-400);
+  background: var(--violet-50);
+}
+
+.newConversation:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.conversationList {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px;
+}
+
+.conversationItem {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 40px;
+  align-items: center;
+  margin-bottom: 4px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+}
+
+.conversationItem:hover,
+.conversationItemActive {
+  border-color: var(--line);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-xs);
+}
+
+.conversationItemActive {
+  border-color: var(--violet-200);
+}
+
+.conversationSelect {
+  min-width: 0;
+  min-height: 54px;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  padding: 8px 6px 8px 10px;
+  border: 0;
+  color: var(--ink-800);
+  background: transparent;
+  text-align: left;
+}
+
+.conversationSelect span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.conversationSelect small {
+  color: var(--ink-400);
+  font-size: 12px;
+}
+
+.conversationDelete {
+  width: 100%;
+  min-height: 40px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--ink-400);
+  background: transparent;
+  font-size: 13px;
+  opacity: 1;
+}
+
+.conversationItem:hover .conversationDelete,
+.conversationDelete:focus-visible {
+  opacity: 1;
+}
+
+.conversationDelete:hover {
+  color: var(--danger-600);
+  background: var(--danger-100);
 }
 
 /* —— 头部 —— */
 .header {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
+  align-items: center;
   gap: 16px;
-  padding: 24px 0 16px;
+  min-height: 82px;
+  padding: 14px 0;
   border-bottom: 1px solid var(--line);
+}
+
+.header > div:first-child {
+  margin-right: auto;
 }
 
 .title {
@@ -37,6 +205,24 @@
 .subtitle {
   margin: 5px 0 0;
   color: var(--ink-500);
+  font-size: 13px;
+}
+
+.agentPicker {
+  display: grid;
+  gap: 4px;
+  color: var(--ink-500);
+  font-size: 12px;
+}
+
+.agentPicker select {
+  min-width: 180px;
+  height: var(--control-sm);
+  padding: 0 32px 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--ink-800);
+  background: var(--surface-raised);
   font-size: 13px;
 }
 
@@ -69,11 +255,12 @@
 
 /* —— 消息流：沉浸式，无边框无底色 —— */
 .stream {
+  min-height: 0;
   overflow-y: auto;
   display: grid;
   align-content: start;
   gap: 20px;
-  padding: 26px 0 20px;
+  padding: 28px 0 24px;
   scrollbar-width: thin;
   scrollbar-color: var(--line-strong) transparent;
 }
@@ -86,6 +273,16 @@
   margin: auto 0;
   padding: 48px 24px;
   text-align: center;
+}
+
+.createAgent {
+  margin-top: 12px;
+  padding: 10px 18px;
+  border-radius: 9px;
+  background: var(--violet-600);
+  color: white;
+  font-weight: 600;
+  text-decoration: none;
 }
 
 .emptyIcon {
@@ -117,6 +314,34 @@
   line-height: 1.8;
 }
 
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.suggestions button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  color: var(--ink-700);
+  background: var(--surface-raised);
+  font-size: 13px;
+}
+
+.suggestions button:hover:not(:disabled) {
+  border-color: var(--violet-300);
+  color: var(--violet-700);
+  background: var(--violet-50);
+}
+
+.suggestions button:disabled {
+  opacity: 0.5;
+}
+
 /* —— 消息行 —— */
 .row {
   display: flex;
@@ -132,8 +357,8 @@
 .avatar {
   flex: none;
   display: grid;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   place-items: center;
   margin-top: 2px;
   border-radius: var(--radius-sm);
@@ -152,7 +377,7 @@
 }
 
 .bubble {
-  max-width: min(560px, 78%);
+  max-width: min(680px, 82%);
   padding: 11px 15px;
   border: 1px solid transparent;
   font-size: 14px;
@@ -164,19 +389,26 @@
 
 /* 用户：品牌紫实底白字，一眼分清两侧 */
 .bubbleUser {
-  border-color: var(--violet-700);
+  border-color: transparent;
   border-radius: 14px 4px 14px 14px;
-  color: #fff;
-  background: var(--violet-600);
+  color: var(--ink-900);
+  background: var(--violet-100);
 }
 
 /* AI：白底细边框，回答是阅读主体，要像卡片一样干净 */
 .bubbleAssistant {
-  border-color: var(--line);
+  border-color: transparent;
   border-radius: 4px 14px 14px 14px;
   color: var(--ink-800);
-  background: var(--surface-raised);
-  box-shadow: var(--shadow-xs);
+  background: transparent;
+  box-shadow: none;
+}
+
+.citations {
+  margin: 8px 0 0 40px;
+  color: var(--ink-500);
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .bubblePending {
@@ -189,6 +421,8 @@
 
 /* 三点波纹打字指示器 */
 .dot {
+  display: inline-block;
+  margin-right: 4px;
   width: 5px;
   height: 5px;
   border-radius: 50%;
@@ -215,9 +449,11 @@
 
 /* —— 底部：错误条 + 停止按钮 + 输入区 —— */
 .footer {
+  position: relative;
+  min-width: 0;
   display: grid;
   gap: 12px;
-  padding: 4px 0 26px;
+  padding: 8px 0 20px;
 }
 
 /* 输入区：一张浮在页面上的纸 */
@@ -241,7 +477,9 @@
 .textarea {
   flex: 1;
   min-height: 42px;
-  max-height: 132px;
+  max-height: 160px;
+  min-width: 0;
+  overflow-y: auto;
   padding: 10px 4px;
   border: 0;
   color: var(--ink-900);
@@ -306,8 +544,36 @@
 
 /* —— 停止生成：小方块符号 + 胶囊 —— */
 .stopRow {
+  min-height: 32px;
+  gap: 8px;
   display: flex;
   justify-content: center;
+}
+
+.page.panelClosed { grid-template-columns: minmax(0, 1fr); }
+.panelClosed .conversationPanel { display: none; }
+.panelToggle, .panelClose { min-height: 40px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: white; color: var(--ink-700); }
+.panelToggle svg, .panelClose svg, .newConversation svg { width: 18px; height: 18px; }
+.panelToggle, .panelClose { display: grid; place-items: center; flex: none; width: 40px; border-color: transparent; background: transparent; }
+.panelBackdrop { display: none; }
+.header { min-height: 64px; gap: 10px; }
+.header > div { min-width: 0; margin-right: auto; }
+.title { font-size: 18px; }
+.conversationDelete { opacity: 1; }
+.composer { box-shadow: var(--shadow-xs); }
+@media (max-width: 1199px) {
+  .page.panelOpen, .page.panelClosed { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+  .panelOpen .conversationPanel { display: flex; position: absolute; inset: 0 auto 0 0; width: min(280px, 85%); z-index: 22; }
+  .panelOpen .panelBackdrop { display: block; position: absolute; inset: 0; z-index: 21; background: #25223255; border: 0; }
+}
+@media (max-width: 767px) {
+  .header { flex-wrap: wrap; padding: 8px 0; }
+  .header, .stream, .footer { width: calc(100% - 24px); }
+  .agentPicker { flex-basis: 100%; }
+  .agentPicker select { width: 100%; min-width: 0; }
+  .subtitle { display: none; }
+  .bubble { max-width: calc(100% - 38px); padding: 8px; }
+  .footer { padding-bottom: 12px; gap: 6px; }
 }
 
 .stop {
@@ -354,6 +620,14 @@
 }
 
 @media (max-width: 760px) {
+  .page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .conversationPanel {
+    display: none;
+  }
+
   .header,
   .stream,
   .footer {
@@ -366,6 +640,30 @@
 
   .bubble {
     max-width: 88%;
+  }
+
+  .badge {
+    display: none;
+  }
+
+  .agentPicker span {
+    display: none;
+  }
+
+  .agentPicker select {
+    min-width: 140px;
+  }
+}
+
+@media (min-width: 761px) and (max-width: 1100px) {
+  .page {
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+
+  .header,
+  .stream,
+  .footer {
+    width: min(800px, calc(100% - 40px));
   }
 
   .badge {

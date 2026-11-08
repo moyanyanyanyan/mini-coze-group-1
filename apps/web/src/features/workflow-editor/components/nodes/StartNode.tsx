@@ -1,4 +1,5 @@
 import React from 'react';
+import { Icon } from '../../../../shared/ui/Icon';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 
 const STATUS_TEXT: Record<string, string> = {
@@ -31,7 +32,7 @@ export function StartNode({ data }: NodeProps) {
       )}
       <div className="wf-node-head">
         <span className="wf-node-icon" style={{ background: '#10b981' }}>
-          ▶
+          <Icon name="play" />
         </span>
         <div>
           <div className="wf-node-title">{d.label || '开始'}</div>

@@ -1,4 +1,5 @@
 import type { PluginToolDefinition } from "./plugins.api";
+import { getPluginIcon } from './plugin-icons';
 
 export type PluginCategory = "coding" | "office" | "information";
 
@@ -27,30 +28,35 @@ export const CATEGORY_META: Record<PluginCategory, string> = {
   information: "信息获取",
 };
 
-const PLUGIN_ICONS: Record<string, string> = {
-  echo: "🔊",
-  time: "🕐",
-  calculator: "🧮",
-  web: "🌐",
-};
-
 type PluginCardProps = {
   plugin: MarketPlugin;
 };
 
 export function PluginCard({ plugin }: PluginCardProps) {
+  const PluginIcon = getPluginIcon(plugin.iconKind);
   return (
     <article className="pm-card">
-      <div className="pm-card-header">
+      <div className="pm-card-head">
         <span className="pm-card-icon">
-          {PLUGIN_ICONS[plugin.iconKind] ?? "🧩"}
+          <PluginIcon />
         </span>
-        <div className="pm-card-title-group">
-          <h3>{plugin.name}</h3>
-          <span className="pm-card-meta">{plugin.pluginId}</span>
+        <div className="pm-card-copy">
+          <div className="pm-card-title-row">
+            <h3 className="pm-card-name">{plugin.name}</h3>
+          </div>
         </div>
       </div>
       <p className="pm-card-desc">{plugin.description}</p>
+      <footer className="pm-card-foot">
+        <details className="pm-technical">
+          <summary>查看 {plugin.tools.length} 个工具</summary>
+          {plugin.tools.length > 0 ? (
+            <ul>{plugin.tools.map(tool => <li key={tool.name}>{tool.name}</li>)}</ul>
+          ) : <p>暂无工具</p>}
+          <code>插件 ID：{plugin.pluginId}</code>
+        </details>
+        <span className="pm-plugin-kind">{CATEGORY_META[plugin.category]}</span>
+      </footer>
     </article>
   );
 }

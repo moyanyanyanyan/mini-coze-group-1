@@ -173,7 +173,7 @@
 
 .api-key-table {
   width: 100%;
-  min-width: 900px;
+  min-width: 720px;
   border-collapse: collapse;
   table-layout: fixed;
   color: var(--ink-700);
@@ -182,7 +182,7 @@
 
 .api-key-table th,
 .api-key-table td {
-  padding: 17px 20px;
+  padding: 14px 12px;
   border-bottom: 1px solid #ebe7f4;
   text-align: left;
   vertical-align: middle;
@@ -193,15 +193,15 @@
   background: #faf8fd;
   font-size: 11px;
   font-weight: 650;
-  letter-spacing: 0.045em;
+  white-space: nowrap;
 }
 
-.api-key-table th:nth-child(1) { width: 21%; }
+.api-key-table th:nth-child(1) { width: 16%; }
 .api-key-table th:nth-child(2) { width: 18%; }
-.api-key-table th:nth-child(3) { width: 18%; }
+.api-key-table th:nth-child(3) { width: 21%; }
 .api-key-table th:nth-child(4) { width: 16%; }
 .api-key-table th:nth-child(5) { width: 15%; }
-.api-key-table th:nth-child(6) { width: 12%; }
+.api-key-table th:nth-child(6) { width: 14%; }
 
 .api-key-table tbody tr:last-child td {
   border-bottom: 0;
@@ -223,7 +223,12 @@
   overflow-wrap: anywhere;
 }
 
+.api-key-table td:nth-child(2) { overflow-wrap: anywhere; }
+
 .api-key-table code {
+  display: block;
+  overflow-wrap: anywhere;
+  white-space: normal;
   color: var(--ink-600);
   font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
   font-size: 12px;

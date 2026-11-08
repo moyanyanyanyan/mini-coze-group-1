@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ChatMessage } from '@minicoze/shared';
+import type { ChatMessage, ConversationSummary } from '@minicoze/shared';
 import { ApiError } from '../../shared/api/http';
-import { listAgents, type Agent } from '../agent-builder/agent.api';
+import { getAgent, listAgents, type Agent } from '../agent-builder/agent.api';
 import {
   createConversation,
+  deleteConversation,
   listConversations,
   listMessages,
   streamMessage,
@@ -11,11 +12,24 @@ import {
 } from './api/chat-api';
 import { ChatBubble } from './components/ChatBubble';
 import { MessageComposer } from './components/MessageComposer';
+import { AppLink } from '../../shared/routing/AppLink';
 import { Icon } from '../../shared/ui/Icon';
+import { ActionMenu } from '../../shared/ui/ActionMenu';
+import { useConfirm } from '../../shared/ui/useConfirm';
+import { useOverlayFocus } from '../../shared/ui/useOverlayFocus';
+import { AgentSwitcher } from './components/AgentSwitcher';
 import styles from './agent-chat.module.css';
 
+const SUGGESTED_PROMPTS = [
+  '介绍一下你能帮我做什么',
+  '帮我梳理一个问题的思路',
+  '帮我规划下一步任务',
+];
+
 export function AgentChatPage() {
+  const { confirm, confirmation } = useConfirm();
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -23,9 +37,26 @@ export function AgentChatPage() {
   /** 非空 = 这一轮还在生成。同时也用作「禁止再发」的闸门 */
   const [streamingId, setStreamingId] = useState<string | null>(null);
   const [sendError, setSendError] = useState('');
+  const [needsAgent, setNeedsAgent] = useState(false);
   const [bootError, setBootError] = useState('');
+  const selectedAgent = agents.find(agent => agent.id === selectedAgentId);
+  const suggestedPrompts = selectedAgent?.knowledgeBaseBindings.some(binding => binding.enabled)
+    ? [SUGGESTED_PROMPTS[0], '根据知识库总结重点', SUGGESTED_PROMPTS[2]] : SUGGESTED_PROMPTS;
 
-  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const streamRef = useRef<HTMLDivElement | null>(null);
+  const following = useRef(true);
+  const requestId = useRef(0);
+  const [awayFromBottom, setAwayFromBottom] = useState(false);
+  const [switching, setSwitching] = useState(false);
+  const [conversationsOpen, setConversationsOpen] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1200);
+  const conversationPanelRef = useRef<HTMLElement>(null);
+  const conversationDrawer = conversationsOpen && typeof window !== 'undefined' && window.innerWidth < 1200;
+  useOverlayFocus(conversationPanelRef, conversationDrawer, () => setConversationsOpen(false));
+  const jumpToLatest = () => {
+    following.current = true;
+    setAwayFromBottom(false);
+    if (streamRef.current) streamRef.current.scrollTop = streamRef.current.scrollHeight;
+  };
   // React 严格模式下 effect 会跑两次，没有这个闸门就会建出两个会话
   const booted = useRef(false);
   // C4 接缝：同一个 AbortController 贯穿整轮。
@@ -33,38 +64,131 @@ export function AgentChatPage() {
   const abortRef = useRef<AbortController | null>(null);
 
   const boot = useCallback(async () => {
+    const request = ++requestId.current;
+    setSwitching(true);
     try {
       const [agentPage, existing] = await Promise.all([listAgents(), listConversations()]);
       const available = agentPage.items.filter((agent) => agent.status !== 'ARCHIVED');
+      const target = new URLSearchParams(window.location.search).get('agentId');
+      if (target && !available.some(agent => agent.id === target)) available.push(await getAgent(target));
+      if (request !== requestId.current) return;
       setAgents(available);
-      if (available.length === 0) {
-        setBootError('请先在智能体页面创建一个智能体');
-        return;
-      }
-      const conversation = existing.find((item) => available.some((agent) => agent.id === item.agentId))
-        ?? (await createConversation(available[0].id));
+      setNeedsAgent(available.length === 0);
+      if (available.length === 0) return;
+      const conversation = existing.find((item) => target ? item.agentId === target : available.some((agent) => agent.id === item.agentId))
+        ?? (await createConversation(target ?? available[0].id));
+      const history = await listMessages(conversation.id);
+      if (request !== requestId.current) return;
+      following.current = true;
 
+      setConversations(existing.some((item) => item.id === conversation.id)
+        ? existing
+        : [conversation, ...existing]);
       setSelectedAgentId(conversation.agentId ?? available[0].id);
       setConversationId(conversation.id);
-      setMessages(await listMessages(conversation.id));
+      setMessages(history);
     } catch (caught) {
-      setBootError(caught instanceof ApiError ? caught.message : '会话加载失败，请稍后再试');
+      if (request === requestId.current) setBootError(caught instanceof ApiError ? caught.message : '会话加载失败，请稍后再试');
+    } finally {
+      if (request === requestId.current) setSwitching(false);
     }
   }, []);
 
   const handleAgentChange = async (agentId: string) => {
+    const request = ++requestId.current;
+    setSwitching(true);
     setBootError('');
     try {
       const existing = await listConversations();
       const conversation = existing.find((item) => item.agentId === agentId)
         ?? (await createConversation(agentId));
       const history = await listMessages(conversation.id);
+      if (request !== requestId.current) return;
+      following.current = true;
+      setAwayFromBottom(false);
       setSelectedAgentId(agentId);
       setConversationId(conversation.id);
+      setConversations(existing.some((item) => item.id === conversation.id)
+        ? existing
+        : [conversation, ...existing]);
       setMessages(history);
       setCitationsByMessage({});
     } catch (caught) {
-      setBootError(caught instanceof Error ? caught.message : '切换智能体失败');
+      if (request === requestId.current) setBootError(caught instanceof Error ? caught.message : '切换智能体失败');
+    } finally {
+      if (request === requestId.current) setSwitching(false);
+    }
+  };
+
+  const handleConversationChange = async (conversation: ConversationSummary) => {
+    if (streamingId || (conversation.id === conversationId && !switching)) {
+      return;
+    }
+    setBootError('');
+    setSendError('');
+    const request = ++requestId.current;
+    setSwitching(true);
+    try {
+      const history = await listMessages(conversation.id);
+      if (request !== requestId.current) return;
+      following.current = true;
+      setAwayFromBottom(false);
+      if (window.innerWidth < 1200) setConversationsOpen(false);
+      setConversationId(conversation.id);
+      setSelectedAgentId(conversation.agentId ?? '');
+      setMessages(history);
+      setCitationsByMessage({});
+    } catch (caught) {
+      if (request === requestId.current) setBootError(caught instanceof Error ? caught.message : '会话加载失败');
+    } finally {
+      if (request === requestId.current) setSwitching(false);
+    }
+  };
+
+  const handleNewConversation = async () => {
+    if (!selectedAgentId || streamingId || switching) {
+      return;
+    }
+    setBootError('');
+    const request = ++requestId.current;
+    setSwitching(true);
+    try {
+      const conversation = await createConversation(selectedAgentId);
+      if (request !== requestId.current) return;
+      setConversations((items) => [conversation, ...items]);
+      setConversationId(conversation.id);
+      setMessages([]);
+      jumpToLatest();
+      if (window.innerWidth < 1200) setConversationsOpen(false);
+      setCitationsByMessage({});
+    } catch (caught) {
+      if (request === requestId.current) setBootError(caught instanceof Error ? caught.message : '新建会话失败');
+    } finally {
+      if (request === requestId.current) setSwitching(false);
+    }
+  };
+
+  const handleDeleteConversation = async (conversation: ConversationSummary) => {
+    if (streamingId || switching) {
+      return;
+    }
+    if (!await confirm(`确定删除“${conversation.title || '新对话'}”吗？删除后无法恢复。`)) {
+      return;
+    }
+    try {
+      await deleteConversation(conversation.id);
+      const next = conversations.filter((item) => item.id !== conversation.id);
+      setConversations(next);
+      if (conversation.id === conversationId) {
+        const fallback = next[0];
+        if (fallback) {
+          await handleConversationChange(fallback);
+        } else {
+          await handleNewConversation();
+        }
+      }
+    } catch (caught) {
+      setBootError(caught instanceof Error ? caught.message : '删除会话失败');
     }
   };
 
@@ -76,17 +200,19 @@ export function AgentChatPage() {
     void boot();
   }, [boot]);
 
-  // 有新内容就滚到底部，聊天页不能让人手动往下拖
+  // 只滚动消息容器；阅读历史时不抢走用户的滚动位置。
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: 'end' });
+    if (following.current) jumpToLatest();
   }, [messages, streamingId]);
 
   const handleSend = async (content: string) => {
-    if (!conversationId || streamingId) {
+    if (!conversationId || streamingId || switching) {
       return;
     }
 
     setSendError('');
+    following.current = true;
+    setAwayFromBottom(false);
 
     const now = new Date().toISOString();
     // 乐观插入：不等后端回包就把两条气泡画出来，打字效果才不卡
@@ -142,6 +268,7 @@ export function AgentChatPage() {
                   : m,
               ),
             );
+            void listConversations().then(setConversations).catch(() => undefined);
           },
           onFailed: (_code, message) => {
             setSendError(message);
@@ -176,72 +303,124 @@ export function AgentChatPage() {
   };
 
   return (
-    <section className={styles.page} aria-label="智能体聊天">
-      <header className={styles.header}>
-        <div>
-          <h1 className={styles.title}>智能体对话</h1>
-          <p className={styles.subtitle}>
-            {conversationId ? '消息存在你的账号下，刷新不丢' : '正在准备会话…'}
-          </p>
+    <section className={`${styles.page} ${conversationsOpen ? styles.panelOpen : styles.panelClosed}`} aria-label="智能体聊天">
+      {confirmation}
+      {conversationsOpen && <button className={styles.panelBackdrop} aria-label="关闭会话列表" onClick={() => setConversationsOpen(false)} />}
+      <aside ref={conversationPanelRef} role={conversationDrawer ? 'dialog' : undefined} aria-modal={conversationDrawer || undefined} className={styles.conversationPanel} aria-label="会话列表">
+        <div className={styles.conversationHeader}>
+          <div>
+            <strong>历史对话</strong>
+          </div>
+          <button className={styles.panelClose} aria-label="关闭会话列表" onClick={() => setConversationsOpen(false)}><Icon name="close" /></button>
         </div>
-        <label>
-          选择智能体{' '}
-          <select
-            value={selectedAgentId}
-            disabled={streamingId !== null || agents.length === 0}
-            onChange={(event) => void handleAgentChange(event.target.value)}
+          <button
+            type="button"
+            className={styles.newConversation}
+            disabled={!selectedAgentId || streamingId !== null || switching}
+            onClick={() => void handleNewConversation()}
           >
-            {agents.length === 0 ? <option value="">暂无智能体</option> : null}
-            {agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
-          </select>
-        </label>
-        <span className={styles.badge}>
-          <span className={styles.badgeDot} aria-hidden="true" />
-          流式输出
-        </span>
-      </header>
+            <Icon name="plus" /> 新建对话
+          </button>
+        <div className={styles.conversationList}>
+          {conversations.map((conversation) => (
+            <div
+              key={conversation.id}
+              className={`${styles.conversationItem}${conversation.id === conversationId ? ` ${styles.conversationItemActive}` : ''}`}
+            >
+              <button
+                type="button"
+                className={styles.conversationSelect}
+                onClick={() => void handleConversationChange(conversation)}
+              >
+                <span>{conversation.title || '新对话'}</span>
+                <small>{new Date(conversation.updatedAt).toLocaleDateString('zh-CN')}</small>
+              </button>
+              <ActionMenu label={`会话操作：${conversation.title || '新对话'}`}><button
+                type="button"
+                className={styles.conversationDelete}
+                disabled={switching || streamingId !== null}
+                aria-label={`删除会话 ${conversation.title || '新对话'}`}
+                onClick={() => void handleDeleteConversation(conversation)}
+              >
+                删除对话
+              </button></ActionMenu>
+            </div>
+          ))}
+        </div>
+      </aside>
 
-      <div className={styles.stream}>
-        {messages.length === 0 ? (
+      <div className={styles.chatMain}>
+        <header className={styles.header}>
+          <button className={styles.panelToggle} aria-label="历史对话" title="历史对话" aria-expanded={conversationsOpen} onClick={() => setConversationsOpen(!conversationsOpen)}><Icon name="panel" /></button>
+          <AgentSwitcher agents={agents} value={selectedAgentId} disabled={streamingId !== null || switching} onChange={(id) => void handleAgentChange(id)} />
+          {(switching || streamingId) && <span className={styles.activity} role="status">{switching ? '正在加载…' : '正在回复…'}</span>}
+        </header>
+
+        <div className={styles.stream} ref={streamRef} onScroll={() => {
+          const el = streamRef.current;
+          if (!el) return;
+          following.current = el.scrollHeight - el.scrollTop - el.clientHeight <= 80;
+          setAwayFromBottom(!following.current);
+        }}>
+        {needsAgent && (
+          <div className={styles.empty}>
+            <strong>创建智能体，开始对话</strong>
+            <AppLink className={styles.createAgent} to="/workspace/agents/create?action=new">创建智能体</AppLink>
+          </div>
+        )}
+        {conversationId && messages.length === 0 ? (
           <div className={styles.empty}>
             <span className={styles.emptyIcon} aria-hidden="true">
               <Icon name="chat" />
             </span>
             <strong>开始你的第一段对话</strong>
-            <p>发送一条消息，回答会一个字一个字地流出来。</p>
+            <p>从一个问题开始，或试试下面的建议。</p>
+            <div className={styles.suggestions}>
+              {suggestedPrompts.map((prompt) => (
+                <button
+                  type="button"
+                  key={prompt}
+                  disabled={!conversationId || streamingId !== null}
+                  onClick={() => void handleSend(prompt)}
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
           </div>
         ) : null}
 
         {messages.map((message) => (
           <div key={message.id}>
-            <ChatBubble message={message} />
+            <ChatBubble message={message} agentName={selectedAgent?.name} avatarUrl={selectedAgent?.avatarUrl} />
             {citationsByMessage[message.id]?.length ? (
-              <div aria-label="本次检索来源">
+              <div className={styles.citations} aria-label="本次检索来源">
                 来源：{citationsByMessage[message.id].map((source) => source.title).join('、')}
               </div>
             ) : null}
           </div>
         ))}
 
-        <div ref={bottomRef} />
-      </div>
+        </div>
 
-      <div className={styles.footer}>
-        {bootError ? <p className={styles.alert} role="alert">{bootError}</p> : null}
+        <div className={styles.footer}>
+        {bootError ? <div className={styles.alert} role="alert">{bootError} <button onClick={() => { setBootError(''); void boot(); }}>重试</button></div> : null}
         {sendError ? <p className={styles.alert} role="alert">{sendError}</p> : null}
 
-        {streamingId ? (
-          <div className={styles.stopRow}>
-            <button className={styles.stop} type="button" onClick={handleStop}>
-              停止生成
-            </button>
-          </div>
-        ) : null}
+          {awayFromBottom && <button className={styles.latestButton} onClick={jumpToLatest}><Icon name="arrowDown" />回到最新消息</button>}
 
-        <MessageComposer
-          disabled={!conversationId || streamingId !== null}
-          onSend={(content) => void handleSend(content)}
-        />
+        {conversationId && (
+          <>
+            <MessageComposer
+              disabled={streamingId !== null || switching}
+              streaming={streamingId !== null}
+              onStop={handleStop}
+              onSend={(content) => void handleSend(content)}
+            />
+            <span className={styles.composerHint}>Enter 发送 · Shift + Enter 换行</span>
+          </>
+        )}
+        </div>
       </div>
     </section>
   );

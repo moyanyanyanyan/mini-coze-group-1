@@ -1,5 +1,6 @@
 // src/features/workflow-editor/components/nodes/ConditionNode.tsx
 import React from 'react';
+import { Icon } from '../../../../shared/ui/Icon';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import type { ConditionNodeData } from '../../types/workflow';
 
@@ -29,7 +30,7 @@ export function ConditionNode({ data }: NodeProps) {
 
       <div className="wf-node-head">
         <span className="wf-node-icon" style={{ background: '#f59e0b' }}>
-          ⑂
+          <Icon name="workflow" />
         </span>
         <div>
           <div className="wf-node-title">{d.label || '条件判断'}</div>

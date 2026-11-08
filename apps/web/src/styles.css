@@ -26,8 +26,8 @@
   --ink-400: #787283;
 
   /* —— 线与面 —— */
-  --line: #e7e3da;
-  --line-strong: #d3cdc1;
+  --line: #e4e4eb;
+  --line-strong: #c9cad6;
   --line-soft: rgba(111, 86, 217, 0.055);
   --surface: #faf9f5;
   --surface-raised: #ffffff;
@@ -60,6 +60,20 @@
   --danger-100: #fdf3f2;
   --success-600: #2e7d5b;
   --success-100: #eff7f2;
+
+  /* —— 产品工作区尺寸 —— */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --control-sm: 32px;
+  --control-md: 40px;
+  --control-lg: 44px;
+  --page-gutter: clamp(20px, 3vw, 40px);
+  --page-max: 1280px;
+  --editor-header: 56px;
 }
 
 * { box-sizing: border-box; }
@@ -72,12 +86,43 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
 button, a { -webkit-tap-highlight-color: transparent; }
 
-a:focus-visible, button:focus-visible {
+button:not(:disabled),
+select:not(:disabled) {
+  cursor: pointer;
+}
+
+a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [role='listbox']:focus-visible {
   outline: 3px solid rgba(111, 86, 217, 0.34);
   outline-offset: 3px;
 }
+
+.ui-action-menu { position: relative; flex: none; }
+.ui-action-menu summary { list-style: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 8px; cursor: pointer; color: var(--ink-600); }
+.ui-action-menu summary::-webkit-details-marker { display: none; }
+.ui-action-menu summary:hover, .ui-action-menu[open] summary { background: var(--violet-50); }
+.ui-action-menu svg, .ui-icon-button svg { width: 18px; height: 18px; }
+.ui-menu-items { position: absolute; z-index: 60; right: 0; top: calc(100% + 4px); width: 160px; padding: 6px; border: 1px solid var(--line); border-radius: 10px; background: white; box-shadow: var(--shadow-sm); }
+.ui-menu-items button { display: block; width: 100%; min-height: 40px; border: 0; border-radius: 6px; padding: 8px 12px; text-align: left; background: transparent; color: var(--ink-800); }
+.ui-menu-items button:hover { background: var(--violet-50); }
+.ui-confirm { width: min(440px, calc(100vw - 32px)); border: 1px solid var(--line); border-radius: 16px; padding: 24px; color: var(--ink-900); box-shadow: var(--shadow-lg); }
+.ui-confirm::backdrop { background: #25223266; }
+.ui-confirm h2 { margin: 0; font-size: 20px; }
+.ui-confirm p { line-height: 1.7; }
+.ui-confirm-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }
+.ui-confirm-actions button { min-height: 40px; padding: 0 18px; border: 1px solid var(--line); border-radius: 8px; background: white; }
+.ui-confirm-actions .ui-danger { background: var(--danger-600); color: white; border-color: var(--danger-600); }
+.ui-icon-button { display: inline-grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--ink-600); }
+.ui-icon-button:hover { background: var(--violet-50); }
+input, select, textarea { accent-color: var(--violet-600); }
 
 ::selection {
   color: var(--ink-900);

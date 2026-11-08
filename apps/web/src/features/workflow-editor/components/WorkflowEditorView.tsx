@@ -1,5 +1,8 @@
 // src/features/workflow-editor/components/WorkflowEditorView.tsx
 import React from 'react';
+import { Icon } from '../../../shared/ui/Icon';
+import { ActionMenu } from '../../../shared/ui/ActionMenu';
+import { useConfirm } from '../../../shared/ui/useConfirm';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ReactFlow,
@@ -42,6 +45,11 @@ import type { LoopNodeData } from '../types/workflow';
 interface Props {
   workflowId: string;
 }
+
+const miniMapColors: Record<string, string> = {
+  start: '#10b981', llm: '#8066d9', condition: '#e8a632', loop: '#329dcc', end: '#8792a4',
+};
+const miniMapNodeColor = (node: Node) => miniMapColors[node.type ?? ''] ?? '#8792a4';
 
 const BASE = '/workspace/workflows';
 
@@ -123,12 +131,14 @@ function WorkflowEditorInner({ workflowId }: Props) {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [leftOpen, setLeftOpen] = useState(true);
-  const [rightOpen, setRightOpen] = useState(true);
+  const [leftOpen, setLeftOpen] = useState(() => window.innerWidth >= 1200);
+  const [notice, setNotice] = useState('');
+  const { confirm, confirmation } = useConfirm();
+  const [rightOpen, setRightOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
 
-  const [showRunDialog, setShowRunDialog] = useState(false);
+  const [runDialog, setRunDialog] = useState<'input' | 'result' | null>(null);
   const [runStatusMap, setRunStatusMap] = useState<Record<string, string>>({});
   const [runResult, setRunResult] = useState<WorkflowRunResult | null>(null);
 
@@ -203,13 +213,13 @@ function WorkflowEditorInner({ workflowId }: Props) {
         (type === 'start' || type === 'end') &&
         nodes.some((n) => n.type === type)
       ) {
-        alert(`${type === 'start' ? '开始' : '结束'}节点只能有 1 个`);
+        setNotice(`${type === 'start' ? '开始' : '结束'}节点只能有 1 个`);
         return;
       }
 
       // 节点总数 ≤ 50
       if (nodes.length >= 50) {
-        alert('节点总数不能超过 50 个');
+        setNotice('节点总数不能超过 50 个');
         return;
       }
 
@@ -255,7 +265,7 @@ function WorkflowEditorInner({ workflowId }: Props) {
       ) {
         const existing = edges.filter((e) => e.source === params.source);
         if (existing.length >= 1) {
-          alert('普通节点只能有 1 条出线');
+          setNotice('普通节点只能有 1 条出线');
           return;
         }
       }
@@ -343,7 +353,7 @@ function WorkflowEditorInner({ workflowId }: Props) {
       });
 
     if (hasEmptyEndOutput) {
-      alert('End 节点的每个输出至少需要勾选一个候选');
+      setNotice('End 节点的每个输出至少需要勾选一个候选');
       return;
     }
     setSaving(true);
@@ -351,9 +361,9 @@ function WorkflowEditorInner({ workflowId }: Props) {
       const def = canvasToDefinition(nodes, edges);
       await saveDraft(workflowId, def);
       setDirty(false);
-      alert('保存成功');
+      setNotice('保存成功');
     } catch (e: any) {
-      alert(e.message || '保存失败');
+      setNotice(e.message || '保存失败');
     } finally {
       setSaving(false);
     }
@@ -380,12 +390,12 @@ function WorkflowEditorInner({ workflowId }: Props) {
       });
 
     if (hasEmptyEndOutput) {
-      alert('End 节点的每个输出至少需要勾选一个候选');
+      setNotice('End 节点的每个输出至少需要勾选一个候选');
       return;
     }
     const startNode = nodes.find((n) => n.type === 'start');
     if (!startNode) {
-      alert('请先添加 Start 节点');
+      setNotice('请先添加 Start 节点');
       return;
     }
 
@@ -396,7 +406,7 @@ function WorkflowEditorInner({ workflowId }: Props) {
         await saveDraft(workflowId, def);
         setDirty(false);
       } catch (e: any) {
-        alert(`保存失败：${e.message || '未知错误'}`);
+        setNotice(`保存失败：${e.message || '未知错误'}`);
         setSaving(false);
         return;
       } finally {
@@ -429,7 +439,7 @@ function WorkflowEditorInner({ workflowId }: Props) {
       return;
     }
 
-    setShowRunDialog(true);
+    setRunDialog('input');
   };
 
   const handleRunComplete = (result: WorkflowRunResult) => {
@@ -441,8 +451,8 @@ function WorkflowEditorInner({ workflowId }: Props) {
     setRunStatusMap(map);
   };
 
-  const handleBack = () => {
-    if (dirty && !confirm('有未保存的修改，确定离开？')) return;
+  const handleBack = async () => {
+    if (dirty && !await confirm('有未保存的修改，确定离开？')) return;
     navigate(BASE);
   };
 
@@ -492,6 +502,7 @@ function WorkflowEditorInner({ workflowId }: Props) {
 
   return (
     <section className="wf-editor-page">
+      {confirmation}
       <header className="wf-editor-header">
         <button className="wf-btn wf-btn-outline" onClick={handleBack}>
           ← 返回
@@ -504,18 +515,13 @@ function WorkflowEditorInner({ workflowId }: Props) {
           {runResult && (
             <button
               className="wf-btn wf-btn-outline"
-              onClick={() => setShowRunDialog(true)}
+              onClick={() => setRunDialog('result')}
               title="查看上次运行结果"
             >
               查看运行结果
             </button>
           )}
-          <button className="wf-btn wf-btn-outline" onClick={handleExport}>
-            导出 JSON
-          </button>
-          <button className="wf-btn wf-btn-outline" onClick={handleValidate}>
-            校验
-          </button>
+          <ActionMenu><button onClick={handleValidate}>校验工作流</button><button onClick={handleExport}>导出 JSON</button></ActionMenu>
           <button
             className="wf-btn wf-btn-outline"
             onClick={handleOpenRun}
@@ -532,9 +538,10 @@ function WorkflowEditorInner({ workflowId }: Props) {
           </button>
         </div>
       </header>
+      {notice && <div className="wf-notice" role="status"><span>{notice}</span><button className="ui-icon-button" aria-label="关闭提示" onClick={() => setNotice('')}><Icon name="close" /></button></div>}
 
       <div className="wf-editor-body">
-        {leftOpen && <NodePalette nodes={nodes} onAdd={handleAddNode} />}
+        {leftOpen && <NodePalette nodes={nodes} onAdd={handleAddNode} onClose={() => setLeftOpen(false)} />}
 
         <div className="wf-canvas-wrap">
           <button
@@ -542,14 +549,14 @@ function WorkflowEditorInner({ workflowId }: Props) {
             onClick={() => setLeftOpen((v) => !v)}
             title={leftOpen ? '收起节点库' : '展开节点库'}
           >
-            {leftOpen ? '‹' : '›'}
+            <Icon name="plus" /><span className="wf-toggle-label">节点库</span>
           </button>
           <button
             className="wf-side-toggle wf-side-toggle-right"
             onClick={() => setRightOpen((v) => !v)}
             title={rightOpen ? '收起配置面板' : '展开配置面板'}
           >
-            {rightOpen ? '›' : '‹'}
+            <Icon name="edit" /><span className="wf-toggle-label">节点配置</span>
           </button>
 
           <ReactFlow
@@ -573,12 +580,22 @@ function WorkflowEditorInner({ workflowId }: Props) {
           >
             <Background gap={22} size={1} color="#dcdee5" />
             <Controls />
-            <MiniMap />
+            <MiniMap
+              className="wf-minimap"
+              ariaLabel="工作流缩略图"
+              style={{ width: 156, height: 94 }}
+              nodeColor={miniMapNodeColor}
+              maskColor="rgba(111, 101, 161, 0.12)"
+              maskStrokeColor="#c6bfdf"
+              maskStrokeWidth={1}
+              pannable
+            />
           </ReactFlow>
         </div>
 
         {rightOpen && (
           <PropertyPanel
+            onClose={() => setRightOpen(false)}
             node={selectedNode}
             nodes={nodes}
             edges={edges}
@@ -589,11 +606,12 @@ function WorkflowEditorInner({ workflowId }: Props) {
         )}
       </div>
 
-      {showRunDialog && (
+      {runDialog && (
         <RunDialog
           workflowId={workflowId}
           startNode={nodes.find((n) => n.type === 'start') || null}
-          onClose={() => setShowRunDialog(false)}
+          initialResult={runDialog === 'result' ? runResult : null}
+          onClose={() => setRunDialog(null)}
           onComplete={handleRunComplete}
         />
       )}
@@ -640,7 +658,7 @@ function WorkflowEditorInner({ workflowId }: Props) {
 
 export function WorkflowEditorView({ workflowId }: Props) {
   return (
-    <ReactFlowProvider>
+    <ReactFlowProvider key={workflowId}>
       <WorkflowEditorInner workflowId={workflowId} />
     </ReactFlowProvider>
   );

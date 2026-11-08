@@ -61,7 +61,7 @@ export class AgentsService {
   }
 
   async list(query: ListAgentsQueryDto, user: CurrentUserPayload) {
-    const where: { ownerId: string; status?: { not: AgentStatus } | AgentStatus } = { ownerId: user.id };
+    const where: Prisma.AgentWhereInput = { ownerId: user.id };
     if (query.status === 'ARCHIVED') {
       where.status = 'ARCHIVED';
     } else if (query.status) {
@@ -70,12 +70,19 @@ export class AgentsService {
       where.status = { not: 'ARCHIVED' };
     }
 
+    if (query.keyword) {
+      where.OR = [
+        { name: { contains: query.keyword, mode: 'insensitive' } },
+        { description: { contains: query.keyword, mode: 'insensitive' } },
+      ];
+    }
+
     const [items, total] = await Promise.all([
       this.prisma.agent.findMany({
         where,
         skip: (query.page! - 1) * query.pageSize!,
         take: query.pageSize,
-        orderBy: { updatedAt: 'desc' },
+        orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }],
         include: {
           pluginBindings: true,
           knowledgeBaseBindings: true,
@@ -131,6 +138,7 @@ export class AgentsService {
         ownerId: true,
         status: true,
         currentVersionId: true,
+        contextLimit: true,
       },
     });
 
@@ -160,10 +168,18 @@ export class AgentsService {
       version.snapshot,
       agent.id,
       version.version,
+      agent.contextLimit,
     );
 
     if (!config) {
       throw new InternalServerErrorException('Agent 发布配置无效');
+    }
+
+    // 发布快照保留历史配置，运行时跳过已删除的库，其他库仍由检索入口校验权限。
+    if (config.knowledgeBaseIds.length) {
+      const bases = await this.knowledgeCatalog.findByIds(config.knowledgeBaseIds);
+      const existingIds = new Set(bases.map((base) => base.id));
+      config.knowledgeBaseIds = config.knowledgeBaseIds.filter((id) => existingIds.has(id));
     }
 
     return {
@@ -345,6 +361,18 @@ export class AgentsService {
     return this.withAgentTransaction(agentId, async (tx) => {
       const agent = await this.assertAgentWritable(agentId, user.id, tx);
 
+      const ids = dto.bindings.map((binding) => binding.workflowId);
+      if (new Set(ids).size !== ids.length) throw new BadRequestException('不能重复绑定同一工作流');
+      if (ids.length) {
+        const available = await tx.workflow.count({
+          where: {
+            id: { in: ids }, creatorId: user.id, workspaceId: agent.workspaceId ?? user.id,
+            status: { not: 'ARCHIVED' },
+          },
+        });
+        if (available !== ids.length) throw new NotFoundException('工作流不存在或无权绑定');
+      }
+
       await tx.agentWorkflow.deleteMany({ where: { agentId } });
       await tx.agentWorkflow.createMany({
         data: dto.bindings.map((b) => ({
@@ -375,7 +403,7 @@ export class AgentsService {
     });
   }
 
-  private async assertAgentWritable(agentId: string, userId: string, db: Prisma.TransactionClient = this.prisma): Promise<{ ownerId: string; status: AgentStatus }> {
+  private async assertAgentWritable(agentId: string, userId: string, db: Prisma.TransactionClient = this.prisma): Promise<{ ownerId: string; workspaceId: string | null; status: AgentStatus }> {
     const agent = await db.agent.findUnique({ where: { id: agentId } });
     if (!agent) throw new NotFoundException('Agent 不存在');
     if (agent.ownerId !== userId) throw new ForbiddenException('无权操作此 Agent');

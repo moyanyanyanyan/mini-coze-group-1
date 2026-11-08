@@ -1,5 +1,7 @@
 // src/features/workflow-editor/components/PropertyPanel.tsx
-import React from 'react';
+import React, { useRef } from 'react';
+import { useOverlayFocus } from '../../../shared/ui/useOverlayFocus';
+import { Icon } from '../../../shared/ui/Icon';
 import type { Node, Edge } from '@xyflow/react';
 import type {
   NodeData,
@@ -16,6 +18,7 @@ import { LoopPanel } from './panels/LoopPanel';
 import { type LoopContext } from '../utils/upstream';
 
 interface Props {
+  onClose?: () => void;
   node: Node | null;
   nodes: Node[];
   edges: Edge[];
@@ -34,11 +37,15 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 export function PropertyPanel({
-  node, nodes, edges, loopContext, onChange, onDelete, onEditLoopBody,
+  node, nodes, edges, loopContext, onChange, onDelete, onEditLoopBody, onClose,
 }: Props) {
+  const panel = useRef<HTMLElement>(null);
+  const drawer = !!onClose && typeof window !== 'undefined' && window.innerWidth < 1200;
+  useOverlayFocus(panel, drawer, () => onClose?.());
   if (!node) {
     return (
-      <aside className="wf-prop-panel">
+      <aside ref={panel} className="wf-prop-panel" role={drawer ? 'dialog' : undefined} aria-modal={drawer || undefined} aria-label="节点配置">
+        {onClose && <button className="ui-icon-button wf-panel-close" aria-label="关闭配置面板" onClick={onClose}><Icon name="close" /></button>}
         <div className="wf-prop-empty">
           <p>点击画布中的节点</p>
           <p style={{ fontSize: 12, color: '#86909c' }}>
@@ -53,19 +60,13 @@ export function PropertyPanel({
   const handleChange = (next: NodeData) => onChange(node.id, next);
 
   return (
-    <aside className="wf-prop-panel">
+    <aside ref={panel} className="wf-prop-panel" role={drawer ? 'dialog' : undefined} aria-modal={drawer || undefined} aria-label="节点配置">
       <div className="wf-prop-head">
+        {onClose && <button className="ui-icon-button wf-panel-close" aria-label="关闭配置面板" onClick={onClose}><Icon name="close" /></button>}
         <div className="wf-prop-title">
-          {TYPE_LABEL[node.type ?? ''] || node.type || '节点'}
+          {data.label || TYPE_LABEL[node.type ?? ''] || node.type || '节点'}
         </div>
-        <div className="wf-prop-sub">节点 ID：{node.id}</div>
-        <button
-          className="wf-btn wf-btn-outline wf-btn-danger"
-          style={{ width: '100%', marginTop: 8 }}
-          onClick={() => onDelete(node.id)}
-        >
-          删除节点
-        </button>
+        <details className="wf-prop-sub"><summary>技术信息</summary>节点 ID：{node.id}</details>
       </div>
 
       <div className="wf-prop-body">
@@ -113,6 +114,7 @@ export function PropertyPanel({
             onEditBody={onEditLoopBody} 
           />
         )}
+        <div className="wf-danger-zone"><button className="wf-btn wf-btn-outline wf-btn-danger" onClick={() => onDelete(node.id)}>删除节点</button></div>
       </div>
     </aside>
   );

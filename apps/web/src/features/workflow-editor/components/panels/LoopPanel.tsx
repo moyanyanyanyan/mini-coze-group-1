@@ -1,5 +1,6 @@
 // src/features/workflow-editor/components/panels/LoopPanel.tsx
 import React from 'react';
+import { Icon } from '../../../../shared/ui/Icon';
 import type { Node } from '@xyflow/react';
 import type { LoopNodeData } from '../../types/workflow';
 
@@ -101,7 +102,7 @@ export function LoopPanel({ data, nodeId, nodes, onChange, onEditBody }: Props) 
               })
             }
           >
-            + 添加
+            <Icon name="plus" width={14} height={14} /> 添加
           </button>
         </div>
         {(data.outputs || []).map((o, idx) => {
@@ -115,11 +116,11 @@ export function LoopPanel({ data, nodeId, nodes, onChange, onEditBody }: Props) 
           return (
             <div
               key={idx}
-              className="wf-input-row"
-              style={{ gridTemplateColumns: '1fr 110px 1fr 24px' }}
+              className="wf-input-row wf-loop-output"
             >
               <input
                 className="wf-input"
+                aria-label="输出名"
                 value={o.name}
                 onChange={(e) => {
                   const next = (data.outputs || []).map((it, i) =>
@@ -131,6 +132,7 @@ export function LoopPanel({ data, nodeId, nodes, onChange, onEditBody }: Props) 
               />
               <select
                 className="wf-input"
+                aria-label="输出类型"
                 value={o.type}
                 onChange={(e) => {
                   const next = (data.outputs || []).map((it, i) =>
@@ -147,6 +149,7 @@ export function LoopPanel({ data, nodeId, nodes, onChange, onEditBody }: Props) 
               </select>
               <select
                 className="wf-input"
+                aria-label="循环体字段"
                 value={o.valueFrom[0] || ''}
                 onChange={(e) => {
                   const v = e.target.value;
@@ -165,6 +168,7 @@ export function LoopPanel({ data, nodeId, nodes, onChange, onEditBody }: Props) 
               </select>
               <button
                 className="wf-icon-btn wf-btn-danger"
+                aria-label={`删除输出 ${o.name}`}
                 onClick={() =>
                   onChange({
                     ...data,
@@ -173,13 +177,13 @@ export function LoopPanel({ data, nodeId, nodes, onChange, onEditBody }: Props) 
                 }
                 type="button"
               >
-                ×
+                <Icon name="close" width={14} height={14} />
               </button>
             </div>
           );
         })}
         <small className="wf-form-help">
-          outputs 的 valueFrom 引用循环体内节点的字段（暂时手动填 `node-llm-body-1.text`）
+          选择循环体内的节点字段，收集每轮的输出。
         </small>
       </div>
     </div>

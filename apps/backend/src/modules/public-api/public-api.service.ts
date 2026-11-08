@@ -11,9 +11,9 @@ import {
   RequestTimeoutException,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import type { RuntimeAgentConfig } from '../agents/types';
 import {
   RuntimeCallError,
-  type RuntimeAgentConfig,
   type RuntimeResult,
   type RuntimeSseEvent,
 } from '../../chat/runtime-client.service';

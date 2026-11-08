@@ -62,7 +62,7 @@ const mockDefinition: WorkflowDefinition = {
       data: {
         label: '结束',
         outputs: [
-          { name: 'result', type: 'string', valueFrom: 'node-llm-1.text' },
+          { name: 'result', type: 'string', valueFrom: ['node-llm-1.text'] },
         ],
       },
     },

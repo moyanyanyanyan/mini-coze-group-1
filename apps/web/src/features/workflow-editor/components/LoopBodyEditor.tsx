@@ -1,5 +1,6 @@
 // src/features/workflow-editor/components/LoopBodyEditor.tsx
 import React from 'react';
+import { Icon } from '../../../shared/ui/Icon';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ReactFlow,
@@ -106,6 +107,7 @@ function LoopBodyEditorInner({
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     if (nodes.length > 0) {
@@ -148,7 +150,7 @@ function LoopBodyEditorInner({
       if (sourceNode && sourceNode.type !== 'condition') {
         const existing = edges.filter((e) => e.source === params.source);
         if (existing.length >= 1) {
-          alert('普通节点只能有 1 条出线');
+          setNotice('普通节点只能有 1 条出线');
           return;
         }
       }
@@ -230,7 +232,7 @@ function LoopBodyEditorInner({
       });
       const roots = nodes.filter((n) => (inDegree.get(n.id) || 0) === 0);
       if (roots.length !== 1) {
-        alert(
+        setNotice(
           `循环体必须恰好有 1 个无入线的起点节点，当前有 ${roots.length} 个`,
         );
         return;
@@ -260,6 +262,7 @@ function LoopBodyEditorInner({
   return (
     <div className="wf-loop-editor-mask">
       <div className="wf-loop-editor">
+        {notice && <div className="wf-notice" role="alert"><span>{notice}</span><button className="ui-icon-button" aria-label="关闭提示" onClick={() => setNotice('')}><Icon name="close" /></button></div>}
         <header className="wf-loop-editor-header">
           <div>
             <h3 style={{ margin: 0 }}>编辑循环体</h3>
@@ -292,7 +295,7 @@ function LoopBodyEditorInner({
                 className="wf-palette-icon"
                 style={{ background: '#4d53e8' }}
               >
-                🤖
+                <Icon name="chat" />
               </span>
               <span className="wf-palette-text">
                 <span className="wf-palette-label">LLM</span>
@@ -307,7 +310,7 @@ function LoopBodyEditorInner({
                 className="wf-palette-icon"
                 style={{ background: '#f59e0b' }}
               >
-                ⑂
+                <Icon name="workflow" />
               </span>
               <span className="wf-palette-text">
                 <span className="wf-palette-label">条件分支</span>

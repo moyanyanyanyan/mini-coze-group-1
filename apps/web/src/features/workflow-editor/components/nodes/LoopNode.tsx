@@ -1,5 +1,6 @@
 // src/features/workflow-editor/components/nodes/LoopNode.tsx
 import React from 'react';
+import { Icon } from '../../../../shared/ui/Icon';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 
 export function LoopNode({ data }: NodeProps) {
@@ -23,7 +24,7 @@ export function LoopNode({ data }: NodeProps) {
 
       <div className="wf-node-head">
         <span className="wf-node-icon" style={{ background: '#0ea5e9' }}>
-          ↻
+          <Icon name="repeat" />
         </span>
         <div>
           <div className="wf-node-title">{d.label || '循环'}</div>

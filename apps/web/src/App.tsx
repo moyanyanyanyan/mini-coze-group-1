@@ -3,7 +3,7 @@ import { getWorkspaceFeature } from './app/feature-registry';
 import { LoginPage, RegisterPage } from './features/auth';
 import { LandingPage } from './features/landing/LandingPage';
 import { WorkspaceLayout } from './shared/layout/WorkspaceLayout';
-import { usePathname } from './shared/routing/navigation';
+import { useRouteLocation } from './shared/routing/navigation';
 
 const authRoutes: Record<string, ComponentType> = {
   '/login': LoginPage,
@@ -11,7 +11,7 @@ const authRoutes: Record<string, ComponentType> = {
 };
 
 export function App() {
-  const pathname = usePathname();
+  const [pathname, search] = useRouteLocation().split('?');
 
   if (pathname === '/') {
     return <LandingPage />;
@@ -27,7 +27,7 @@ export function App() {
 
   if (feature) {
     const Page = feature.Component;
-    return <WorkspaceLayout pathname={pathname}><Page /></WorkspaceLayout>;
+    return <WorkspaceLayout pathname={pathname}><Page key={search ?? ''} /></WorkspaceLayout>;
   }
 
   return <LandingPage />;

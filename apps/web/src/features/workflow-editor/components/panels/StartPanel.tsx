@@ -1,5 +1,6 @@
 // src/features/workflow-editor/components/panels/StartPanel.tsx
 import React from 'react';
+import { Icon } from '../../../../shared/ui/Icon';
 import type { StartNodeData, StartInput } from '../../types/workflow';
 
 interface Props {
@@ -44,7 +45,7 @@ export function StartPanel({ data, onChange }: Props) {
         <div className="wf-form-label-row">
           <span>输入参数</span>
           <button className="wf-link-btn" onClick={addInput} type="button">
-            + 添加
+            <Icon name="plus" width={14} height={14} /> 添加
           </button>
         </div>
         {inputs.length === 0 && (
@@ -54,12 +55,14 @@ export function StartPanel({ data, onChange }: Props) {
           <div className="wf-input-row" key={idx}>
             <input
               className="wf-input"
+              aria-label="变量名"
               value={it.name}
               onChange={(e) => updateInput(idx, { name: e.target.value })}
               placeholder="变量名"
             />
             <select
               className="wf-input"
+              aria-label="变量类型"
               value={it.type}
               onChange={(e) =>
                 updateInput(idx, { type: e.target.value as StartInput['type'] })
@@ -68,6 +71,9 @@ export function StartPanel({ data, onChange }: Props) {
               <option value="string">string</option>
               <option value="number">number</option>
               <option value="boolean">boolean</option>
+              <option value="array<string>">{'array<string>'}</option>
+              <option value="array<number>">{'array<number>'}</option>
+              <option value="array<boolean>">{'array<boolean>'}</option>
             </select>
             <label className="wf-checkbox">
               <input
@@ -81,9 +87,9 @@ export function StartPanel({ data, onChange }: Props) {
               className="wf-icon-btn wf-btn-danger"
               onClick={() => removeInput(idx)}
               type="button"
-              title="删除"
+              aria-label={`删除输入参数 ${it.name}`}
             >
-              ×
+              <Icon name="close" width={14} height={14} />
             </button>
           </div>
         ))}

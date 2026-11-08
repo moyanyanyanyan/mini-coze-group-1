@@ -1,0 +1,44 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {"id":"start","type":"start","position":{"x":40,"y":200},"data":{"inputs":[
+      {"name":"activities","type":"array<string>","required":true},
+      {"name":"rainExpected","type":"boolean","required":true}
+    ]}},
+    {"id":"activities-loop","type":"loop","position":{"x":360,"y":200},"data":{
+      "mode":"array","items":"start.activities",
+      "body":{"nodes":[
+        {"id":"activity-kit","type":"llm","position":{"x":80,"y":80},"data":{
+          "model":"deepseek-ai/DeepSeek-V4.1-Flash",
+          "systemPrompt":"你帮助用户轻装出门。针对给出的一项活动，列出最多三件需要从家带走的物品，并用短语说明用途。优先必要物品，保留活动中明确提到的要求。",
+          "userPromptTemplate":"当天活动：{{activities-loop.item}}"
+        }}
+      ],"edges":[]},
+      "outputs":[{"name":"kits","type":"array<string>","valueFrom":"activity-kit.text"}]
+    }},
+    {"id":"weather","type":"condition","position":{"x":680,"y":200},"data":{"branches":[
+      {"id":"rain","logic":"and","conditions":[{"left":"start.rainExpected","op":"eq","right":{"type":"literal","value":true}}]}
+    ]}},
+    {"id":"rain-list","type":"llm","position":{"x":1000,"y":40},"data":{
+      "model":"deepseek-ai/DeepSeek-V4.1-Flash",
+      "systemPrompt":"生成一份中文出门打包清单，每行用 □ 开头。合并重复物品，保留活动的特殊要求。当天预计有雨，按活动挑选一件合适的雨具，提醒哪些物品需要防水。若活动列表为空，给出简短的雨天通用清单。",
+      "userPromptTemplate":"活动：{{start.activities}}\n逐项备品：{{activities-loop.kits}}"
+    }},
+    {"id":"regular-list","type":"llm","position":{"x":1000,"y":360},"data":{
+      "model":"deepseek-ai/DeepSeek-V4.1-Flash",
+      "systemPrompt":"生成一份中文轻装出门打包清单，每行用 □ 开头。合并重复物品，保留活动的特殊要求。当天未预计降雨，只列活动需要携带的物品。若活动列表为空，给出简短的通用清单。",
+      "userPromptTemplate":"活动：{{start.activities}}\n逐项备品：{{activities-loop.kits}}"
+    }},
+    {"id":"end","type":"end","position":{"x":1320,"y":200},"data":{"outputs":[
+      {"name":"checklist","type":"string","valueFrom":["rain-list.text","regular-list.text"]}
+    ]}}
+  ],
+  "edges": [
+    {"id":"e1","source":"start","target":"activities-loop"},
+    {"id":"e2","source":"activities-loop","target":"weather"},
+    {"id":"e3","source":"weather","sourceHandle":"rain","target":"rain-list"},
+    {"id":"e4","source":"weather","sourceHandle":"else","target":"regular-list"},
+    {"id":"e5","source":"rain-list","target":"end"},
+    {"id":"e6","source":"regular-list","target":"end"}
+  ]
+}

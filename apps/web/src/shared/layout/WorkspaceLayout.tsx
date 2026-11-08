@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { workspaceNavigation } from '../../app/feature-registry';
 import { getMe, logout } from '../../features/auth/api/auth-api';
+import { ApiError } from '../api/http';
 import type { AuthUser } from '../../features/auth/types';
 import { AppLink } from '../routing/AppLink';
 import { navigate } from '../routing/navigation';
 import { Icon } from '../ui/Icon';
+import { useOverlayFocus } from '../ui/useOverlayFocus';
 import './workspace-layout.css';
 
 interface WorkspaceLayoutProps {
@@ -14,6 +16,16 @@ interface WorkspaceLayoutProps {
 }
 
 export function WorkspaceLayout({ pathname, children }: WorkspaceLayoutProps) {
+  const editorMode = pathname.includes('/workflows') || pathname.includes('/chat');
+  const [navPreference, setNavPreference] = useState<boolean | null>(() => {
+    const stored = sessionStorage.getItem('workspace-nav-collapsed');
+    return stored === null ? null : stored === 'true';
+  });
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const sidebarRef = useRef<HTMLElement>(null);
+  useOverlayFocus(sidebarRef, mobileNavOpen, () => setMobileNavOpen(false));
+  const collapsed = navPreference ?? editorMode;
+  useEffect(() => { setMobileNavOpen(false); }, [pathname]);
   // 底部头像区：me 为 null = 还没问到 / 问失败，显示「未登录」兜底
   const [me, setMe] = useState<AuthUser | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -27,8 +39,10 @@ export function WorkspaceLayout({ pathname, children }: WorkspaceLayoutProps) {
           setMe(user);
         }
       })
-      .catch(() => {
-        // cookie 过期等情况：不弹错，底部显示兜底文案
+      .catch((caught) => {
+        if (caught instanceof ApiError && caught.status === 401) {
+          navigate('/login');
+        }
       });
     return () => {
       alive = false;
@@ -63,8 +77,15 @@ export function WorkspaceLayout({ pathname, children }: WorkspaceLayoutProps) {
   const displayName = me ? me.displayName || me.email : '未登录';
 
   return (
-    <div className="workspace-shell">
-      <aside className="workspace-sidebar" aria-label="功能导航">
+    <div className={`workspace-shell${collapsed ? ' is-editor-mode' : ''}${mobileNavOpen ? ' is-nav-open' : ''}`}>
+      <button className="workspace-mobile-toggle" aria-label="打开导航" onClick={() => setMobileNavOpen(true)}><Icon name="menu" /> 菜单</button>
+      {mobileNavOpen && <button className="workspace-nav-backdrop" aria-label="关闭导航" onClick={() => setMobileNavOpen(false)} />}
+      <aside ref={sidebarRef} className="workspace-sidebar" aria-label="功能导航" role={mobileNavOpen ? 'dialog' : undefined} aria-modal={mobileNavOpen || undefined}>
+        <button className="workspace-collapse" aria-label={collapsed ? '展开导航' : '收起导航'} onClick={() => {
+          setNavPreference(!collapsed);
+          sessionStorage.setItem('workspace-nav-collapsed', String(!collapsed));
+          setMobileNavOpen(false);
+        }}><Icon name="panel" /></button>
         <AppLink className="workspace-brand" to="/" aria-label="返回 MiniCoze 首页">
           <span className="workspace-brand-mark" aria-hidden="true">M</span>
           <span>MiniCoze</span>
@@ -72,13 +93,15 @@ export function WorkspaceLayout({ pathname, children }: WorkspaceLayoutProps) {
 
         <nav className="workspace-nav">
           {workspaceNavigation.map((item) => {
-            const isActive = pathname === item.route;
+            const isActive = pathname === item.route || (item.route !== '/workspace' && pathname.startsWith(`${item.route}/`));
 
             return (
               <AppLink
                 key={item.id}
                 className={`workspace-nav-item${isActive ? ' is-active' : ''}`}
                 to={item.route}
+                title={item.navLabel}
+                aria-label={item.navLabel}
                 aria-current={isActive ? 'page' : undefined}
               >
                 <Icon name={item.icon} />
@@ -93,6 +116,7 @@ export function WorkspaceLayout({ pathname, children }: WorkspaceLayoutProps) {
             <button
               type="button"
               className="workspace-user-trigger"
+              aria-label="账户菜单"
               onClick={() => setMenuOpen((open) => !open)}
               aria-haspopup="menu"
               aria-expanded={menuOpen}

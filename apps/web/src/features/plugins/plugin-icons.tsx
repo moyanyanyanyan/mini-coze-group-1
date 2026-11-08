@@ -47,6 +47,24 @@ export function UploadIcon(props: PIconProps) {
   );
 }
 
+export function CalculatorIcon(props: PIconProps) {
+  return (
+    <svg {...base(props)}>
+      <rect x="4" y="2" width="16" height="20" rx="2" />
+      <path d="M8 6h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 19h.01M12 19h4" />
+    </svg>
+  );
+}
+
+export function WebIcon(props: PIconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3c2.2 2.5 3.3 5.5 3.3 9S14.2 18.5 12 21M12 3C9.8 5.5 8.7 8.5 8.7 12s1.1 6.5 3.3 9" />
+    </svg>
+  );
+}
+
 /** 关闭（lucide x） */
 export function CloseIcon(props: PIconProps) {
   return (
@@ -57,6 +75,9 @@ export function CloseIcon(props: PIconProps) {
   );
 }
 
-export function getPluginIcon(kind: 'echo' | 'time') {
-  return kind === 'time' ? ClockIcon : EchoIcon;
+export function getPluginIcon(kind: string) {
+  if (kind === 'time') return ClockIcon;
+  if (kind === 'calculator') return CalculatorIcon;
+  if (kind === 'web') return WebIcon;
+  return EchoIcon;
 }

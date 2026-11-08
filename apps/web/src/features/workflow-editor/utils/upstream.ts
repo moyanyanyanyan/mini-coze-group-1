@@ -20,7 +20,7 @@ export interface LoopContext {
   externalNodes: Node[];
 }
 
-export function getNodeOutputs(node: Node): Array<{ name: string; type: string }> {
+export function getNodeOutputs(node: Pick<Node, 'type' | 'data'>): Array<{ name: string; type: string }> {
   if (node.type === 'start') {
     const d = node.data as unknown as StartNodeData;
     return (d.inputs || []).map((i) => ({ name: i.name, type: i.type }));

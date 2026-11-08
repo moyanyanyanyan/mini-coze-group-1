@@ -1,3 +1,5 @@
+import { API_BASE } from '../../shared/api/http';
+
 export type AgentStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
 
 export const modelOptions = [
@@ -125,8 +127,6 @@ interface ApiEnvelope<T> {
   data: T;
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '';
-
 async function getCurrentUserId(): Promise<string> {
   const response = await fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' });
   if (response.ok) {
@@ -145,8 +145,9 @@ async function readResponse<T>(response: Response): Promise<T> {
   return body.data;
 }
 
-export async function listAgents(): Promise<AgentListResponse> {
-  const response = await fetch(`${API_BASE}/api/agents`, { credentials: 'include' });
+export async function listAgents(params = new URLSearchParams()): Promise<AgentListResponse> {
+  const query = params.toString();
+  const response = await fetch(`${API_BASE}/api/agents${query ? '?' + query : ''}`, { credentials: 'include' });
   return readResponse<AgentListResponse>(response);
 }
 

@@ -13,6 +13,7 @@ model KnowledgeBase {
   updatedAt   DateTime            @updatedAt
   documents   KnowledgeDocument[]
   chunks      KnowledgeChunk[]
+  agentBindings KnowledgeBaseAgentBinding[]
 
   @@index([workspaceId, createdAt])
 }
