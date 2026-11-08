@@ -4,12 +4,16 @@ Run from repository root: .venv/bin/python docs/workflows/smoke.py
 
 import argparse
 import json
+import os
 from pathlib import Path
 from urllib.request import Request, urlopen
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--base-url", default="http://localhost:3000/api")
 args = parser.parse_args()
+token = os.environ.get("WORKFLOW_SMOKE_TOKEN")
+if not token:
+    parser.error("请设置 WORKFLOW_SMOKE_TOKEN 为当前账号的有效 JWT")
 
 
 def request(path, method="GET", body=None):
@@ -18,7 +22,7 @@ def request(path, method="GET", body=None):
         args.base_url.rstrip("/") + path,
         data=data,
         method=method,
-        headers={"Content-Type": "application/json"},
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
     )
     with urlopen(req, timeout=90) as response:
         return json.load(response)

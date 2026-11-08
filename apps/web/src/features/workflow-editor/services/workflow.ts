@@ -6,9 +6,11 @@ import type {
   WorkflowRunResult,
 } from '../types/workflow';
 
+import { API_BASE } from '../../../shared/api/http';
+
 const USE_MOCK = false;
-const env = (import.meta as unknown as { env?: Record<string, string> }).env ?? {};
-const BASE = env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+
+const BASE = `${API_BASE}/api`;
 
 // ---------- Mock 数据 ----------
 const mockWorkflows: Workflow[] = [
@@ -75,12 +77,11 @@ const mockDefinition: WorkflowDefinition = {
 
 // ---------- 通用请求 ----------
 async function http<T>(url: string, init?: RequestInit): Promise<T> {
-  const token = localStorage.getItem('token');
   const res = await fetch(`${BASE}${url}`, {
     ...init,
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init?.headers || {}),
     },
   });

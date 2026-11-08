@@ -9,7 +9,11 @@ import {
   Post,
   Put,
   Query,
+  UseGuards,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import type { CurrentUser as CurrentUserPayload } from '@minicoze/shared';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import {
   CreateWorkflowDto,
   ListRunsDto,
@@ -22,6 +26,7 @@ import {
 import { WorkflowsService } from './workflows.service';
 
 @Controller('workflows')
+@UseGuards(AuthGuard('jwt'))
 export class WorkflowsController {
   /**
    * 注入工作流业务服务。
@@ -30,13 +35,16 @@ export class WorkflowsController {
   constructor(private readonly service: WorkflowsService) {}
 
   /**
-   * 创建当前开发身份下的空白工作流。
-   * @param dto 工作流名称、可选描述和开发 workspace ID。
+   * 创建当前登录用户下的空白工作流。
+   * @param dto 工作流名称、可选描述和个人 workspace ID。
    * @returns 新建工作流详情，draftDefinition 和 currentVersionId 为 null。
    */
   @Post()
-  create(@Body() dto: CreateWorkflowDto) {
-    return this.service.create(dto);
+  create(
+    @Body() dto: CreateWorkflowDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.service.create(dto, user.id);
   }
 
   /**
@@ -45,8 +53,11 @@ export class WorkflowsController {
    * @returns 列表项、总数、页码和每页数量，列表项包含节点数。
    */
   @Get()
-  list(@Query() dto: ListWorkflowsDto) {
-    return this.service.list(dto);
+  list(
+    @Query() dto: ListWorkflowsDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.service.list(dto, user.id);
   }
 
   /**
@@ -56,8 +67,8 @@ export class WorkflowsController {
    * @throws NotFoundException 工作流不存在、已归档或不属于当前身份。
    */
   @Get(':id')
-  detail(@Param('id') id: string) {
-    return this.service.detail(id);
+  detail(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload) {
+    return this.service.detail(id, user.id);
   }
 
   /**
@@ -67,8 +78,12 @@ export class WorkflowsController {
    * @returns 工作流 ID 和更新时间。
    */
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateWorkflowDto) {
-    return this.service.update(id, dto);
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateWorkflowDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.service.update(id, dto, user.id);
   }
 
   /**
@@ -78,8 +93,12 @@ export class WorkflowsController {
    * @returns 工作流 ID 和更新时间。
    */
   @Put(':id/draft')
-  save(@Param('id') id: string, @Body() dto: SaveDraftDto) {
-    return this.service.save(id, dto.definition);
+  save(
+    @Param('id') id: string,
+    @Body() dto: SaveDraftDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.service.save(id, dto.definition, user.id);
   }
 
   /**
@@ -89,8 +108,8 @@ export class WorkflowsController {
    */
   @Delete(':id')
   @HttpCode(204)
-  archive(@Param('id') id: string) {
-    return this.service.archive(id);
+  archive(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload) {
+    return this.service.archive(id, user.id);
   }
 
   /**
@@ -101,8 +120,12 @@ export class WorkflowsController {
    */
   @Post(':id/validate')
   @HttpCode(200)
-  validate(@Param('id') id: string, @Body() dto: ValidateWorkflowDto) {
-    return this.service.validate(id, dto.definition);
+  validate(
+    @Param('id') id: string,
+    @Body() dto: ValidateWorkflowDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.service.validate(id, dto.definition, user.id);
   }
 
   /**
@@ -115,8 +138,12 @@ export class WorkflowsController {
    */
   @Post(':id/run')
   @HttpCode(200)
-  run(@Param('id') id: string, @Body() dto: RunWorkflowDto) {
-    return this.service.run(id, dto.input);
+  run(
+    @Param('id') id: string,
+    @Body() dto: RunWorkflowDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.service.run(id, dto.input, user.id);
   }
 
   /**
@@ -127,7 +154,11 @@ export class WorkflowsController {
    * @throws NotFoundException 工作流不存在、已归档或不属于当前身份。
    */
   @Get(':id/runs')
-  runs(@Param('id') id: string, @Query() dto: ListRunsDto) {
-    return this.service.runs(id, dto.page, dto.size);
+  runs(
+    @Param('id') id: string,
+    @Query() dto: ListRunsDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.service.runs(id, dto.page, dto.size, user.id);
   }
 }

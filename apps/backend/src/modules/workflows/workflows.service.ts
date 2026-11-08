@@ -5,7 +5,6 @@ import {
   ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import {
   WorkflowAgentClient,
@@ -19,8 +18,6 @@ import {
 } from './workflows.dto';
 import { WorkflowsRepository } from './workflows.repository';
 
-const USER = 'workflow-dev-user';
-const WORKSPACE = 'workflow-dev-workspace';
 /**
  * 将已通过请求校验的 JSON 值转换为 Prisma 写入类型。
  * @param value 可 JSON 序列化的数据。
@@ -53,46 +50,27 @@ const nullableJson = (value: unknown) =>
 @Injectable()
 export class WorkflowsService {
   /**
-   * 注入工作流存储、Python 服务客户端和环境配置。
+   * 注入工作流存储、Python 服务客户端。
    * @param repository 工作流及运行记录的数据库访问接口。
    * @param agent Python 校验和执行接口的 HTTP 客户端。
-   * @param config 开发开关及运行环境配置。
    */
   constructor(
     private readonly repository: WorkflowsRepository,
     private readonly agent: WorkflowAgentClient,
-    private readonly config: ConfigService,
   ) {}
 
   /**
-   * 限制未接入鉴权的接口仅在显式启用的开发环境中使用。
-   * @returns 无返回值，通过检查后继续执行。
-   * @throws ServiceUnavailableException 生产环境或未启用开发开关（503）。
-   */
-  private developmentOnly() {
-    if (
-      this.config.get<string>('NODE_ENV') === 'production' ||
-      this.config.get<string>('WORKFLOW_DEV_MODE') !== 'true'
-    ) {
-      throw new ServiceUnavailableException(
-        'Workflow authentication is pending; enable WORKFLOW_DEV_MODE only in local development',
-      );
-    }
-  }
-
-  /**
-   * 读取属于当前固定开发身份和 workspace 的未归档工作流。
+   * 读取属于当前登录用户和个人 workspace 的未归档工作流。
    * @param id 工作流 ID。
    * @returns 可访问的数据库工作流记录。
    * @throws NotFoundException 记录不存在、已归档或归属不匹配（404）。
    */
-  private async owned(id: string) {
-    this.developmentOnly();
+  private async owned(id: string, userId: string) {
     const workflow = await this.repository.find(id);
     if (
       !workflow ||
-      workflow.creatorId !== USER ||
-      workflow.workspaceId !== WORKSPACE ||
+      workflow.creatorId !== userId ||
+      workflow.workspaceId !== userId ||
       workflow.status === 'ARCHIVED'
     ) {
       throw new NotFoundException('WORKFLOW_NOT_FOUND');
@@ -102,23 +80,22 @@ export class WorkflowsService {
 
   /**
    * 创建空白草稿，由服务端设置创建者及 workspace。
-   * @param dto 名称、可选描述及固定开发 workspace ID。
+   * @param dto 名称、可选描述及当前用户的个人 workspace ID。
    * @returns 新建记录和暂未实现的版本指针 currentVersionId=null。
-   * @throws BadRequestException 请求 workspace 与固定开发 workspace 不符（400）。
+   * @throws BadRequestException 请求 workspace 与当前用户不符（400）。
    */
-  async create(dto: CreateWorkflowDto) {
-    this.developmentOnly();
-    if (dto.workspaceId && dto.workspaceId !== WORKSPACE) {
+  async create(dto: CreateWorkflowDto, userId: string) {
+    if (dto.workspaceId && dto.workspaceId !== userId) {
       throw new BadRequestException(
-        'Use workflow-dev-workspace during local development',
+        'Workspace must belong to the current user',
       );
     }
     return {
       ...(await this.repository.create({
         name: dto.name,
         description: dto.description,
-        workspaceId: WORKSPACE,
-        creatorId: USER,
+        workspaceId: userId,
+        creatorId: userId,
       })),
       currentVersionId: null,
     };
@@ -129,12 +106,11 @@ export class WorkflowsService {
    * @param dto 页码、每页数量、可选关键词和状态；默认排除归档项。
    * @returns items、total、page、size；列表项不包含完整草稿。
    */
-  async list(dto: ListWorkflowsDto) {
-    this.developmentOnly();
+  async list(dto: ListWorkflowsDto, userId: string) {
     const result = await this.repository.list(
       {
-        creatorId: USER,
-        workspaceId: WORKSPACE,
+        creatorId: userId,
+        workspaceId: userId,
         status: dto.status ?? { not: 'ARCHIVED' },
         ...(dto.keyword
           ? { name: { contains: dto.keyword, mode: 'insensitive' } }
@@ -159,8 +135,8 @@ export class WorkflowsService {
    * @returns 包含 draftDefinition 和空版本指针的工作流记录。
    * @throws NotFoundException 工作流不可访问（404）。
    */
-  async detail(id: string) {
-    return { ...(await this.owned(id)), currentVersionId: null };
+  async detail(id: string, userId: string) {
+    return { ...(await this.owned(id, userId)), currentVersionId: null };
   }
 
   /**
@@ -169,8 +145,8 @@ export class WorkflowsService {
    * @param dto 可选名称和描述，不修改草稿或执行状态。
    * @returns 更新后的工作流 ID 和 updatedAt。
    */
-  async update(id: string, dto: UpdateWorkflowDto) {
-    await this.owned(id);
+  async update(id: string, dto: UpdateWorkflowDto, userId: string) {
+    await this.owned(id, userId);
     const row = await this.repository.update(id, dto);
     return { id: row.id, updatedAt: row.updatedAt };
   }
@@ -180,8 +156,8 @@ export class WorkflowsService {
    * @param id 工作流 ID。
    * @returns Promise<void>，归档成功后不返回数据。
    */
-  async archive(id: string) {
-    await this.owned(id);
+  async archive(id: string, userId: string) {
+    await this.owned(id, userId);
     await this.repository.update(id, { status: 'ARCHIVED' });
   }
 
@@ -192,8 +168,8 @@ export class WorkflowsService {
    * @returns 工作流 ID 和更新时间。
    * @throws BadRequestException 定义的基础字段或类型错误（400）。
    */
-  async save(id: string, definition: Record<string, unknown>) {
-    await this.owned(id);
+  async save(id: string, definition: Record<string, unknown>, userId: string) {
+    await this.owned(id, userId);
     const number = (v: unknown) => typeof v === 'number' && Number.isFinite(v);
     if (
       typeof definition.version !== 'string' ||
@@ -236,8 +212,12 @@ export class WorkflowsService {
    * @returns valid 和结构化 errors，不修改草稿。
    * @throws ServiceUnavailableException Python 不可达或响应异常（503）。
    */
-  async validate(id: string, definition?: Record<string, unknown>) {
-    const row = await this.owned(id);
+  async validate(
+    id: string,
+    definition: Record<string, unknown> | undefined,
+    userId: string,
+  ) {
+    const row = await this.owned(id, userId);
     try {
       return await this.agent.validate(definition ?? row.draftDefinition);
     } catch {
@@ -255,8 +235,8 @@ export class WorkflowsService {
    * @throws ServiceUnavailableException 预校验阶段 Python 服务不可用（503）。
    * @remarks 创建记录后的执行故障转为 FAILED；数据库写入失败仍会向上传播。
    */
-  async run(id: string, input: Record<string, unknown>) {
-    const row = await this.owned(id);
+  async run(id: string, input: Record<string, unknown>, userId: string) {
+    const row = await this.owned(id, userId);
     let validation;
     try {
       validation = await this.agent.validate(row.draftDefinition, input);
@@ -278,7 +258,7 @@ export class WorkflowsService {
     }
     const run = await this.repository.startRun({
       workflow: { connect: { id } },
-      userId: USER,
+      userId,
       definition: json(row.draftDefinition),
       input: json(input),
       status: 'RUNNING',
@@ -324,8 +304,8 @@ export class WorkflowsService {
    * @returns items、total、page、size；列表项不含 Definition 快照，RUNNING 记录 endedAt 为 null。
    * @throws NotFoundException 工作流不可访问（404）。
    */
-  async runs(id: string, page: number, size: number) {
-    await this.owned(id);
+  async runs(id: string, page: number, size: number, userId: string) {
+    await this.owned(id, userId);
     const result = await this.repository.listRuns(id, page, size);
     return {
       ...result,

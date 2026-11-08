@@ -8,20 +8,15 @@
 - 尚未完成真实数据库验收：没有生成或提交 migration。
 - 已合入 Runtime 分支 `codex/feature/wangyiheng/agent-runtime`（775b3db），Agent 启动时注入 `app.state.workflow_complete`（`app/workflow/runtime_adapter.py: runtime_complete`）。真实模型验收仍阻塞：DeepSeek 与 SiliconFlow 账号均返回 402 余额不足。
 - 尚未与同学实际联调，以下协调清单供负责人发送和约时间。自动测试不能替代真实模型、数据库和编辑器验收。
-- 鉴权、发布、版本、SSE、运行取消接口不在本次交付中。`currentVersionId` 始终为 null。
+- 已接入 JWT 登录鉴权及账号隔离；发布、版本、SSE、运行取消接口尚未实现。`currentVersionId` 始终为 null。
 
 ## 启动与数据库部署
 
-沿用仓库 README 安装依赖和启动三个服务。仅限本地开发，在根 `.env` 加：
+沿用仓库 README 安装依赖和启动三个服务。配置沿用 `DATABASE_URL`、`JWT_SECRET`、`AGENT_SERVICE_URL`（默认 http://localhost:8000）、`PORT`（3000）。不要提交 `.env`。
 
-```dotenv
-WORKFLOW_DEV_MODE=true
-```
+所有工作流接口使用现有 JWT 鉴权，支持登录 Cookie 或 Authorization Bearer；未登录返回 401。创建者和个人 workspace 均取当前用户 ID，列表仅返回本人数据，访问其他账号的工作流返回 404。创建请求可省略 workspaceId，若提供必须与当前用户 ID 相同。
 
-其他配置沿用 `DATABASE_URL`、`AGENT_SERVICE_URL`（默认 http://localhost:8000）、`PORT`（3000）。不要提交 `.env`。
-
-未显式打开开发开关，或 `NODE_ENV=production` 时，所有工作流业务接口返回 503。当前没有 JWT 权限隔离，所有本地调用共享服务端固定身份 `workflow-dev-user`、workspace `workflow-dev-workspace`；前端不需要 JWT，未来由真实 CurrentUser 替换。创建请求的 workspaceId 可省略，若提供必须为这个固定 workspace。禁止将此开发配置用于公开部署。
-
+旧版共享开发身份创建的数据保留在数据库中，但不会展示给普通账号，也不会自动分配所有者。
 领域模型位于 `apps/backend/prisma/schema/workflows.prisma`。遵循仓库约定：由集成人员将 Schema 合入集成分支后，针对开发数据库统一生成、审核和应用 migration：
 
 ```sh
@@ -38,7 +33,7 @@ Base URL：`http://localhost:3000/api`。Content-Type：`application/json`。前
 
 | 方法/路径 | 请求 | 响应 |
 |---|---|---|
-| POST /workflows | `{ "name":"问答", "description":"可选", "workspaceId":"workflow-dev-workspace" }` | 201；完整 Workflow，draftDefinition=null、status=DRAFT、currentVersionId=null |
+| POST /workflows | `{ "name":"问答", "description":"可选" }` | 201；完整 Workflow，draftDefinition=null、status=DRAFT、currentVersionId=null |
 | GET /workflows | page=1，size=10（1–50），keyword 可选，status 可选 | 200；`{items,total,page,size}`，列表项含 nodeCount、currentVersionId，不含 draftDefinition |
 | GET /workflows/:id | 无 | 200；完整 Workflow，包括 draftDefinition |
 | PUT /workflows/:id/draft | `{ "definition": WorkflowDefinition }` | 200；`{id,updatedAt}` |
@@ -136,7 +131,7 @@ pnpm --filter @minicoze/backend build
 
 本次自动结果：Python 21 项、NestJS 8 项通过，Prisma validate/generate、后端类型检查和构建通过。NestJS HTTP 测试使用 Repository/Agent 桩，覆盖真实 DTO、Controller、Service 和异常过滤器，尚不证明 PostgreSQL 读写。Python 测试使用固定返回的异步 Provider，不调用真实模型。
 
-真实服务就绪后可运行 `.venv/bin/python docs/workflows/smoke.py`，自动创建并保留一条验收工作流，验证 HTTP 保存、加载、校验和成功运行；这不证明 Provider 实际使用了哪家模型，须核对 Runtime 配置。
+真实服务就绪后设置环境变量 `WORKFLOW_SMOKE_TOKEN` 为当前账号的有效 JWT，再运行 `.venv/bin/python docs/workflows/smoke.py`，自动创建并保留一条验收工作流，验证 HTTP 保存、加载、校验和成功运行；这不证明 Provider 实际使用了哪家模型，须核对 Runtime 配置。
 
 22 日中午前须人工完成：
 
@@ -151,11 +146,11 @@ pnpm --filter @minicoze/backend build
 
 ## 建议集中发出的对齐信息（尚未发送）
 
-博美佳：采用附件新版 version/userPromptTemplate/valueFrom、PUT /draft、大写状态；请先保存再运行。文档与样例在本目录，开发固定 workspaceId 如上。预约 22 日上午完成保存加载、校验定位和真实运行验收。
+博美佳：采用附件新版 version/userPromptTemplate/valueFrom、PUT /draft、大写状态；请先保存再运行。文档与样例在本目录，个人 workspaceId 规则如上。预约 22 日上午完成保存加载、校验定位和真实运行验收。
 
 王一恒：请确认上面的非流式异步签名和 usage/异常语义，争取 21 日中午前提供公开入口，21 日下午一起完成真实 DeepSeek 调用。没有 Runtime 实现时，真实验收明确处于阻塞状态。
 
-组长：请安排集成分支 migration 执行人，确认内部 token 的统一方案；本轮鉴权暂缓，工作流接口只在显式打开开发开关时提供服务。请审核公共异常过滤器保留 details 的小改动。
+组长：请安排集成分支 migration 执行人，确认内部 token 的统一方案；工作流接口现已接入 JWT 账号隔离。请审核公共异常过滤器保留 details 的小改动。
 
 周五 23:59 前的协作定稿应包含参与人、最终接口、三方代码提交、真实联调结果和 Week3 遗留项。当前文件为实现交付说明，不能作为已完成三方联调的证明。
 
