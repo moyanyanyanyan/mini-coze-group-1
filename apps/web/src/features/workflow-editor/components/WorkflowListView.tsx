@@ -1,6 +1,6 @@
 // src/features/workflow-editor/components/WorkflowListView.tsx
 import React from 'react';
-import { useConfirm } from '../../../shared/ui/useConfirm';
+import { useConfirm } from '@minicoze/ui/hooks';
 import { useEffect, useRef, useState } from 'react';
 import { navigate } from '../../../shared/routing/navigation';
 import {

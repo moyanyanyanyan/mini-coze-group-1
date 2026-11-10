@@ -1,7 +1,7 @@
 // src/features/workflow-editor/components/NodePalette.tsx
 import React, { useRef } from 'react';
-import { useOverlayFocus } from '../../../shared/ui/useOverlayFocus';
-import { Icon } from '../../../shared/ui/Icon';
+import { useOverlayFocus } from '@minicoze/ui/hooks';
+import { Icon } from '@minicoze/ui/components';
 import type { IconName } from '../../../app/types';
 import type { Node } from '@xyflow/react';
 import type { NodeType } from '../types/workflow';

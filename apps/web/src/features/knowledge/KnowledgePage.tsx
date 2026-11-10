@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { ActionMenu } from '../../shared/ui/ActionMenu';
-import { useConfirm } from '../../shared/ui/useConfirm';
+import { ActionMenu } from '@minicoze/ui/components';
+import { useConfirm } from '@minicoze/ui/hooks';
 import { createKnowledgeBase, createTextDocument, getKnowledgeWorkspaceId, deleteKnowledgeBase, deleteKnowledgeDocument, listDocumentChunks, listKnowledgeBases, listKnowledgeDocuments, previewKnowledgeSearch, retryKnowledgeDocument, updateKnowledgeBaseStatus, uploadDocumentFile, type KnowledgeBase, type KnowledgeChunkPage, type KnowledgeDocument, type KnowledgeSearchResult } from './knowledge.api';
 import './knowledge.css';
 

@@ -1,6 +1,6 @@
 // src/features/workflow-editor/components/panels/LoopPanel.tsx
 import React from 'react';
-import { Icon } from '../../../../shared/ui/Icon';
+import { Icon } from '@minicoze/ui/components';
 import type { Node } from '@xyflow/react';
 import type { LoopNodeData } from '../../types/workflow';
 

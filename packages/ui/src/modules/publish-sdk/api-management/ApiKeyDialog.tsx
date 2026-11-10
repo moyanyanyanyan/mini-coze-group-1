@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
-// Shared dialog primitives for API Key flows.
+// API 密钥模块共用的弹窗交互。
 
 interface ApiKeyDialogProps {
   open: boolean;

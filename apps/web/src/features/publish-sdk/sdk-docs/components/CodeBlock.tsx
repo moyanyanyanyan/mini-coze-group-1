@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { NoticeType } from '../../../../shared/hooks/use-notice';
+import type { NoticeType } from '@minicoze/ui/hooks';
 import type { CodeSample } from '../data/api-docs.data';
 
 interface CodeBlockProps {

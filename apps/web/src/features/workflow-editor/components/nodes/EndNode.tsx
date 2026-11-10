@@ -1,5 +1,5 @@
 import React from 'react';
-import { Icon } from '../../../../shared/ui/Icon';
+import { Icon } from '@minicoze/ui/components';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 
 const STATUS_TEXT: Record<string, string> = {

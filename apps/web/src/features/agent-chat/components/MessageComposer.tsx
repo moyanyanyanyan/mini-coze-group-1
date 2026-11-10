@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { FormEvent, KeyboardEvent } from 'react';
-import { Icon } from '../../../shared/ui/Icon';
+import { Icon } from '@minicoze/ui/components';
 import styles from '../agent-chat.module.css';
 
 interface MessageComposerProps {

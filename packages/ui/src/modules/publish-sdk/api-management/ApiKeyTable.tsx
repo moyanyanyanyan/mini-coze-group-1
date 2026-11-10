@@ -1,15 +1,12 @@
-import { LIST_LOAD_ERROR_MESSAGE } from '../utils/api-key-form';
-import type { ApiKey } from '../api/api-keys.types';
-import type { NoticeType } from '../../../../shared/hooks/use-notice';
-import { ApiKeyRowActions } from './ApiKeyRowActions';
-import type { ApiKeyListStatus } from '../hooks/use-api-keys';
+import type { ReactNode } from 'react';
+import type { ApiKeyRecord, ApiKeyListStatus } from './types';
 
-interface ApiKeyTableProps {
-  records: ApiKey[];
+export interface ApiKeyTableProps {
+  records: ApiKeyRecord[];
   status: ApiKeyListStatus;
-  onRefresh: () => Promise<boolean>;
-  onDeleted: (id: string) => void;
-  onNotice: (type: NoticeType, message: string) => void;
+  onRefresh: () => void;
+  renderActions: (apiKey: ApiKeyRecord) => ReactNode;
+  loadErrorMessage: string;
 }
 
 const dateFormatter = new Intl.DateTimeFormat('zh-CN', {
@@ -35,8 +32,8 @@ export function ApiKeyTable({
   records,
   status,
   onRefresh,
-  onDeleted,
-  onNotice,
+  renderActions,
+  loadErrorMessage,
 }: ApiKeyTableProps) {
   return (
     <div className="api-key-table-shell">
@@ -57,7 +54,7 @@ export function ApiKeyTable({
             {status === 'error' ? (
               <tr>
                 <td className="api-key-table-state" colSpan={6}>
-                  <p>{LIST_LOAD_ERROR_MESSAGE}</p>
+                  <p>{loadErrorMessage}</p>
                   <button
                     className="api-key-button api-key-button--secondary"
                     type="button"
@@ -84,12 +81,7 @@ export function ApiKeyTable({
                 <td>{formatDate(apiKey.createdAt)}</td>
                 <td>{apiKey.lastUsedAt ? formatDate(apiKey.lastUsedAt) : '从未使用'}</td>
                 <td>
-                  <ApiKeyRowActions
-                    apiKey={apiKey}
-                    onDeleted={onDeleted}
-                    onRefresh={onRefresh}
-                    onNotice={onNotice}
-                  />
+                  {renderActions(apiKey)}
                 </td>
               </tr>
             )) : null}

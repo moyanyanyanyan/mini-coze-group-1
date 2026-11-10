@@ -1,6 +1,6 @@
 // src/features/workflow-editor/components/panels/StartPanel.tsx
 import React from 'react';
-import { Icon } from '../../../../shared/ui/Icon';
+import { Icon } from '@minicoze/ui/components';
 import type { StartNodeData, StartInput } from '../../types/workflow';
 
 interface Props {

@@ -20,7 +20,8 @@ Agent Service (FastAPI) ----> DeepSeek / Embedding（后续接入）
 
 ## 目录职责
 
-- `apps/web`：页面、浏览器状态和 API 调用；业务代码按 `features/<领域>` 组织。
+- `apps/web`：应用入口、路由装配、业务状态和 API 调用；业务代码按 `features/<领域>` 组织。已迁移模块通过 props 和回调接入 `packages/ui`。
+- `packages/ui`：公共组件、主题、布局视图，以及 `modules/<领域>` 下由各模块负责人维护的界面。当前已迁移公共 UI 和 `publish-sdk/api-management`；其他模块的界面暂留在 `apps/web`，按模块逐步迁移。
 - `apps/backend/src/modules`：NestJS 业务领域模块，模块内部拥有自己的 Controller、Service、Repository、DTO 和错误。
 - `apps/backend/src/integrations`：FastAPI 等外部服务适配，不承载业务规则。
 - `apps/backend/src/database`：Prisma 生命周期和数据库基础设施。
@@ -49,5 +50,7 @@ Agent Service (FastAPI) ----> DeepSeek / Embedding（后续接入）
 8. `common` 只接收至少两个领域已经复用的技术能力，业务逻辑和临时 Mock 留在所属模块。
 9. Prisma 模型由领域负责人维护，migration 只在集成分支统一生成和审核。
 10. 前端顶级页面只在 `app/feature-registry.tsx` 注册一次，路由、侧栏和首页入口由 registry 派生。
+11. UI 包不能反向引用应用代码，也不能发起业务请求。业务校验、请求状态和服务端错误处理留在 web；焦点、弹窗、折叠等纯交互状态可以留在 UI。
+12. UI 包按公共出口使用：`@minicoze/ui/components`、`hooks`、`layouts`、`api-management`。应用入口统一导入 `@minicoze/ui/theme.css`；模块样式由对应视图导入。路由链接通过应用注入的 Link 组件适配，不在 UI 内绑定路由实现。
 
 具体 API 路径、请求响应、事件和错误格式由相关负责人共同确认后再写入公共文档和共享类型。

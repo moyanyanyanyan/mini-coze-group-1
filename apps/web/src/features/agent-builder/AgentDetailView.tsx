@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Icon } from '../../shared/ui/Icon';
-import { useOverlayFocus } from '../../shared/ui/useOverlayFocus';
+import { Icon } from '@minicoze/ui/components';
+import { useOverlayFocus } from '@minicoze/ui/hooks';
 import {
   BindingPickerModal,
   type PickerItem,

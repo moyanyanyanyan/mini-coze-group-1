@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Agent } from '../../agent-builder/agent.api';
-import { Icon } from '../../../shared/ui/Icon';
+import { Icon } from '@minicoze/ui/components';
 import styles from '../agent-chat.module.css';
 
 export function AgentSwitcher({ agents, value, disabled, onChange }: { agents: Agent[]; value: string; disabled: boolean; onChange: (id: string) => void }) {

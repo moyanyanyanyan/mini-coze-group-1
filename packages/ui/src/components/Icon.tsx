@@ -1,5 +1,5 @@
 import type { ReactNode, SVGProps } from 'react';
-import type { IconName } from '../../app/types';
+import type { IconName } from './types';
 
 interface IconProps extends SVGProps<SVGSVGElement> {
   name: IconName;

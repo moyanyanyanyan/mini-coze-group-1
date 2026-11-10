@@ -1,6 +1,6 @@
 // src/features/workflow-editor/components/nodes/LoopNode.tsx
 import React from 'react';
-import { Icon } from '../../../../shared/ui/Icon';
+import { Icon } from '@minicoze/ui/components';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 
 export function LoopNode({ data }: NodeProps) {

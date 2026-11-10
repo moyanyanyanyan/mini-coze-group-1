@@ -1,6 +1,6 @@
 // src/features/workflow-editor/components/nodes/ConditionNode.tsx
 import React from 'react';
-import { Icon } from '../../../../shared/ui/Icon';
+import { Icon } from '@minicoze/ui/components';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import type { ConditionNodeData } from '../../types/workflow';
 

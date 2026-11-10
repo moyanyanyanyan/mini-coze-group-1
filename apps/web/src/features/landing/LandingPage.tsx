@@ -1,6 +1,6 @@
 import { landingModules } from '../../app/feature-registry';
 import { AppLink } from '../../shared/routing/AppLink';
-import { Icon } from '../../shared/ui/Icon';
+import { Icon } from '@minicoze/ui/components';
 import './landing.css';
 
 export function LandingPage() {

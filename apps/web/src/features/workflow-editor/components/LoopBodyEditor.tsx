@@ -1,6 +1,6 @@
 // src/features/workflow-editor/components/LoopBodyEditor.tsx
 import React from 'react';
-import { Icon } from '../../../shared/ui/Icon';
+import { Icon } from '@minicoze/ui/components';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ReactFlow,

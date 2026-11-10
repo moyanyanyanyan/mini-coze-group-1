@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { AppLink } from '../../../../shared/routing/AppLink';
-import { useNotice, type NoticeType } from '../../../../shared/hooks/use-notice';
-import { NoticeToast } from '../../../../shared/ui/NoticeToast';
+import { useNotice, type NoticeType } from '@minicoze/ui/hooks';
+import { NoticeToast } from '@minicoze/ui/components';
 import {
   API_DOC_SECTIONS,
   ENDPOINTS,

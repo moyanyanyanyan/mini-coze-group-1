@@ -13,10 +13,10 @@ import {
 import { ChatBubble } from './components/ChatBubble';
 import { MessageComposer } from './components/MessageComposer';
 import { AppLink } from '../../shared/routing/AppLink';
-import { Icon } from '../../shared/ui/Icon';
-import { ActionMenu } from '../../shared/ui/ActionMenu';
-import { useConfirm } from '../../shared/ui/useConfirm';
-import { useOverlayFocus } from '../../shared/ui/useOverlayFocus';
+import { Icon } from '@minicoze/ui/components';
+import { ActionMenu } from '@minicoze/ui/components';
+import { useConfirm } from '@minicoze/ui/hooks';
+import { useOverlayFocus } from '@minicoze/ui/hooks';
 import { AgentSwitcher } from './components/AgentSwitcher';
 import styles from './agent-chat.module.css';
 

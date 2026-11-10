@@ -1,8 +1,8 @@
 // src/features/workflow-editor/components/WorkflowEditorView.tsx
 import React from 'react';
-import { Icon } from '../../../shared/ui/Icon';
-import { ActionMenu } from '../../../shared/ui/ActionMenu';
-import { useConfirm } from '../../../shared/ui/useConfirm';
+import { Icon } from '@minicoze/ui/components';
+import { ActionMenu } from '@minicoze/ui/components';
+import { useConfirm } from '@minicoze/ui/hooks';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ReactFlow,

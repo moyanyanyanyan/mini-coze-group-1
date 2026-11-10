@@ -1,7 +1,7 @@
 // src/features/workflow-editor/components/PropertyPanel.tsx
 import React, { useRef } from 'react';
-import { useOverlayFocus } from '../../../shared/ui/useOverlayFocus';
-import { Icon } from '../../../shared/ui/Icon';
+import { useOverlayFocus } from '@minicoze/ui/hooks';
+import { Icon } from '@minicoze/ui/components';
 import type { Node, Edge } from '@xyflow/react';
 import type {
   NodeData,
