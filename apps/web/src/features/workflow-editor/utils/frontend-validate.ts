@@ -1,7 +1,7 @@
 // src/features/workflow-editor/utils/frontend-validate.ts
 import type { Node, Edge } from '@xyflow/react';
 import type { StartNodeData, LlmNodeData, EndNodeData } from '../types/workflow';
-import type { ValidationError } from '../components/ValidationDialog';
+import type { ValidationError } from '@minicoze/ui/workflow-editor';
 
 export function frontendValidate(
   nodes: Node[],

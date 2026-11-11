@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { ApiError, register } from './api/auth-api';
-import { AuthField } from './components/AuthField';
-import { AuthLayout } from './components/AuthLayout';
+import { RegisterView } from '@minicoze/ui/auth';
+import { AppLink } from '../../shared/routing/AppLink';
 import { navigate } from '../../shared/routing/navigation';
-import styles from './auth.module.css';
 
 interface FieldErrors {
   displayName?: string;
@@ -69,55 +68,21 @@ export function RegisterPage() {
   };
 
   return (
-    <AuthLayout
-      title="创建账号"
-      description="注册后即可搭建属于你的智能体。"
-      footer={{ text: '已经有账号了？', label: '去登录', to: '/login' }}
-    >
-      <form className={styles.form} onSubmit={handleSubmit} noValidate>
-        <AuthField
-          label="昵称"
-          type="text"
-          value={displayName}
-          placeholder="怎么称呼你"
-          autoComplete="nickname"
-          error={fieldErrors.displayName}
-          onChange={setDisplayName}
-        />
-        <AuthField
-          label="邮箱"
-          type="email"
-          value={email}
-          placeholder="you@example.com"
-          autoComplete="email"
-          error={fieldErrors.email}
-          onChange={setEmail}
-        />
-        <AuthField
-          label="密码"
-          type="password"
-          value={password}
-          placeholder="至少 8 位"
-          autoComplete="new-password"
-          error={fieldErrors.password}
-          onChange={setPassword}
-        />
-        <AuthField
-          label="确认密码"
-          type="password"
-          value={confirmPassword}
-          placeholder="再输入一次密码"
-          autoComplete="new-password"
-          error={fieldErrors.confirmPassword}
-          onChange={setConfirmPassword}
-        />
-
-        {formError ? <p className={styles.alert} role="alert">{formError}</p> : null}
-
-        <button className={styles.submit} type="submit" disabled={submitting}>
-          {submitting ? '注册中…' : '注册'}
-        </button>
-      </form>
-    </AuthLayout>
+    <RegisterView
+      displayName={displayName}
+      onDisplayNameChange={setDisplayName}
+      email={email}
+      onEmailChange={setEmail}
+      password={password}
+      onPasswordChange={setPassword}
+      confirmPassword={confirmPassword}
+      onConfirmPasswordChange={setConfirmPassword}
+      formError={formError}
+      submitting={submitting}
+      handleSubmit={handleSubmit}
+      LinkComponent={AppLink}
+      footerRoute="/login"
+      fieldErrors={fieldErrors}
+    />
   );
 }

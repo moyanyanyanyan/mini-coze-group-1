@@ -4,13 +4,10 @@ import {
   type PluginCatalogItem,
 } from "./plugins.api";
 import {
-  CATEGORY_META,
-  CATEGORY_ORDER,
-  PluginCard,
+  PluginsView,
   type MarketPlugin,
   type PluginCategory,
-} from "./PluginCard";
-import "./plugins.css";
+} from "@minicoze/ui/plugins";
 
 /** 内置插件 → 市场分类的展示映射（分类仅用于 UI 分组，不改后端契约） */
 function categoryOf(pluginId: string): PluginCategory {
@@ -85,68 +82,16 @@ export function PluginsPage() {
   }, [reload]);
 
   return (
-    <section className="feature-page plugins-page" aria-label="插件市场">
-      <header className="pm-header">
-        <div className="pm-header-inner">
-          <div>
-            <h1>插件</h1>
-            <p>浏览内置能力，在智能体编辑页选择并绑定使用。</p>
-          </div>
-        </div>
-      </header>
-
-      <main className="pm-main">
-        <div className="pm-toolbar">
-          <input
-            className="pm-search"
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="搜索插件名称或能力"
-            aria-label="搜索插件"
-          />
-          <div className="pm-filters" aria-label="插件分类">
-            <button type="button" className={category === 'all' ? 'is-active' : ''} onClick={() => setCategory('all')}>全部</button>
-            {CATEGORY_ORDER.map((item) => (
-              <button key={item} type="button" className={category === item ? 'is-active' : ''} onClick={() => setCategory(item)}>
-                {CATEGORY_META[item]}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="pm-grid pm-skeleton-grid" aria-label="正在加载插件">
-            {Array.from({ length: 6 }, (_, index) => <div className="pm-skeleton" key={index} />)}
-          </div>
-        ) : null}
-        {error ? (
-          <p className="pm-status pm-status-error">加载失败：{error} <button onClick={() => setReload((value) => value + 1)}>重试</button></p>
-        ) : null}
-        {!loading && !error && filteredMarket.length === 0 ? (
-          <div className="pm-empty">
-            <strong>没有找到匹配的插件</strong>
-            <span>调整搜索词或分类后再试。</span>
-            <button onClick={() => { setQuery(''); setCategory('all'); }}>清空筛选</button>
-          </div>
-        ) : null}
-
-        {!loading &&
-          !error &&
-          (
-              <section className="pm-section" aria-label="插件列表">
-                <div className="pm-grid">
-                  {filteredMarket.map((plugin) => (
-                    <PluginCard
-                      key={plugin.pluginId}
-                      plugin={plugin}
-                    />
-                  ))}
-                </div>
-              </section>
-            )}
-      </main>
-
-    </section>
+    <PluginsView
+      loading={loading}
+      error={error}
+      query={query}
+      category={category}
+      filteredMarket={filteredMarket}
+      onQueryChange={setQuery}
+      onCategoryChange={setCategory}
+      onRetry={() => setReload((value) => value + 1)}
+      onClearFilters={() => { setQuery(''); setCategory('all'); }}
+    />
   );
 }

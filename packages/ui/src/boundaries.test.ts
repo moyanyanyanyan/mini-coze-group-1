@@ -16,7 +16,7 @@ function sourceFiles(directory: string): string[] {
 
 it('keeps UI imports inside the package or its declared presentation dependencies', () => {
   const violations: string[] = [];
-  const allowed = new Set(['react', 'react-dom', 'react/jsx-runtime']);
+  const allowed = new Set(['react', 'react-dom', 'react/jsx-runtime', '@xyflow/react', '@xyflow/react/dist/style.css']);
   for (const path of sourceFiles(sourceRoot)) {
     const source = ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true,
       extname(path) === '.tsx' ? ts.ScriptKind.TSX : ts.ScriptKind.TS);

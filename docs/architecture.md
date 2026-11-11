@@ -21,7 +21,7 @@ Agent Service (FastAPI) ----> DeepSeek / Embedding（后续接入）
 ## 目录职责
 
 - `apps/web`：应用入口、路由装配、业务状态和 API 调用；业务代码按 `features/<领域>` 组织。已迁移模块通过 props 和回调接入 `packages/ui`。
-- `packages/ui`：公共组件、主题、布局视图，以及 `modules/<领域>` 下由各模块负责人维护的界面。当前已迁移公共 UI 和 `publish-sdk/api-management`；其他模块的界面暂留在 `apps/web`，按模块逐步迁移。
+- `packages/ui`：公共组件、主题、布局视图，以及 `modules/<领域>` 下由各模块负责人维护的界面。当前已迁移公共 UI、`publish-sdk/api-management`、`publish-sdk/sdk-docs`、`auth`、`agent-builder`、`plugins`、`knowledge`、`agent-chat`、`workflow-editor`、`workspace` 和 `landing`。
 - `apps/backend/src/modules`：NestJS 业务领域模块，模块内部拥有自己的 Controller、Service、Repository、DTO 和错误。
 - `apps/backend/src/integrations`：FastAPI 等外部服务适配，不承载业务规则。
 - `apps/backend/src/database`：Prisma 生命周期和数据库基础设施。
@@ -51,6 +51,13 @@ Agent Service (FastAPI) ----> DeepSeek / Embedding（后续接入）
 9. Prisma 模型由领域负责人维护，migration 只在集成分支统一生成和审核。
 10. 前端顶级页面只在 `app/feature-registry.tsx` 注册一次，路由、侧栏和首页入口由 registry 派生。
 11. UI 包不能反向引用应用代码，也不能发起业务请求。业务校验、请求状态和服务端错误处理留在 web；焦点、弹窗、折叠等纯交互状态可以留在 UI。
-12. UI 包按公共出口使用：`@minicoze/ui/components`、`hooks`、`layouts`、`api-management`。应用入口统一导入 `@minicoze/ui/theme.css`；模块样式由对应视图导入。路由链接通过应用注入的 Link 组件适配，不在 UI 内绑定路由实现。
+12. UI 包按公共出口使用：`@minicoze/ui/components`、`hooks`、`layouts`、`api-management`、`sdk-docs`、`auth`、`agent-builder`、`plugins`、`knowledge`、`agent-chat`、`workflow-editor`、`workspace`、`landing`。应用入口统一导入 `@minicoze/ui/theme.css`；模块样式由对应视图导入。路由链接通过应用注入的 Link 组件适配，不在 UI 内绑定路由实现。
 
 具体 API 路径、请求响应、事件和错误格式由相关负责人共同确认后再写入公共文档和共享类型。
+
+
+智能体聊天的消息、会话和 SSE 请求由 `apps/web/src/features/agent-chat/AgentChatPage.tsx` 管理，`AbortController`、增量内容追加、最终消息替换和旧请求隔离继续留在应用。`packages/ui/src/modules/agent-chat` 维护聊天视图、输入框、智能体切换器及滚动/抽屉交互；路由链接和确认弹窗由应用注入。
+
+工作流由 `apps/web/src/features/workflow-editor/components` 下的 `WorkflowListController`、`WorkflowEditorController`、`RunDialogController` 和 `LoopBodyController` 管理业务状态、序列化、连线约束、保存、校验及执行。`packages/ui/src/modules/workflow-editor` 维护列表、画布、节点/配置面板、变量选项展示、运行与校验结果以及 CSS。运行弹窗和循环体控制器通过插槽装配，UI 不调用 API；UI 展示契约与应用 DTO 分开维护。React Flow 继续使用现有版本，UI 包声明直接依赖，应用保留画布状态 hooks。
+
+工作流的 `PropertyPanelController` 与 `ConditionPanelController` 负责上游字段解析、循环体候选、按类型筛选输出、条件运算符和数量限制；图遍历与变量语义位于 web 的 `utils/upstream.ts`，运算符规则位于 `utils/condition-rules.ts`。UI 只接收字段选项、条件行展示状态和操作回调；属性面板以插槽接入主画布和循环体。节点输出展示字段只附加到渲染数据，不写入草稿。

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { AgentListView } from './AgentListView';
-import { CreateAgentModal } from './CreateAgentModal';
-import { AgentDetailView } from './AgentDetailView';
+import { AgentListController } from './AgentListController';
+import { CreateAgentController } from './CreateAgentController';
+import { AgentDetailController } from './AgentDetailController';
 import {
   createAgent,
   getAgent,
@@ -17,7 +17,7 @@ import {
   type PluginSummary,
   type UpdateAgentInput,
 } from './agent.api';
-import './agent-builder.css';
+import { AgentBuilderView } from '@minicoze/ui/agent-builder';
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -153,50 +153,37 @@ export function AgentBuilderPage() {
   };
 
   return (
-    <section className="feature-page agent-builder" aria-label="智能体创建">
-      {error && <div className="agent-builder__error">{error}</div>}
-      {loading ? (
-        <div className="agent-builder__loading">加载中...</div>
-      ) : (
-        <>
-          {!selectedAgent && (
-            <AgentListView
-              onSelect={setSelectedAgent}
-              onCreate={() => setCreateOpen(true)}
-            />
-          )}
-
-          {selectedAgent && (
-            <AgentDetailView
-              key={selectedAgent.id}
-              agent={selectedAgent}
-              knowledgeBases={knowledgeBases}
-              plugins={plugins}
-              saveState={saveState}
-              saveMessage={saveMessage}
-              onBack={() => setSelectedAgent(null)}
-              onSave={(updates) => handleSave(selectedAgent.id, updates)}
-              onStatusTransition={(next, updates) => handleStatusTransition(selectedAgent.id, next, updates)}
-              onUpdateKnowledgeBindings={(ids) => handleUpdateKnowledgeBindings(selectedAgent.id, ids)}
-              onUpdatePluginBindings={(ids) => handleUpdatePluginBindings(selectedAgent.id, ids)}
-            />
-          )}
-
-          {knowledgeError && (
-            <div className="agent-builder__note">知识库目录暂时不可用</div>
-          )}
-          {pluginError && (
-            <div className="agent-builder__note">插件目录暂时不可用</div>
-          )}
-
-          {createOpen && (
-            <CreateAgentModal
-              onClose={() => setCreateOpen(false)}
-              onSubmit={handleCreate}
-            />
-          )}
-        </>
+    <AgentBuilderView
+      loading={loading}
+      error={error}
+      knowledgeError={knowledgeError}
+      pluginError={pluginError}
+      createDialog={createOpen && (
+        <CreateAgentController onClose={() => setCreateOpen(false)} onSubmit={handleCreate} />
       )}
-    </section>
+    >
+      {!selectedAgent && (
+        <AgentListController
+          onSelect={setSelectedAgent}
+          onCreate={() => setCreateOpen(true)}
+        />
+      )}
+
+      {selectedAgent && (
+        <AgentDetailController
+          key={selectedAgent.id}
+          agent={selectedAgent}
+          knowledgeBases={knowledgeBases}
+          plugins={plugins}
+          saveState={saveState}
+          saveMessage={saveMessage}
+          onBack={() => setSelectedAgent(null)}
+          onSave={(updates) => handleSave(selectedAgent.id, updates)}
+          onStatusTransition={(next, updates) => handleStatusTransition(selectedAgent.id, next, updates)}
+          onUpdateKnowledgeBindings={(ids) => handleUpdateKnowledgeBindings(selectedAgent.id, ids)}
+          onUpdatePluginBindings={(ids) => handleUpdatePluginBindings(selectedAgent.id, ids)}
+        />
+      )}
+    </AgentBuilderView>
   );
 }

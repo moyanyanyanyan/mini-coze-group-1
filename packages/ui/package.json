@@ -4,6 +4,15 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./sdk-docs": "./src/modules/publish-sdk/sdk-docs/index.ts",
+    "./landing": "./src/modules/landing/index.ts",
+    "./workspace": "./src/modules/workspace/index.ts",
+    "./workflow-editor": "./src/modules/workflow-editor/index.ts",
+    "./agent-chat": "./src/modules/agent-chat/index.ts",
+    "./knowledge": "./src/modules/knowledge/index.ts",
+    "./plugins": "./src/modules/plugins/index.ts",
+    "./agent-builder": "./src/modules/agent-builder/index.ts",
+    "./auth": "./src/modules/auth/index.ts",
     "./components": "./src/components/index.ts",
     "./hooks": "./src/hooks/index.ts",
     "./layouts": "./src/layouts/index.ts",
@@ -16,6 +25,9 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
+  },
+  "dependencies": {
+    "@xyflow/react": "^12.12.0"
   },
   "peerDependencies": {
     "react": "^19.2.0",

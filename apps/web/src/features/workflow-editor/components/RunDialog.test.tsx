@@ -1,11 +1,11 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it } from 'vitest';
-import { RunDialog } from './RunDialog';
+import { RunDialogController } from './RunDialogController';
 import type { WorkflowRunResult } from '../types/workflow';
 
 function renderOutput(output: WorkflowRunResult['output']) {
   return renderToStaticMarkup(
-    <RunDialog
+    <RunDialogController
       workflowId="workflow"
       startNode={null}
       initialResult={{ runId: 'run', status: 'SUCCEEDED', output, nodeResults: [], error: null }}

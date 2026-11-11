@@ -10,15 +10,9 @@ import {
   streamMessage,
   type ChatCitation,
 } from './api/chat-api';
-import { ChatBubble } from './components/ChatBubble';
-import { MessageComposer } from './components/MessageComposer';
 import { AppLink } from '../../shared/routing/AppLink';
-import { Icon } from '@minicoze/ui/components';
-import { ActionMenu } from '@minicoze/ui/components';
 import { useConfirm } from '@minicoze/ui/hooks';
-import { useOverlayFocus } from '@minicoze/ui/hooks';
-import { AgentSwitcher } from './components/AgentSwitcher';
-import styles from './agent-chat.module.css';
+import { AgentChatView, useChatViewport } from '@minicoze/ui/agent-chat';
 
 const SUGGESTED_PROMPTS = [
   '介绍一下你能帮我做什么',
@@ -43,20 +37,10 @@ export function AgentChatPage() {
   const suggestedPrompts = selectedAgent?.knowledgeBaseBindings.some(binding => binding.enabled)
     ? [SUGGESTED_PROMPTS[0], '根据知识库总结重点', SUGGESTED_PROMPTS[2]] : SUGGESTED_PROMPTS;
 
-  const streamRef = useRef<HTMLDivElement | null>(null);
-  const following = useRef(true);
+  const viewport = useChatViewport(messages, streamingId);
+  const { following, setAwayFromBottom, jumpToLatest, closeConversationDrawer } = viewport;
   const requestId = useRef(0);
-  const [awayFromBottom, setAwayFromBottom] = useState(false);
   const [switching, setSwitching] = useState(false);
-  const [conversationsOpen, setConversationsOpen] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1200);
-  const conversationPanelRef = useRef<HTMLElement>(null);
-  const conversationDrawer = conversationsOpen && typeof window !== 'undefined' && window.innerWidth < 1200;
-  useOverlayFocus(conversationPanelRef, conversationDrawer, () => setConversationsOpen(false));
-  const jumpToLatest = () => {
-    following.current = true;
-    setAwayFromBottom(false);
-    if (streamRef.current) streamRef.current.scrollTop = streamRef.current.scrollHeight;
-  };
   // React 严格模式下 effect 会跑两次，没有这个闸门就会建出两个会话
   const booted = useRef(false);
   // C4 接缝：同一个 AbortController 贯穿整轮。
@@ -133,7 +117,7 @@ export function AgentChatPage() {
       if (request !== requestId.current) return;
       following.current = true;
       setAwayFromBottom(false);
-      if (window.innerWidth < 1200) setConversationsOpen(false);
+      closeConversationDrawer();
       setConversationId(conversation.id);
       setSelectedAgentId(conversation.agentId ?? '');
       setMessages(history);
@@ -159,7 +143,7 @@ export function AgentChatPage() {
       setConversationId(conversation.id);
       setMessages([]);
       jumpToLatest();
-      if (window.innerWidth < 1200) setConversationsOpen(false);
+      closeConversationDrawer();
       setCitationsByMessage({});
     } catch (caught) {
       if (request === requestId.current) setBootError(caught instanceof Error ? caught.message : '新建会话失败');
@@ -199,11 +183,6 @@ export function AgentChatPage() {
     booted.current = true;
     void boot();
   }, [boot]);
-
-  // 只滚动消息容器；阅读历史时不抢走用户的滚动位置。
-  useEffect(() => {
-    if (following.current) jumpToLatest();
-  }, [messages, streamingId]);
 
   const handleSend = async (content: string) => {
     if (!conversationId || streamingId || switching) {
@@ -303,125 +282,36 @@ export function AgentChatPage() {
   };
 
   return (
-    <section className={`${styles.page} ${conversationsOpen ? styles.panelOpen : styles.panelClosed}`} aria-label="智能体聊天">
-      {confirmation}
-      {conversationsOpen && <button className={styles.panelBackdrop} aria-label="关闭会话列表" onClick={() => setConversationsOpen(false)} />}
-      <aside ref={conversationPanelRef} role={conversationDrawer ? 'dialog' : undefined} aria-modal={conversationDrawer || undefined} className={styles.conversationPanel} aria-label="会话列表">
-        <div className={styles.conversationHeader}>
-          <div>
-            <strong>历史对话</strong>
-          </div>
-          <button className={styles.panelClose} aria-label="关闭会话列表" onClick={() => setConversationsOpen(false)}><Icon name="close" /></button>
-        </div>
-          <button
-            type="button"
-            className={styles.newConversation}
-            disabled={!selectedAgentId || streamingId !== null || switching}
-            onClick={() => void handleNewConversation()}
-          >
-            <Icon name="plus" /> 新建对话
-          </button>
-        <div className={styles.conversationList}>
-          {conversations.map((conversation) => (
-            <div
-              key={conversation.id}
-              className={`${styles.conversationItem}${conversation.id === conversationId ? ` ${styles.conversationItemActive}` : ''}`}
-            >
-              <button
-                type="button"
-                className={styles.conversationSelect}
-                onClick={() => void handleConversationChange(conversation)}
-              >
-                <span>{conversation.title || '新对话'}</span>
-                <small>{new Date(conversation.updatedAt).toLocaleDateString('zh-CN')}</small>
-              </button>
-              <ActionMenu label={`会话操作：${conversation.title || '新对话'}`}><button
-                type="button"
-                className={styles.conversationDelete}
-                disabled={switching || streamingId !== null}
-                aria-label={`删除会话 ${conversation.title || '新对话'}`}
-                onClick={() => void handleDeleteConversation(conversation)}
-              >
-                删除对话
-              </button></ActionMenu>
-            </div>
-          ))}
-        </div>
-      </aside>
-
-      <div className={styles.chatMain}>
-        <header className={styles.header}>
-          <button className={styles.panelToggle} aria-label="历史对话" title="历史对话" aria-expanded={conversationsOpen} onClick={() => setConversationsOpen(!conversationsOpen)}><Icon name="panel" /></button>
-          <AgentSwitcher agents={agents} value={selectedAgentId} disabled={streamingId !== null || switching} onChange={(id) => void handleAgentChange(id)} />
-          {(switching || streamingId) && <span className={styles.activity} role="status">{switching ? '正在加载…' : '正在回复…'}</span>}
-        </header>
-
-        <div className={styles.stream} ref={streamRef} onScroll={() => {
-          const el = streamRef.current;
-          if (!el) return;
-          following.current = el.scrollHeight - el.scrollTop - el.clientHeight <= 80;
-          setAwayFromBottom(!following.current);
-        }}>
-        {needsAgent && (
-          <div className={styles.empty}>
-            <strong>创建智能体，开始对话</strong>
-            <AppLink className={styles.createAgent} to="/workspace/agents/create?action=new">创建智能体</AppLink>
-          </div>
-        )}
-        {conversationId && messages.length === 0 ? (
-          <div className={styles.empty}>
-            <span className={styles.emptyIcon} aria-hidden="true">
-              <Icon name="chat" />
-            </span>
-            <strong>开始你的第一段对话</strong>
-            <p>从一个问题开始，或试试下面的建议。</p>
-            <div className={styles.suggestions}>
-              {suggestedPrompts.map((prompt) => (
-                <button
-                  type="button"
-                  key={prompt}
-                  disabled={!conversationId || streamingId !== null}
-                  onClick={() => void handleSend(prompt)}
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        {messages.map((message) => (
-          <div key={message.id}>
-            <ChatBubble message={message} agentName={selectedAgent?.name} avatarUrl={selectedAgent?.avatarUrl} />
-            {citationsByMessage[message.id]?.length ? (
-              <div className={styles.citations} aria-label="本次检索来源">
-                来源：{citationsByMessage[message.id].map((source) => source.title).join('、')}
-              </div>
-            ) : null}
-          </div>
-        ))}
-
-        </div>
-
-        <div className={styles.footer}>
-        {bootError ? <div className={styles.alert} role="alert">{bootError} <button onClick={() => { setBootError(''); void boot(); }}>重试</button></div> : null}
-        {sendError ? <p className={styles.alert} role="alert">{sendError}</p> : null}
-
-          {awayFromBottom && <button className={styles.latestButton} onClick={jumpToLatest}><Icon name="arrowDown" />回到最新消息</button>}
-
-        {conversationId && (
-          <>
-            <MessageComposer
-              disabled={streamingId !== null || switching}
-              streaming={streamingId !== null}
-              onStop={handleStop}
-              onSend={(content) => void handleSend(content)}
-            />
-            <span className={styles.composerHint}>Enter 发送 · Shift + Enter 换行</span>
-          </>
-        )}
-        </div>
-      </div>
-    </section>
+    <AgentChatView
+      conversationId={conversationId}
+      conversations={conversations}
+      agents={agents}
+      selectedAgentId={selectedAgentId}
+      messages={messages}
+      citationsByMessage={citationsByMessage}
+      streamingId={streamingId}
+      sendError={sendError}
+      needsAgent={needsAgent}
+      bootError={bootError}
+      switching={switching}
+      suggestedPrompts={suggestedPrompts}
+      viewport={viewport}
+      confirmation={confirmation}
+      LinkComponent={AppLink}
+      createAgentRoute="/workspace/agents/create?action=new"
+      handleNewConversation={handleNewConversation}
+      handleConversationChange={(id) => {
+        const conversation = conversations.find((item) => item.id === id);
+        if (conversation) void handleConversationChange(conversation);
+      }}
+      handleDeleteConversation={(id) => {
+        const conversation = conversations.find((item) => item.id === id);
+        if (conversation) void handleDeleteConversation(conversation);
+      }}
+      handleAgentChange={handleAgentChange}
+      handleSend={handleSend}
+      handleStop={handleStop}
+      onRetry={() => { setBootError(''); void boot(); }}
+    />
   );
 }
