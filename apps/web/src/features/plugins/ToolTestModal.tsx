@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { PluginToolDefinition, PluginToolResult } from './plugins.api';
 import { executeToolDirect } from './plugins.api';
-import { CloseIcon } from './plugin-icons';
+import { ToolTestView } from '@minicoze/ui/plugins';
 
 interface ToolTestModalProps {
   tool: PluginToolDefinition;
@@ -59,68 +59,17 @@ export function ToolTestModal({ tool, onClose, onNotify }: ToolTestModalProps) {
   }
 
   return (
-    <div className="pm-modal-overlay" role="dialog" aria-modal="true" aria-label={`测试 ${tool.name}`}>
-      <div className="pm-modal">
-        <header className="pm-modal-header">
-          <h3>
-            <span className="pm-modal-title">测试</span>
-            <code>{tool.name}</code>
-          </h3>
-          <button type="button" className="pm-icon-button" onClick={onClose} aria-label="关闭">
-            <CloseIcon className="h-4 w-4" />
-          </button>
-        </header>
-
-        <p className="pm-modal-desc">{tool.description}</p>
-
-        <div className="pm-tool-fields">
-          {propertyEntries.length === 0 ? (
-            <p className="pm-tool-hint">该工具无需参数，直接执行即可。</p>
-          ) : (
-            propertyEntries.map(([key, schema]) => (
-              <label key={key} className="pm-field">
-                <span className="pm-field-label">
-                  {key}
-                  {requiredKeys.includes(key) ? <em className="pm-req">*</em> : null}
-                  <span className="pm-field-type">{schema.type ?? 'string'}</span>
-                </span>
-                {schema.description ? (
-                  <span className="pm-field-desc">{schema.description}</span>
-                ) : null}
-                <input
-                  type="text"
-                  value={values[key] ?? ''}
-                  onChange={(e) => setValues((prev) => ({ ...prev, [key]: e.target.value }))}
-                  placeholder={schema.type === 'number' ? '0' : ''}
-                />
-              </label>
-            ))
-          )}
-        </div>
-
-        {state.kind === 'success' ? (
-          <pre className={`pm-result is-${state.result.status}`}>
-            {JSON.stringify(state.result, null, 2)}
-          </pre>
-        ) : null}
-        {state.kind === 'error' ? (
-          <pre className="pm-result is-error">{state.message}</pre>
-        ) : null}
-
-        <footer className="pm-modal-footer">
-          <button type="button" className="pm-button pm-button-ghost" onClick={onClose}>
-            取消
-          </button>
-          <button
-            type="button"
-            className="pm-button pm-button-primary"
-            onClick={handleRun}
-            disabled={state.kind === 'loading'}
-          >
-            {state.kind === 'loading' ? '执行中…' : '执行'}
-          </button>
-        </footer>
-      </div>
-    </div>
+    <ToolTestView
+      tool={tool}
+      requiredKeys={requiredKeys}
+      propertyEntries={propertyEntries}
+      values={values}
+      state={state.kind === 'success'
+        ? { kind: 'success', status: state.result.status, text: JSON.stringify(state.result, null, 2) }
+        : state}
+      onValueChange={(key, value) => setValues((prev) => ({ ...prev, [key]: value }))}
+      handleRun={handleRun}
+      onClose={onClose}
+    />
   );
 }

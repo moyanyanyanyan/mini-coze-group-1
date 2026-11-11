@@ -9,9 +9,9 @@ import {
 } from '../utils/api-key-form';
 import type { AgentOption, CreatedApiKey } from '../api/api-keys.types';
 import { createApiKey } from '../api/api-keys.service';
-import type { NoticeType } from '../../../../shared/hooks/use-notice';
+import type { NoticeType } from '@minicoze/ui/hooks';
 import { ApiError } from '../../../../shared/api/http';
-import { ApiKeyDialog } from './ApiKeyDialog';
+import { ApiKeyCreateView } from '@minicoze/ui/api-management';
 
 interface ApiKeyCreateManagerProps {
   open: boolean;
@@ -155,113 +155,25 @@ export function ApiKeyCreateManager({
   };
 
   return (
-    <>
-      <ApiKeyDialog
-        open={open}
-        title="创建 API Key"
-        onClose={closeCreateDialog}
-        canDismiss={!submitting}
-        busy={submitting}
-        className="api-key-dialog--form"
-        footer={(
-          <>
-            <button
-              className="api-key-button api-key-button--secondary"
-              type="button"
-              disabled={submitting}
-              onClick={closeCreateDialog}
-            >
-              取消
-            </button>
-            <button
-              className="api-key-button api-key-button--primary"
-              type="button"
-              disabled={!agentId || !canSubmitName(name) || submitting}
-              onClick={() => void handleCreate()}
-            >
-              {submitting ? '创建中……' : '创建'}
-            </button>
-          </>
-        )}
-      >
-        <label className="api-key-field" htmlFor="new-api-key-agent">
-          <span>Agent</span>
-          <select
-            id="new-api-key-agent"
-            value={agentId}
-            disabled={submitting}
-            onChange={(event) => setAgentId(event.target.value)}
-          >
-            {agents.map((agent) => (
-              <option value={agent.id} key={agent.id}>{agent.name}</option>
-            ))}
-          </select>
-        </label>
-        <label className="api-key-field" htmlFor="new-api-key-name">
-          <span>名称</span>
-          <input
-            id="new-api-key-name"
-            data-autofocus
-            value={name}
-            disabled={submitting}
-            aria-invalid={Boolean(nameError)}
-            aria-describedby={nameError ? 'new-api-key-name-error' : undefined}
-            onChange={(event) => {
-              const nextName = event.target.value;
-              setName(nextName);
-
-              if (!getNameError(nextName)) {
-                setNameError(null);
-              }
-            }}
-          />
-        </label>
-        {nameError ? (
-          <p className="api-key-field__error" id="new-api-key-name-error" role="alert">
-            {nameError}
-          </p>
-        ) : null}
-      </ApiKeyDialog>
-
-      <ApiKeyDialog
-        open={Boolean(created)}
-        title="API Key 已创建"
-        onClose={closeCreatedKey}
-        canDismiss={false}
-        showClose={false}
-        className="api-key-dialog--secret"
-        footer={(
-          <>
-            <button
-              className="api-key-button api-key-button--secondary"
-              type="button"
-              onClick={() => void handleCopy()}
-            >
-              {copied ? '已复制' : '复制'}
-            </button>
-            <button
-              className="api-key-button api-key-button--primary"
-              type="button"
-              onClick={closeCreatedKey}
-            >
-              关闭
-            </button>
-          </>
-        )}
-      >
-        <p className="api-key-secret-warning">
-          请立即复制并妥善保存，关闭后将无法再次查看。
-        </p>
-        <textarea
-          className="api-key-secret"
-          data-autofocus
-          value={created?.secret ?? ''}
-          rows={3}
-          readOnly
-          spellCheck={false}
-          aria-label="完整 API Key"
-        />
-      </ApiKeyDialog>
-    </>
+    <ApiKeyCreateView
+      open={open}
+      agents={agents}
+      name={name}
+      agentId={agentId}
+      nameError={nameError}
+      submitting={submitting}
+      canCreate={Boolean(agentId) && canSubmitName(name)}
+      secret={created?.secret ?? null}
+      copied={copied}
+      onAgentChange={setAgentId}
+      onNameChange={(nextName) => {
+        setName(nextName);
+        if (!getNameError(nextName)) setNameError(null);
+      }}
+      closeCreateDialog={closeCreateDialog}
+      handleCreate={handleCreate}
+      handleCopy={handleCopy}
+      closeCreatedKey={closeCreatedKey}
+    />
   );
 }
