@@ -1,10 +1,11 @@
 import { useMemo, useRef, useState } from 'react';
 import { Icon } from '../../components/Icon';
+import { CollapsibleSection } from '../../components/CollapsibleSection';
 import { useOverlayFocus } from '../../hooks/useOverlayFocus';
 import { BindingPickerModal, type PickerItem } from './BindingPickerModal';
 import type {
   AgentDetailData, AgentFormValues, AgentSaveState, AgentStatus, BindingPickerKind,
-  KnowledgeBaseOption, PluginOption, AgentVersionItem, AgentVersionPreview,
+  KnowledgeBaseOption, PluginOption, AgentVersionItem, AgentVersionPreview, AgentModelOption,
 } from './types';
 
 export interface AgentDetailViewProps {
@@ -14,7 +15,8 @@ export interface AgentDetailViewProps {
   plugins: PluginOption[];
   form: AgentFormValues;
   update: <K extends keyof AgentFormValues>(key: K, value: AgentFormValues[K]) => void;
-  modelOptions: { value: string; label: string }[];
+  modelOptions: AgentModelOption[];
+  modelNotice: string | null;
   contextLimitOptions: number[];
   saveState: AgentSaveState;
   saveMessage: string;
@@ -43,13 +45,14 @@ export interface AgentDetailViewProps {
 
 export function AgentDetailView({
   agent, knowledgeBases, availableKnowledgeBases, plugins, form, update, modelOptions,
-  contextLimitOptions, saveState, saveMessage, pluginSaving, pluginSaveError, pickerOpen,
+  modelNotice, contextLimitOptions, saveState, saveMessage, pluginSaving, pluginSaveError, pickerOpen,
   versions, versionsLoading, versionsError, versionDetailOpen, selectedVersion,
   selectedVersionLoading, selectedVersionError, onBack, onSave, onStatusTransition,
   toggleKb, togglePlugin, onOpenPicker, onClosePicker, onConfirmPlugins, onConfirmKnowledge,
   openVersionDetail, closeVersionDetail,
 }: AgentDetailViewProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'publish' | 'withdraw' | 'leave' | null>(null);
   const previewRef = useRef<HTMLElement>(null);
   useOverlayFocus(previewRef, previewOpen, () => setPreviewOpen(false));
   const pluginPickerItems: PickerItem[] = useMemo(
@@ -89,10 +92,43 @@ export function AgentDetailView({
 
   const busy = saveState === 'saving' || pluginSaving;
 
+  const selectedModel = modelOptions.find((option) => option.value === form.model);
+  const modelsUsable = !modelNotice && modelOptions.length > 0;
+  const modelUnavailable = modelsUsable && (!selectedModel || !selectedModel.enabled);
+  const maxTokenLimit = modelsUsable && selectedModel ? selectedModel.maxOutputTokens : null;
+  const tokenError = form.maxTokens < 1
+    ? '最大输出长度需大于 0'
+    : maxTokenLimit !== null && form.maxTokens > maxTokenLimit
+      ? `最大输出长度不能超过 ${maxTokenLimit}`
+      : null;
+  const saveBlocked = modelUnavailable || tokenError !== null;
+
+  const feedbackMessage = saveState === 'dirty' ? '有未保存修改' : saveMessage;
+
+  const confirmText = {
+    publish: '发布后线上将使用当前配置，确定发布？',
+    withdraw: '撤回后智能体变为草稿，确定撤回？',
+    leave: '有未保存的修改，确定离开？',
+  };
+  const confirmLabel = { publish: '确认发布', withdraw: '确认撤回', leave: '确认离开' };
+
+  const confirmPending = () => {
+    if (pendingAction === 'publish') onStatusTransition('ACTIVE', form);
+    else if (pendingAction === 'withdraw') onStatusTransition('DRAFT');
+    else if (pendingAction === 'leave') onBack();
+    setPendingAction(null);
+  };
+
   return (
     <div className="ab-detail">
       <header className="ab-detail-header">
-        <button className="ab-btn ab-btn-ghost" onClick={onBack} disabled={pluginSaving}>← 返回列表</button>
+        <button
+          className="ab-btn ab-btn-ghost"
+          onClick={() => { if (saveState === 'dirty') setPendingAction('leave'); else onBack(); }}
+          disabled={pluginSaving}
+        >
+          ← 返回列表
+        </button>
         <div className="ab-detail-title-row">
           <h2 className="ab-detail-title">{form.name || '未命名智能体'}</h2>
           <span className={`ab-status-badge status-${agent.status.toLowerCase()}`}>{statusLabel[agent.status]}</span>
@@ -102,8 +138,8 @@ export function AgentDetailView({
           {agent.status === 'DRAFT' && (
             <button
               className="ab-btn ab-btn-ghost"
-              onClick={() => onStatusTransition('ACTIVE', form)}
-              disabled={busy}
+              onClick={() => setPendingAction('publish')}
+              disabled={busy || saveBlocked}
             >
               发布
             </button>
@@ -111,7 +147,7 @@ export function AgentDetailView({
           {agent.status === 'ACTIVE' && (
             <button
               className="ab-btn ab-btn-ghost"
-              onClick={() => onStatusTransition('DRAFT')}
+              onClick={() => setPendingAction('withdraw')}
               disabled={busy}
             >
               撤回
@@ -120,123 +156,160 @@ export function AgentDetailView({
           <button
             className="ab-btn ab-btn-primary"
             onClick={() => onSave(form)}
-            disabled={busy}
+            disabled={busy || saveBlocked}
           >
             {busy && <span className="ab-spinner" aria-hidden />}
-            {busy && saveMessage ? saveMessage : '保存'}
+            保存
           </button>
-          {saveState !== 'idle' && saveMessage && (
-            <span className={`ab-save-feedback ab-save-feedback--${saveState}`}>{saveMessage}</span>
+          {saveState !== 'idle' && feedbackMessage && (
+            <span className={`ab-save-feedback ab-save-feedback--${saveState}`}>{feedbackMessage}</span>
           )}
         </div>
       </header>
 
-      <div className="ab-detail-body">
-        <div className="ab-detail-main">
-        <aside className="ab-detail-col ab-detail-col-left">
-          <div className="ab-identity-row"><div className="ab-detail-avatar">{form.name.slice(0, 1) || '?'}</div>
-          <div className="ab-field">
-            <label className="ab-label" htmlFor="agent-name">名称</label>
-            <input
-              id="agent-name"
-              className="ab-input"
-              type="text"
-              value={form.name}
-              onChange={(e) => update('name', e.target.value)}
-              maxLength={50}
-            />
-          </div></div>
+      {pendingAction && (
+        <div className="ab-confirm-bar" role="alertdialog" aria-label="操作确认">
+          <span className="ab-confirm-bar-text">{confirmText[pendingAction]}</span>
+          <div className="ab-confirm-bar-actions">
+            <button type="button" className="ab-btn ab-btn-ghost ab-btn-mini" onClick={() => setPendingAction(null)}>
+              取消
+            </button>
+            <button type="button" className="ab-btn ab-btn-primary ab-btn-mini" onClick={confirmPending}>
+              {confirmLabel[pendingAction]}
+            </button>
+          </div>
+        </div>
+      )}
 
-          <div className="ab-field">
-            <label className="ab-label" htmlFor="agent-description">描述</label>
-            <textarea
-              id="agent-description"
-              className="ab-textarea"
-              value={form.description}
-              onChange={(e) => update('description', e.target.value)}
-              rows={3}
-            />
+      <div className="ab-editor">
+        <section className="ab-editor-left" aria-label="人设与回复逻辑">
+          <div className="ab-editor-head-row">
+            <h3 className="ab-editor-heading">人设与回复逻辑</h3>
           </div>
 
-        </aside>
+          <div className="ab-editor-fields">
+            <div className="ab-field">
+              <label className="ab-label" htmlFor="agent-name">名称</label>
+              <input
+                id="agent-name"
+                className="ab-input"
+                type="text"
+                value={form.name}
+                onChange={(e) => update('name', e.target.value)}
+                maxLength={50}
+              />
+            </div>
 
-        <section className="ab-detail-col ab-detail-col-center">
+            <div className="ab-field">
+              <label className="ab-label" htmlFor="agent-description">描述</label>
+              <textarea
+                id="agent-description"
+                className="ab-textarea"
+                value={form.description}
+                onChange={(e) => update('description', e.target.value)}
+                rows={2}
+              />
+            </div>
+          </div>
 
-          <div className="ab-section">
-            <h3 className="ab-section-title"><label htmlFor="agent-system-prompt">角色与任务</label></h3>
+          <div className="ab-editor-prompt">
+            <label className="ab-label" htmlFor="agent-system-prompt">回复逻辑</label>
             <textarea
               id="agent-system-prompt"
-              className="ab-textarea ab-textarea-large"
+              className="ab-textarea ab-editor-prompt-input"
               value={form.systemPrompt}
               onChange={(e) => update('systemPrompt', e.target.value)}
-              rows={6}
               placeholder="描述智能体的角色、要完成的任务，以及回复时应遵循的规则。"
             />
+            <div className="ab-editor-prompt-foot">{form.systemPrompt.length} 字</div>
+          </div>
+        </section>
+
+        <aside className="ab-editor-right" aria-label="编排">
+          <div className="ab-editor-head-row">
+            <h3 className="ab-editor-heading">编排</h3>
           </div>
 
-          <div className="ab-section">
-            <h3 className="ab-section-title">对话设置</h3>
-            <label className="ab-label" htmlFor="agent-opening">开场白</label>
-            <textarea id="agent-opening" className="ab-textarea" value={form.openingMessage} onChange={(e) => update('openingMessage', e.target.value)} rows={2} placeholder="用户首次进入对话时看到的消息" />
-          </div>
-
-          <div className="ab-section">
-            <div className="ab-section-title-row">
-              <h3 className="ab-section-title">
-                知识库绑定 <span className="ab-section-count">{enabledKbCount}/{agent.knowledgeBaseBindings.length} 启用</span>
-              </h3>
-              <button
-                type="button"
-                className="ab-btn ab-btn-ghost ab-btn-mini"
-                onClick={() => onOpenPicker('knowledge')}
-                disabled={knowledgeBases.length === 0}
-                title={knowledgeBases.length === 0 ? '知识库目录暂无可用项' : '从目录中添加或移除'}
+          <CollapsibleSection title="模型设置" defaultOpen>
+            <div className="ab-field">
+              <label className="ab-label" htmlFor="agent-model">模型</label>
+              <select
+                id="agent-model"
+                className={`ab-input${modelUnavailable ? ' ab-input-error' : ''}`}
+                aria-invalid={modelUnavailable}
+                value={form.model}
+                onChange={(e) => update('model', e.target.value)}
               >
-                + 添加
-              </button>
+                {modelOptions.map((o) => (
+                  <option key={o.value} value={o.value} disabled={!o.enabled}>{o.label}</option>
+                ))}
+                {!selectedModel && (
+                  <option value={form.model}>{form.model}（不可用）</option>
+                )}
+              </select>
+              {modelUnavailable && (
+                <small className="ab-field-error" role="alert">
+                  {selectedModel ? '该模型已停用，请更换模型后再保存。' : '当前模型不在可用列表中，请重新选择。'}
+                </small>
+              )}
+              {modelNotice && <small className="ab-field-notice">{modelNotice}</small>}
             </div>
-            {agent.knowledgeBaseBindings.length === 0 ? (
-              <div className="ab-empty-inline">
-                未绑定知识库
-                <button
-                  type="button"
-                  className="ab-btn ab-btn-ghost ab-btn-mini"
-                  onClick={() => onOpenPicker('knowledge')}
-                  disabled={knowledgeBases.length === 0}
-                >
-                  选择知识库
-                </button>
-              </div>
-            ) : (
-              <ul className="ab-binding-list">
-                {availableKnowledgeBases.map((kb) => {
-                  const binding = agent.knowledgeBaseBindings.find((b) => b.knowledgeBaseId === kb.id);
-                  return (
-                    <li key={kb.id} className={`ab-binding-item${!binding?.enabled ? ' is-disabled' : ''}`}>
-                      <div className="ab-binding-info">
-                        <div className="ab-binding-name">{kb.name}</div>
-                        {kb?.description && <div className="ab-binding-desc">{kb.description}</div>}
-                      </div>
-                      <label className="ab-switch">
-                        <input
-                          type="checkbox"
-                          checked={binding?.enabled ?? false}
-                          onChange={() => toggleKb(kb.id)}
-                        />
-                        <span className="ab-switch-slider" />
-                      </label>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
 
-          <div className="ab-section">
-            <div className="ab-section-title-row">
-              <h3 className="ab-section-title">
-                插件绑定 <span className="ab-section-count">{enabledPluginCount}/{agent.pluginBindings.length} 启用</span>
-              </h3>
+            <div className="ab-field-grid">
+              <div className="ab-field">
+                <label className="ab-label" htmlFor="agent-max-tokens">最大输出长度</label>
+                <input
+                  id="agent-max-tokens"
+                  aria-describedby="agent-tokens-hint"
+                  aria-invalid={Boolean(tokenError)}
+                  className={`ab-input${tokenError ? ' ab-input-error' : ''}`}
+                  type="number"
+                  min={1}
+                  max={maxTokenLimit ?? undefined}
+                  value={form.maxTokens}
+                  onChange={(e) => update('maxTokens', Number(e.target.value))}
+                />
+                <small id="agent-tokens-hint" className="ab-field-hint">
+                  {maxTokenLimit !== null ? `该模型单次回复上限 ${maxTokenLimit} Token。` : '每次回复的 Token 上限。'}
+                </small>
+                {tokenError && <small className="ab-field-error" role="alert">{tokenError}</small>}
+              </div>
+
+              <div className="ab-field">
+                <label className="ab-label" htmlFor="agent-context">历史消息轮数</label>
+                <select id="agent-context" className="ab-input" value={form.contextLimit} onChange={(e) => update('contextLimit', Number(e.target.value))}>
+                  {contextLimitOptions.map((n) => (
+                    <option key={n} value={n}>{n} 轮</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="ab-field">
+              <label className="ab-label" htmlFor="agent-temperature">
+                回答随机性 <span className="ab-field-value">{form.temperature.toFixed(1)}</span>
+              </label>
+              <input
+                id="agent-temperature"
+                aria-describedby="agent-temperature-hint"
+                className="ab-range"
+                type="range"
+                min={0}
+                max={2}
+                step={0.1}
+                value={form.temperature}
+                onChange={(e) => update('temperature', Number(e.target.value))}
+              />
+              <small id="agent-temperature-hint" className="ab-field-hint">数值越低越稳定，越高越多样。</small>
+            </div>
+          </CollapsibleSection>
+
+          <CollapsibleSection
+            title="技能"
+            badge={agent.pluginBindings.length > 0
+              ? `${enabledPluginCount}/${agent.pluginBindings.length}`
+              : undefined}
+            actions={(
               <button
                 type="button"
                 className="ab-btn ab-btn-ghost ab-btn-mini"
@@ -246,21 +319,12 @@ export function AgentDetailView({
               >
                 + 添加
               </button>
-            </div>
+            )}
+          >
             {pluginSaving && <p role="status">正在保存插件绑定…</p>}
             {pluginSaveError && <p role="alert">{pluginSaveError}</p>}
             {agent.pluginBindings.length === 0 ? (
-              <div className="ab-empty-inline">
-                未绑定插件
-                <button
-                  type="button"
-                  className="ab-btn ab-btn-ghost ab-btn-mini"
-                  onClick={() => { onOpenPicker('plugin'); }}
-                  disabled={busy || plugins.length === 0}
-                >
-                  选择插件
-                </button>
-              </div>
+              <div className="ab-empty-inline">未绑定插件</div>
             ) : (
               <ul className="ab-binding-list">
                 {agent.pluginBindings.map((b) => {
@@ -285,126 +349,156 @@ export function AgentDetailView({
                 })}
               </ul>
             )}
-          </div>
-          <div className="ab-section ab-model-settings">
-            <h3 className="ab-section-title">模型设置</h3>
+          </CollapsibleSection>
 
-            <div className="ab-field-grid">
-              <div className="ab-field">
-                <label className="ab-label" htmlFor="agent-model">模型</label>
-                <select id="agent-model" className="ab-input" value={form.model} onChange={(e) => update('model', e.target.value)}>
-                  {modelOptions.map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="ab-field">
-                <label className="ab-label" htmlFor="agent-max-tokens">最大输出长度</label>
-                <input
-                  id="agent-max-tokens"
-                  aria-describedby="agent-tokens-hint"
-                  className="ab-input"
-                  type="number"
-                  min={1}
-                  max={8192}
-                  value={form.maxTokens}
-                  onChange={(e) => update('maxTokens', Number(e.target.value))}
-                />
-                <small id="agent-tokens-hint" className="ab-field-hint">每次回复的 Token 上限，不等同于字数。</small>
-              </div>
-
-              <div className="ab-field">
-                <label className="ab-label" htmlFor="agent-temperature">
-                  回答随机性 <span className="ab-field-value">{form.temperature.toFixed(1)}</span>
-                </label>
-                <input
-                  id="agent-temperature"
-                  aria-describedby="agent-temperature-hint"
-                  className="ab-range"
-                  type="range"
-                  min={0}
-                  max={2}
-                  step={0.1}
-                  value={form.temperature}
-                  onChange={(e) => update('temperature', Number(e.target.value))}
-                />
-                <small id="agent-temperature-hint" className="ab-field-hint">数值越低越稳定，越高越多样。</small>
-              </div>
-
-              <div className="ab-field">
-                <label className="ab-label" htmlFor="agent-context">历史消息轮数</label>
-                <select id="agent-context" className="ab-input" value={form.contextLimit} onChange={(e) => update('contextLimit', Number(e.target.value))}>
-                  {contextLimitOptions.map((n) => (
-                    <option key={n} value={n}>{n} 轮</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        </div>
-        {previewOpen && <button className="ab-preview-backdrop" aria-label="关闭预览与版本" onClick={() => setPreviewOpen(false)} />}
-        <aside ref={previewRef} role={previewOpen ? 'dialog' : undefined} aria-modal={previewOpen || undefined} className={`ab-detail-col ab-detail-col-right${previewOpen ? ' is-open' : ''}`} aria-label="预览与版本">
-          <div className="ab-preview-heading"><strong>预览与版本</strong><button className="ui-icon-button ab-preview-close" aria-label="关闭预览与版本" onClick={() => setPreviewOpen(false)}><Icon name="close" /></button></div>
-          <div className="ab-section ab-preview">
-            <h3 className="ab-section-title">开场白预览</h3>
-            <div className="ab-preview-bubble">
-              {form.openingMessage || <span className="ab-preview-empty">（未设置开场白）</span>}
-            </div>
-          </div>
-
-          <div className="ab-section">
-            <h3 className="ab-section-title">绑定概览</h3>
-            <div className="ab-stat-row">
-              <span>插件</span><strong>{enabledPluginCount}/{agent.pluginBindings.length}</strong>
-            </div>
-            <div className="ab-stat-row">
-              <span>知识库</span><strong>{enabledKbCount}/{agent.knowledgeBaseBindings.length}</strong>
-            </div>
-            <div className="ab-stat-row">
-              <span>工作流</span><strong>{agent.workflowBindings.filter((b) => b.enabled).length}/{agent.workflowBindings.length}</strong>
-            </div>
-          </div>
-
-          <div className="ab-section">
-            <h3 className="ab-section-title">版本历史</h3>
-            {versionsLoading && <div className="ab-versions-empty">加载中…</div>}
-            {versionsError && <div className="ab-versions-empty ab-versions-error">{versionsError}</div>}
-            {!versionsLoading && !versionsError && versions.length === 0 && (
-              <div className="ab-versions-empty">暂无版本记录</div>
+          <CollapsibleSection
+            title="知识"
+            defaultOpen
+            badge={agent.knowledgeBaseBindings.length > 0
+              ? `${enabledKbCount}/${agent.knowledgeBaseBindings.length}`
+              : undefined}
+            actions={(
+              <button
+                type="button"
+                className="ab-btn ab-btn-ghost ab-btn-mini"
+                onClick={() => onOpenPicker('knowledge')}
+                disabled={knowledgeBases.length === 0}
+                title={knowledgeBases.length === 0 ? '知识库目录暂无可用项' : '从目录中添加或移除'}
+              >
+                + 添加
+              </button>
             )}
-            {!versionsLoading && !versionsError && versions.length > 0 && (
-              <ul className="ab-versions-list">
-                {versions.map((v, idx) => (
-                  <li key={v.id} className="ab-version-item">
-                    <button
-                      type="button"
-                      className="ab-version-btn"
-                      onClick={() => openVersionDetail(v.id)}
-                      title="查看此版本快照"
-                    >
-                      <span className="ab-version-num">v{v.version}</span>
-                    </button>
-                    <span className="ab-version-time">
-                      {new Date(v.createdAt).toLocaleString()}
-                    </span>
-                    {idx === 0 && agent.status === 'ACTIVE' && (
-                      <span className="ab-version-current">当前</span>
-                    )}
-                  </li>
-                ))}
+          >
+            {agent.knowledgeBaseBindings.length === 0 ? (
+              <div className="ab-empty-inline">
+                未绑定知识库
+                <button
+                  type="button"
+                  className="ab-btn ab-btn-ghost ab-btn-mini"
+                  onClick={() => onOpenPicker('knowledge')}
+                  disabled={knowledgeBases.length === 0}
+                >
+                  选择知识库
+                </button>
+              </div>
+            ) : (
+              <ul className="ab-binding-list">
+                {agent.knowledgeBaseBindings.map((binding) => {
+                  const kb = availableKnowledgeBases.find((item) => item.id === binding.knowledgeBaseId);
+                  return (
+                    <li key={binding.knowledgeBaseId} className={`ab-binding-item${!binding.enabled ? ' is-disabled' : ''}`}>
+                      <div className="ab-binding-info">
+                        <div className="ab-binding-name">{kb?.name ?? binding.knowledgeBaseId}</div>
+                        {kb?.description && <div className="ab-binding-desc">{kb.description}</div>}
+                      </div>
+                      <label className="ab-switch">
+                        <input
+                          type="checkbox"
+                          checked={binding.enabled}
+                          onChange={() => toggleKb(binding.knowledgeBaseId)}
+                        />
+                        <span className="ab-switch-slider" />
+                      </label>
+                    </li>
+                  );
+                })}
               </ul>
             )}
-          </div>
+          </CollapsibleSection>
 
-          <div className="ab-meta">
-            <div>创建于 {new Date(agent.createdAt).toLocaleString()}</div>
-            <div>最后更新 {new Date(agent.updatedAt).toLocaleString()}</div>
-          </div>
+          <CollapsibleSection
+            title="对话体验"
+            badge={form.openingMessage ? '已设置' : undefined}
+          >
+            <div className="ab-field">
+              <label className="ab-label" htmlFor="agent-opening">开场白</label>
+              <textarea
+                id="agent-opening"
+                className="ab-textarea"
+                value={form.openingMessage}
+                onChange={(e) => update('openingMessage', e.target.value)}
+                rows={3}
+                placeholder="用户首次进入对话时看到的消息"
+              />
+              <small className="ab-field-hint">用户首次进入对话时展示。</small>
+            </div>
+          </CollapsibleSection>
         </aside>
       </div>
+
+      {previewOpen && (
+        <button className="ab-preview-backdrop" aria-label="关闭预览与版本" onClick={() => setPreviewOpen(false)} />
+      )}
+      <aside
+        ref={previewRef}
+        role="dialog"
+        aria-modal={previewOpen}
+        hidden={!previewOpen}
+        className={`ab-preview-drawer${previewOpen ? ' is-open' : ''}`}
+        aria-label="预览与版本"
+      >
+        <div className="ab-preview-heading">
+          <strong>预览与版本</strong>
+          <button className="ui-icon-button ab-preview-close" aria-label="关闭预览与版本" onClick={() => setPreviewOpen(false)}>
+            <Icon name="close" />
+          </button>
+        </div>
+            <div className="ab-section ab-preview">
+              <h3 className="ab-section-title">开场白预览</h3>
+              <div className="ab-preview-bubble">
+                {form.openingMessage || <span className="ab-preview-empty">（未设置开场白）</span>}
+              </div>
+            </div>
+
+            <div className="ab-section">
+              <h3 className="ab-section-title">绑定概览</h3>
+              <div className="ab-stat-row">
+                <span>插件</span><strong>{enabledPluginCount}/{agent.pluginBindings.length}</strong>
+              </div>
+              <div className="ab-stat-row">
+                <span>知识库</span><strong>{enabledKbCount}/{agent.knowledgeBaseBindings.length}</strong>
+              </div>
+              <div className="ab-stat-row">
+                <span>工作流</span><strong>{agent.workflowBindings.filter((b) => b.enabled).length}/{agent.workflowBindings.length}</strong>
+              </div>
+            </div>
+
+            <div className="ab-section">
+              <h3 className="ab-section-title">版本历史</h3>
+              {versionsLoading && <div className="ab-versions-empty">加载中…</div>}
+              {versionsError && <div className="ab-versions-empty ab-versions-error">{versionsError}</div>}
+              {!versionsLoading && !versionsError && versions.length === 0 && (
+                <div className="ab-versions-empty">暂无版本记录</div>
+              )}
+              {!versionsLoading && !versionsError && versions.length > 0 && (
+                <ul className="ab-versions-list">
+                  {versions.map((v, idx) => (
+                    <li key={v.id} className="ab-version-item">
+                      <button
+                        type="button"
+                        className="ab-version-btn"
+                        onClick={() => openVersionDetail(v.id)}
+                        title="查看此版本快照"
+                      >
+                        <span className="ab-version-num">v{v.version}</span>
+                      </button>
+                      <span className="ab-version-time">
+                        {new Date(v.createdAt).toLocaleString()}
+                      </span>
+                      {idx === 0 && agent.status === 'ACTIVE' && (
+                        <span className="ab-version-current">当前</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="ab-meta">
+              <div>创建于 {new Date(agent.createdAt).toLocaleString()}</div>
+              <div>最后更新 {new Date(agent.updatedAt).toLocaleString()}</div>
+            </div>
+          </aside>
 
       {pickerOpen === 'plugin' && (
         <BindingPickerModal

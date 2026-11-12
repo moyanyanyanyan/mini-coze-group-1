@@ -33,10 +33,6 @@ class EnvironmentVariables {
   @IsString()
   INTERNAL_SERVICE_TOKEN = '';
 
-  // 传给 Runtime 的模型名，随模型供应商不同而不同
-  @IsString()
-  AGENT_MODEL = 'deepseek-chat';
-
   @IsString()
   DATABASE_URL!: string;
 

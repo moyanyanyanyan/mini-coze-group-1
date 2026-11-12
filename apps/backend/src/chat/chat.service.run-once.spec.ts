@@ -17,6 +17,8 @@ const agentConfig = {
   name: 'Published Agent',
   systemPrompt: 'Published prompt',
   model: 'deepseek-chat',
+  provider: 'deepseek' as const,
+  upstreamModel: 'deepseek-chat',
   temperature: 0.3,
   maxTokens: 1024,
   knowledgeBaseIds: ['kb-1'],

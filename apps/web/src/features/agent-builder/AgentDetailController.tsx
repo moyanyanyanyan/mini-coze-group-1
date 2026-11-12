@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AgentDetailView } from '@minicoze/ui/agent-builder';
+import { AgentDetailView, type AgentModelOption, type AgentSaveState } from '@minicoze/ui/agent-builder';
 import {
-  modelOptions,
   contextLimitOptions,
   getAgentVersion,
   listAgentVersions,
@@ -22,6 +21,8 @@ interface Props {
   agent: Agent;
   knowledgeBases: KnowledgeBaseSummary[];
   plugins: PluginSummary[];
+  modelOptions: AgentModelOption[];
+  modelNotice: string | null;
   saveState: SaveState;
   saveMessage: string;
   onBack: () => void;
@@ -39,6 +40,8 @@ export function AgentDetailController({
   agent,
   knowledgeBases,
   plugins,
+  modelOptions,
+  modelNotice,
   saveState,
   saveMessage,
   onBack,
@@ -118,6 +121,29 @@ export function AgentDetailController({
     setForm((f) => ({ ...f, [key]: value }));
   };
 
+  const dirty =
+    form.name !== agent.name ||
+    form.description !== (agent.description ?? '') ||
+    form.systemPrompt !== agent.systemPrompt ||
+    form.model !== agent.model ||
+    form.temperature !== agent.temperature ||
+    form.maxTokens !== agent.maxTokens ||
+    form.contextLimit !== agent.contextLimit ||
+    form.openingMessage !== (agent.openingMessage ?? '');
+
+  useEffect(() => {
+    if (!dirty) return;
+    const handler = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [dirty]);
+
+  const effectiveSaveState: AgentSaveState =
+    dirty && (saveState === 'idle' || saveState === 'saved') ? 'dirty' : saveState;
+
   const toggleKb = (kbId: string) => {
     const bindings = agent.knowledgeBaseBindings.map((b) => ({
       knowledgeBaseId: b.knowledgeBaseId,
@@ -182,8 +208,9 @@ export function AgentDetailController({
       form={form}
       update={update}
       modelOptions={modelOptions}
+      modelNotice={modelNotice}
       contextLimitOptions={contextLimitOptions}
-      saveState={saveState}
+      saveState={effectiveSaveState}
       saveMessage={saveMessage}
       pluginSaving={pluginSaving}
       pluginSaveError={pluginSaveError}

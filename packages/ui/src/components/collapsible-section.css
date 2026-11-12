@@ -1,0 +1,88 @@
+.ui-collapse {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.ui-collapse-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 16px;
+}
+
+.ui-collapse.is-open .ui-collapse-head {
+  padding-bottom: 8px;
+}
+
+.ui-collapse-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-900);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ui-collapse-trigger:focus-visible {
+  outline: 2px solid var(--violet-300);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.ui-collapse-chevron {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--ink-400);
+  transform: rotate(-90deg);
+  transition: transform 160ms ease;
+}
+
+.ui-collapse.is-open .ui-collapse-chevron {
+  transform: rotate(0deg);
+}
+
+.ui-collapse-title {
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 620;
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-collapse-trigger:hover .ui-collapse-title {
+  color: var(--violet-700);
+}
+
+.ui-collapse-badge {
+  flex: none;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--violet-50);
+  color: var(--ink-500);
+  font-size: 11px;
+  font-weight: 550;
+  line-height: 1.7;
+}
+
+.ui-collapse-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+
+.ui-collapse-body {
+  display: grid;
+  gap: 14px;
+  padding: 2px 16px 18px 40px;
+}

@@ -5,8 +5,17 @@ import type {
   KnowledgeBindingView,
   WorkflowBindingView,
 } from './types';
+import {
+  MODEL_PROVIDERS,
+  type ModelProvider,
+  type ModelRuntimeDescriptor,
+} from '../models/model-config.mapper';
 
-export function buildAgentConfig(agent: AgentDetail, revision = 0): RuntimeAgentConfig {
+export function buildAgentConfig(
+  agent: AgentDetail,
+  revision = 0,
+  modelRuntime?: ModelRuntimeDescriptor | null,
+): RuntimeAgentConfig {
   return {
     id: agent.id,
     revision,
@@ -14,6 +23,8 @@ export function buildAgentConfig(agent: AgentDetail, revision = 0): RuntimeAgent
     name: agent.name,
     systemPrompt: agent.systemPrompt,
     model: agent.model,
+    provider: modelRuntime?.provider ?? inferProviderFromEnv(),
+    upstreamModel: modelRuntime?.upstreamModel ?? agent.model,
     temperature: agent.temperature,
     maxTokens: agent.maxTokens,
     knowledgeBaseIds: agent.knowledgeBaseBindings
@@ -23,11 +34,29 @@ export function buildAgentConfig(agent: AgentDetail, revision = 0): RuntimeAgent
   };
 }
 
+export function inferProviderFromEnv(env: NodeJS.ProcessEnv = process.env): ModelProvider {
+  const explicit = env.MODEL_PROVIDER;
+  if (explicit && MODEL_PROVIDERS.includes(explicit as ModelProvider)) {
+    return explicit as ModelProvider;
+  }
+
+  const baseUrl = env.DEEPSEEK_BASE_URL ?? '';
+  if (baseUrl.includes('siliconflow.cn')) {return 'siliconflow';}
+  if (baseUrl.includes('api.deepseek.com')) {return 'deepseek';}
+  if (baseUrl) {return 'openai_compatible';}
+  return 'deepseek';
+}
+
+function isModelProvider(value: unknown): value is ModelProvider {
+  return typeof value === 'string' && MODEL_PROVIDERS.includes(value as ModelProvider);
+}
+
 export function parseRuntimeAgentConfigSnapshot(
   snapshot: Prisma.JsonValue,
   expectedAgentId: string,
   expectedRevision: number,
   legacyContextLimit: number,
+  legacyModel?: ModelRuntimeDescriptor | null,
 ): RuntimeAgentConfig | null {
   if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
     return null;
@@ -63,6 +92,14 @@ export function parseRuntimeAgentConfigSnapshot(
     return null;
   }
 
+  // 旧快照没有 provider/upstreamModel：优先用 key 反查到的模型记录，再回退环境变量与 key 本身。
+  const provider = isModelProvider(value.provider)
+    ? value.provider
+    : legacyModel?.provider ?? inferProviderFromEnv();
+  const upstreamModel = typeof value.upstreamModel === 'string' && value.upstreamModel
+    ? value.upstreamModel
+    : legacyModel?.upstreamModel ?? value.model;
+
   return {
     id: value.id,
     revision: value.revision,
@@ -70,6 +107,8 @@ export function parseRuntimeAgentConfigSnapshot(
     name: value.name,
     systemPrompt: value.systemPrompt,
     model: value.model,
+    provider,
+    upstreamModel,
     temperature: value.temperature,
     maxTokens: value.maxTokens,
     knowledgeBaseIds: value.knowledgeBaseIds,

@@ -12,6 +12,7 @@
     "./knowledge": "./src/modules/knowledge/index.ts",
     "./plugins": "./src/modules/plugins/index.ts",
     "./agent-builder": "./src/modules/agent-builder/index.ts",
+    "./model-management": "./src/modules/model-management/index.ts",
     "./auth": "./src/modules/auth/index.ts",
     "./components": "./src/components/index.ts",
     "./hooks": "./src/hooks/index.ts",

@@ -2,12 +2,6 @@ import { API_BASE } from '../../shared/api/http';
 
 export type AgentStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
 
-export const modelOptions = [
-  { value: 'deepseek-ai/DeepSeek-V4.1-Flash', label: 'DeepSeek V4.1 Flash (硅基流动)' },
-  { value: 'deepseek-ai/DeepSeek-V3.2', label: 'DeepSeek V3.2 (旧配置)' },
-  { value: 'deepseek-chat', label: 'DeepSeek Chat (旧配置)' },
-];
-
 export const contextLimitOptions = [0, 5, 10, 20, 50, 100];
 
 export interface AgentPluginBinding {
@@ -46,6 +40,8 @@ export interface Agent {
   contextLimit: number;
   openingMessage?: string;
   status: AgentStatus;
+  configVersion?: number;
+  published?: boolean;
   createdAt: string;
   updatedAt: string;
   pluginBindings: AgentPluginBinding[];

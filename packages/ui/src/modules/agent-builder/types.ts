@@ -1,6 +1,14 @@
 export type AgentStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
-export type AgentSaveState = 'idle' | 'saving' | 'saved' | 'error';
+export type AgentSaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
 export type BindingPickerKind = 'plugin' | 'knowledge';
+
+export interface AgentModelOption {
+  value: string;
+  label: string;
+  maxOutputTokens: number;
+  enabled: boolean;
+  isDefault: boolean;
+}
 
 export interface AgentFormValues {
   name: string;

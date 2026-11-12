@@ -17,9 +17,18 @@ import {
   type PluginSummary,
   type UpdateAgentInput,
 } from './agent.api';
-import { AgentBuilderView } from '@minicoze/ui/agent-builder';
+import { AgentBuilderView, type AgentModelOption } from '@minicoze/ui/agent-builder';
+import { loadAgentModels } from './agentModels';
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
+
+/** 已发布 Agent 保存即生成新版本并生效；草稿只保存不生效。 */
+function saveSuccessText(agent: Agent): string {
+  if (agent.published && agent.configVersion !== undefined) {
+    return `已保存并生效（版本 v${agent.configVersion}）`;
+  }
+  return '已保存；发布后生效';
+}
 
 export function AgentBuilderPage() {
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
@@ -31,6 +40,8 @@ export function AgentBuilderPage() {
   const [error, setError] = useState<string | null>(null);
   const [knowledgeError, setKnowledgeError] = useState(false);
   const [pluginError, setPluginError] = useState(false);
+  const [modelOptions, setModelOptions] = useState<AgentModelOption[]>([]);
+  const [modelNotice, setModelNotice] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [saveMessage, setSaveMessage] = useState<string>('');
 
@@ -41,10 +52,11 @@ export function AgentBuilderPage() {
         target ? getAgent(target) : Promise.resolve(null),
         listKnowledgeBases(),
         listPlugins(),
+        loadAgentModels(),
       ]);
 
       if (!active) return;
-      const [agentsRes, kbRes, pluginsRes] = results;
+      const [agentsRes, kbRes, pluginsRes, modelsRes] = results;
 
       if (agentsRes.status === 'fulfilled') {
         setSelectedAgent(agentsRes.value);
@@ -69,12 +81,22 @@ export function AgentBuilderPage() {
         setPluginError(true);
       }
 
+      if (modelsRes.status === 'fulfilled') {
+        setModelOptions(modelsRes.value.options);
+        setModelNotice(modelsRes.value.error);
+      }
+
       setLoading(false);
     })();
     return () => { active = false; };
   }, [target]);
 
-  const handleCreate = async (data: { name: string; description: string }) => {
+  const handleCreate = async (data: {
+    name: string;
+    description: string;
+    model: string;
+    openingMessage: string;
+  }) => {
     try {
       const created = await createAgent(data);
       setSelectedAgent(created);
@@ -92,41 +114,48 @@ export function AgentBuilderPage() {
       const saved = await updateAgent(agentId, updates);
       setSelectedAgent((current) => current?.id === agentId ? saved : current);
       setSaveState('saved');
-      setSaveMessage('已保存');
+      setSaveMessage(saveSuccessText(saved));
       setError(null);
       window.setTimeout(() => {
         setSaveState('idle');
         setSaveMessage('');
       }, 2200);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '保存失败';
+      const msg = err instanceof Error ? err.message : '未知错误';
       setSaveState('error');
-      setSaveMessage(msg);
-      setError(msg);
+      setSaveMessage(`保存失败：${msg}`);
     }
+  };
+
+  const flashSaved = (message: string) => {
+    setSaveState('saved');
+    setSaveMessage(message);
+    window.setTimeout(() => {
+      setSaveState('idle');
+      setSaveMessage('');
+    }, 2200);
   };
 
   const handleStatusTransition = async (agentId: string, nextStatus: AgentStatus, updates?: UpdateAgentInput) => {
     const verb = nextStatus === 'ACTIVE' ? '发布' : '撤回为草稿';
-    if (!window.confirm(`确定要${verb}吗？`)) return;
 
     setSaveState('saving');
     setSaveMessage(`${verb}中…`);
     try {
       const saved = await updateAgent(agentId, { ...updates, status: nextStatus });
       setSelectedAgent((current) => current?.id === agentId ? saved : current);
-      setSaveState('saved');
-      setSaveMessage(`已${verb}`);
       setError(null);
-      window.setTimeout(() => {
-        setSaveState('idle');
-        setSaveMessage('');
-      }, 2200);
+      if (nextStatus === 'ACTIVE') {
+        flashSaved(saved.configVersion !== undefined
+          ? `已发布并生效（版本 v${saved.configVersion}）`
+          : '已发布并生效');
+      } else {
+        flashSaved('已撤回为草稿；修改需重新发布后生效');
+      }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '状态变更失败';
+      const msg = err instanceof Error ? err.message : '未知错误';
       setSaveState('error');
-      setSaveMessage(msg);
-      setError(msg);
+      setSaveMessage(`${verb}失败：${msg}`);
     }
   };
 
@@ -138,8 +167,14 @@ export function AgentBuilderPage() {
       const saved = await replaceKnowledgeBindings(agentId, { bindings });
       setSelectedAgent((current) => current?.id === agentId ? { ...current, knowledgeBaseBindings: saved } : current);
       setError(null);
+      flashSaved(selectedAgent?.status === 'ACTIVE'
+        ? '知识库绑定已保存并生效'
+        : '知识库绑定已保存；发布后生效');
     } catch (err) {
-      setError(err instanceof Error ? err.message : '更新知识库绑定失败');
+      const msg = err instanceof Error ? err.message : '未知错误';
+      setError(`更新知识库绑定失败：${msg}`);
+      setSaveState('error');
+      setSaveMessage(`知识库绑定保存失败：${msg}`);
     }
   };
 
@@ -150,6 +185,9 @@ export function AgentBuilderPage() {
     const saved = await replacePluginBindings(agentId, { bindings });
     setSelectedAgent((current) => current?.id === agentId ? { ...current, pluginBindings: saved } : current);
     setError(null);
+    flashSaved(selectedAgent?.status === 'ACTIVE'
+      ? '插件绑定已保存并生效'
+      : '插件绑定已保存；发布后生效');
   };
 
   return (
@@ -159,7 +197,12 @@ export function AgentBuilderPage() {
       knowledgeError={knowledgeError}
       pluginError={pluginError}
       createDialog={createOpen && (
-        <CreateAgentController onClose={() => setCreateOpen(false)} onSubmit={handleCreate} />
+        <CreateAgentController
+          modelOptions={modelOptions}
+          modelNotice={modelNotice}
+          onClose={() => setCreateOpen(false)}
+          onSubmit={handleCreate}
+        />
       )}
     >
       {!selectedAgent && (
@@ -175,6 +218,8 @@ export function AgentBuilderPage() {
           agent={selectedAgent}
           knowledgeBases={knowledgeBases}
           plugins={plugins}
+          modelOptions={modelOptions}
+          modelNotice={modelNotice}
           saveState={saveState}
           saveMessage={saveMessage}
           onBack={() => setSelectedAgent(null)}

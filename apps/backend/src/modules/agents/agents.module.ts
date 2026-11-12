@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { KnowledgeModule } from '../knowledge/knowledge.module';
+import { ModelsModule } from '../models/models.module';
 import { PluginsModule } from '../plugins/plugins.module';
 import { AgentsController } from './agents.controller';
 import { AgentsService } from './agents.service';
@@ -11,7 +12,7 @@ import { KnowledgeCatalogAdapter } from './adapters/knowledge-catalog.adapter';
 import { PluginCatalogAdapter } from './adapters/plugin-catalog.adapter';
 
 @Module({
-  imports: [KnowledgeModule, PluginsModule],
+  imports: [KnowledgeModule, ModelsModule, PluginsModule],
   controllers: [AgentsController],
   providers: [
     AgentsService,

@@ -6,4 +6,4 @@ export { AgentDetailView } from './AgentDetailView';
 export type { AgentDetailViewProps } from './AgentDetailView';
 export { CreateAgentView } from './CreateAgentView';
 export type { CreateAgentViewProps } from './CreateAgentView';
-export type { AgentFormValues, AgentListItem } from './types';
+export type { AgentFormValues, AgentListItem, AgentModelOption, AgentSaveState } from './types';

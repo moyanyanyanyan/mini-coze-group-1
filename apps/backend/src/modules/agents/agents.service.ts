@@ -14,6 +14,8 @@ import {
   buildAgentConfig,
   parseRuntimeAgentConfigSnapshot,
 } from './agent-config.mapper';
+import { ModelsService } from '../models/models.service';
+import { toModelProvider, type ModelRuntimeDescriptor } from '../models/model-config.mapper';
 import { CreateAgentDto } from './dto/create-agent.dto';
 import { UpdateAgentDto } from './dto/update-agent.dto';
 import { ListAgentsQueryDto } from './dto/list-agents.query.dto';
@@ -33,9 +35,13 @@ export class AgentsService {
     private readonly prisma: PrismaService,
     @Inject(KNOWLEDGE_CATALOG_PORT) private readonly knowledgeCatalog: KnowledgeCatalogPort,
     @Inject(PLUGIN_CATALOG_PORT) private readonly pluginCatalog: PluginCatalogPort,
+    private readonly models: ModelsService,
   ) {}
 
   async create(dto: CreateAgentDto, user: CurrentUserPayload) {
+    const model = dto.model ?? await this.models.getDefaultKey();
+    await this.models.assertAvailable(model);
+
     const agent = await this.prisma.agent.create({
       data: {
         ownerId: user.id,
@@ -44,7 +50,7 @@ export class AgentsService {
         description: dto.description,
         avatarUrl: dto.avatarUrl,
         systemPrompt: dto.systemPrompt ?? '',
-        model: dto.model ?? process.env.DEEPSEEK_MODEL ?? 'deepseek-ai/DeepSeek-V4.1-Flash',
+        model,
         temperature: dto.temperature ?? 0.7,
         maxTokens: dto.maxTokens ?? 4096,
         contextLimit: dto.contextLimit ?? 20,
@@ -109,9 +115,9 @@ export class AgentsService {
         workflowBindings: true,
       },
     });
-    if (!agent) throw new NotFoundException('Agent 不存在');
-    if (agent.status === 'ARCHIVED') throw new NotFoundException('Agent 已归档');
-    if (agent.ownerId !== user.id) throw new ForbiddenException('无权访问此 Agent');
+    if (!agent) {throw new NotFoundException('Agent 不存在');}
+    if (agent.status === 'ARCHIVED') {throw new NotFoundException('Agent 已归档');}
+    if (agent.ownerId !== user.id) {throw new ForbiddenException('无权访问此 Agent');}
     return toAgentDetail(agent);
   }
 
@@ -124,10 +130,21 @@ export class AgentsService {
         workflowBindings: true,
       },
     });
-    if (!agent) throw new NotFoundException('Agent 不存在');
-    if (agent.status === 'ARCHIVED') throw new NotFoundException('Agent 已归档');
-    if (agent.ownerId !== userId) throw new ForbiddenException('无权访问此 Agent');
-    return buildAgentConfig(toAgentDetail(agent));
+    if (!agent) {throw new NotFoundException('Agent 不存在');}
+    if (agent.status === 'ARCHIVED') {throw new NotFoundException('Agent 已归档');}
+    if (agent.ownerId !== userId) {throw new ForbiddenException('无权访问此 Agent');}
+    const detail = toAgentDetail(agent);
+    const modelConfig = await this.models.getByKey(detail.model);
+    return buildAgentConfig(
+      detail,
+      0,
+      modelConfig
+        ? {
+          provider: toModelProvider(modelConfig.provider),
+          upstreamModel: modelConfig.upstreamModel,
+        }
+        : null,
+    );
   }
 
   async getPublicAgent(agentId: string): Promise<PublicAgentConfig> {
@@ -142,8 +159,8 @@ export class AgentsService {
       },
     });
 
-    if (!agent) throw new NotFoundException('Agent 不存在');
-    if (agent.status === 'DRAFT') throw new ForbiddenException('Agent 尚未发布');
+    if (!agent) {throw new NotFoundException('Agent 不存在');}
+    if (agent.status === 'DRAFT') {throw new ForbiddenException('Agent 尚未发布');}
     if (agent.status === 'ARCHIVED') {
       throw new ForbiddenException('Agent 已归档，暂不可调用');
     }
@@ -164,11 +181,13 @@ export class AgentsService {
       throw new NotFoundException('Agent 发布版本不存在');
     }
 
+    const legacyModel = await this.resolveSnapshotModel(version.snapshot);
     const config = parseRuntimeAgentConfigSnapshot(
       version.snapshot,
       agent.id,
       version.version,
       agent.contextLimit,
+      legacyModel,
     );
 
     if (!config) {
@@ -191,6 +210,8 @@ export class AgentsService {
   }
 
   async update(agentId: string, dto: UpdateAgentDto, user: CurrentUserPayload) {
+    if (dto.model !== undefined) {await this.models.assertAvailable(dto.model);}
+
     return this.withAgentTransaction(agentId, async (tx) => {
       const existing = await this.assertAgentWritable(agentId, user.id, tx);
 
@@ -231,11 +252,17 @@ export class AgentsService {
         },
       });
 
+      let configVersion: number | undefined;
       if (becomingActive || stayingActiveWithChanges) {
-        await this.takeSnapshot(agentId, tx);
+        const snapshot = await this.takeSnapshot(agentId, tx);
+        if (snapshot.version > 0) {configVersion = snapshot.version;}
       }
 
-      return toAgentDetail(agent);
+      return {
+        ...toAgentDetail(agent),
+        configVersion,
+        published: agent.status === 'ACTIVE',
+      };
     });
   }
 
@@ -259,13 +286,13 @@ export class AgentsService {
   async replacePluginBindings(agentId: string, dto: ReplacePluginBindingsDto, user: CurrentUserPayload) {
     if (dto.bindings.some((binding) =>
       binding.autoInvoke !== undefined || binding.sortOrder !== undefined || binding.config !== undefined,
-    )) throw new BadRequestException('MVP 不支持设置 autoInvoke、sortOrder 或 config');
+    )) {throw new BadRequestException('MVP 不支持设置 autoInvoke、sortOrder 或 config');}
     return this.withAgentTransaction(agentId, async (tx) => {
       const agent = await this.assertAgentWritable(agentId, user.id, tx);
 
       const seen = new Set<string>();
       for (const b of dto.bindings) {
-        if (seen.has(b.pluginId)) throw new BadRequestException(`插件 ${b.pluginId} 重复绑定`);
+        if (seen.has(b.pluginId)) {throw new BadRequestException(`插件 ${b.pluginId} 重复绑定`);}
         seen.add(b.pluginId);
       }
 
@@ -274,7 +301,7 @@ export class AgentsService {
         const catalogs = await this.pluginCatalog.findByIds(pluginIds);
         const catalogIds = new Set(catalogs.map((c) => c.pluginId));
         const missing = pluginIds.filter((id) => !catalogIds.has(id));
-        if (missing.length > 0) throw new BadRequestException(`以下插件不存在：[${missing.join(', ')}]`);
+        if (missing.length > 0) {throw new BadRequestException(`以下插件不存在：[${missing.join(', ')}]`);}
       }
 
       // 只删除解除绑定的项；启停更新不重建记录、不清除历史配置。
@@ -289,7 +316,7 @@ export class AgentsService {
         });
       }
 
-      if (agent.status === 'ACTIVE') await this.takeSnapshot(agentId, tx);
+      if (agent.status === 'ACTIVE') {await this.takeSnapshot(agentId, tx);}
 
       const saved = await tx.agent.findUniqueOrThrow({
         where: { id: agentId }, include: { pluginBindings: true },
@@ -313,7 +340,7 @@ export class AgentsService {
 
       const seen = new Set<string>();
       for (const b of dto.bindings) {
-        if (seen.has(b.knowledgeBaseId)) throw new BadRequestException(`知识库 ${b.knowledgeBaseId} 重复绑定`);
+        if (seen.has(b.knowledgeBaseId)) {throw new BadRequestException(`知识库 ${b.knowledgeBaseId} 重复绑定`);}
         seen.add(b.knowledgeBaseId);
       }
 
@@ -322,11 +349,11 @@ export class AgentsService {
         const catalogs = await this.knowledgeCatalog.findByIds(kbIds);
         const catalogIds = new Set(catalogs.map((c) => c.id));
         const missing = kbIds.filter((id) => !catalogIds.has(id));
-        if (missing.length > 0) throw new BadRequestException(`以下知识库不存在：[${missing.join(', ')}]`);
+        if (missing.length > 0) {throw new BadRequestException(`以下知识库不存在：[${missing.join(', ')}]`);}
         const inactive = catalogs.filter((c) => c.status !== 'ACTIVE').map((c) => c.id);
-        if (inactive.length > 0) throw new BadRequestException(`以下知识库不可用：[${inactive.join(', ')}]`);
+        if (inactive.length > 0) {throw new BadRequestException(`以下知识库不可用：[${inactive.join(', ')}]`);}
         const foreign = catalogs.filter((c) => c.workspaceId !== user.id).map((c) => c.id);
-        if (foreign.length > 0) throw new ForbiddenException('不能绑定其他用户的知识库');
+        if (foreign.length > 0) {throw new ForbiddenException('不能绑定其他用户的知识库');}
       }
 
       await tx.knowledgeBaseAgentBinding.deleteMany({ where: { agentId } });
@@ -339,7 +366,7 @@ export class AgentsService {
         })),
       });
 
-      if (agent.status === 'ACTIVE') await this.takeSnapshot(agentId, tx);
+      if (agent.status === 'ACTIVE') {await this.takeSnapshot(agentId, tx);}
 
       const saved = await tx.agent.findUniqueOrThrow({
         where: { id: agentId }, include: { knowledgeBaseBindings: true },
@@ -362,7 +389,7 @@ export class AgentsService {
       const agent = await this.assertAgentWritable(agentId, user.id, tx);
 
       const ids = dto.bindings.map((binding) => binding.workflowId);
-      if (new Set(ids).size !== ids.length) throw new BadRequestException('不能重复绑定同一工作流');
+      if (new Set(ids).size !== ids.length) {throw new BadRequestException('不能重复绑定同一工作流');}
       if (ids.length) {
         const available = await tx.workflow.count({
           where: {
@@ -370,7 +397,7 @@ export class AgentsService {
             status: { not: 'ARCHIVED' },
           },
         });
-        if (available !== ids.length) throw new NotFoundException('工作流不存在或无权绑定');
+        if (available !== ids.length) {throw new NotFoundException('工作流不存在或无权绑定');}
       }
 
       await tx.agentWorkflow.deleteMany({ where: { agentId } });
@@ -383,7 +410,7 @@ export class AgentsService {
         })),
       });
 
-      if (agent.status === 'ACTIVE') await this.takeSnapshot(agentId, tx);
+      if (agent.status === 'ACTIVE') {await this.takeSnapshot(agentId, tx);}
 
       const saved = await tx.agent.findUniqueOrThrow({
         where: { id: agentId }, include: { workflowBindings: true },
@@ -405,9 +432,27 @@ export class AgentsService {
 
   private async assertAgentWritable(agentId: string, userId: string, db: Prisma.TransactionClient = this.prisma): Promise<{ ownerId: string; workspaceId: string | null; status: AgentStatus }> {
     const agent = await db.agent.findUnique({ where: { id: agentId } });
-    if (!agent) throw new NotFoundException('Agent 不存在');
-    if (agent.ownerId !== userId) throw new ForbiddenException('无权操作此 Agent');
+    if (!agent) {throw new NotFoundException('Agent 不存在');}
+    if (agent.ownerId !== userId) {throw new ForbiddenException('无权操作此 Agent');}
     return agent;
+  }
+
+  // 只有旧快照缺 provider 时才查表；新快照自带 provider/upstreamModel。
+  private async resolveSnapshotModel(
+    snapshot: Prisma.JsonValue,
+  ): Promise<ModelRuntimeDescriptor | null> {
+    if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {return null;}
+    const value = snapshot as Record<string, unknown>;
+    if (value.provider !== undefined) {return null;}
+    if (typeof value.model !== 'string' || !value.model) {return null;}
+
+    const model = await this.models.getByKey(value.model);
+    return model
+      ? {
+        provider: toModelProvider(model.provider),
+        upstreamModel: model.upstreamModel,
+      }
+      : null;
   }
 
   private async takeSnapshot(agentId: string, tx: Prisma.TransactionClient): Promise<{ version: number; versionId: string }> {
@@ -419,8 +464,8 @@ export class AgentsService {
         workflowBindings: true,
       },
     });
-    if (!agent) throw new NotFoundException('Agent 不存在');
-    if (agent.status !== 'ACTIVE') return { version: 0, versionId: agent.currentVersionId ?? '' };
+    if (!agent) {throw new NotFoundException('Agent 不存在');}
+    if (agent.status !== 'ACTIVE') {return { version: 0, versionId: agent.currentVersionId ?? '' };}
 
     const maxVersionRow = await tx.agentVersion.aggregate({
       where: { agentId },
@@ -429,7 +474,14 @@ export class AgentsService {
     const nextVersion = (maxVersionRow._max.version ?? 0) + 1;
 
     const detail = toAgentDetail(agent);
-    const snapshot = buildAgentConfig(detail, nextVersion);
+    const modelConfig = await tx.modelConfig.findUnique({ where: { key: agent.model } });
+    const modelRuntime = modelConfig
+      ? {
+        provider: toModelProvider(modelConfig.provider),
+        upstreamModel: modelConfig.upstreamModel,
+      }
+      : null;
+    const snapshot = buildAgentConfig(detail, nextVersion, modelRuntime);
 
     const version = await tx.agentVersion.create({
       data: {
@@ -466,7 +518,7 @@ export class AgentsService {
     const version = await this.prisma.agentVersion.findUnique({
       where: { id: versionId },
     });
-    if (!version || version.agentId !== agentId) throw new NotFoundException('版本不存在');
+    if (!version || version.agentId !== agentId) {throw new NotFoundException('版本不存在');}
     return version;
   }
 }

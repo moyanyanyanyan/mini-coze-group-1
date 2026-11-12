@@ -189,3 +189,25 @@ model Plugin {
 
   @@map("plugins")
 }
+
+/// 模型配置：Agent.model 存 key；Runtime 按 provider 取凭据、用 upstreamModel 调供应商。
+model ModelConfig {
+  id              String   @id @default(cuid())
+  key             String   @unique
+  displayName     String
+  description     String?
+  provider        String
+  upstreamModel   String
+  contextWindow   Int      @default(32768)
+  maxOutputTokens Int      @default(8192)
+  supportsVision  Boolean  @default(false)
+  enabled         Boolean  @default(true)
+  isDefault       Boolean  @default(false)
+  sortOrder       Int      @default(0)
+  createdBy       String?
+  updatedBy       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([enabled, sortOrder])
+}

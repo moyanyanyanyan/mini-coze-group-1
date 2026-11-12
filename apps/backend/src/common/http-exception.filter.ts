@@ -7,7 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { ErrorCode, resolveErrorCode } from './errors/error-codes';
+import { ErrorCode, isErrorCode, resolveErrorCode } from './errors/error-codes';
 
 interface AuthErrorResponse {
   statusCode: number;
@@ -76,10 +76,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
       return;
     }
 
+    // 业务显式给出的字符串 code 优先（如 MODEL_IN_USE），其余接口保持数字 code。
+    const explicitCode = isErrorCode(rawCode) ? rawCode : undefined;
     response.status(status).json({
-      code: status,
+      code: explicitCode ?? status,
       message: Array.isArray(message) ? message.join('; ') : message,
       data: null,
+      ...(explicitCode ? { statusCode: status } : {}),
       ...(details !== undefined ? { details } : {}),
     });
   }

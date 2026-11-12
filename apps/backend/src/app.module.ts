@@ -8,6 +8,7 @@ import { AgentsModule } from './modules/agents/agents.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ConversationsModule } from './modules/conversations/conversations.module';
 import { KnowledgeModule } from './modules/knowledge/knowledge.module';
+import { ModelsModule } from './modules/models/models.module';
 import { PluginsModule } from './modules/plugins/plugins.module';
 import { PublishingModule } from './modules/publishing/publishing.module';
 import { UsersModule } from './modules/users/users.module';
@@ -33,6 +34,7 @@ import { PublicApiModule } from './modules/public-api/public-api.module';
     PublicApiModule,
     ConversationsModule,
     KnowledgeModule,
+    ModelsModule,
     ChatModule,
     PluginsModule,
     WorkflowsModule,

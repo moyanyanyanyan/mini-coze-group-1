@@ -61,18 +61,18 @@ export function AgentListView({
             value={keyword}
             onChange={(e) => { onKeywordChange(e.target.value); }}
           />
-          <div className="ab-status-tabs" role="tablist">
-            {statusFilters.map((tab) => (
-              <button
-                key={tab.value}
-                role="tab"
-                aria-selected={statusFilter === tab.value}
-                className={`ab-status-tab${statusFilter === tab.value ? ' is-active' : ''}`}
-                onClick={() => { onStatusChange(tab.value); }}
-              >
-                {tab.label}
-              </button>
-            ))}
+          <div className="ab-status-filter">
+            <label className="ab-visually-hidden" htmlFor="ab-status-filter">按状态筛选</label>
+            <select
+              id="ab-status-filter"
+              className="ab-status-select"
+              value={statusFilter}
+              onChange={(e) => { onStatusChange(e.target.value as 'ALL' | AgentStatus); }}
+            >
+              {statusFilters.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
           </div>
         </div>
       </header>
@@ -94,19 +94,19 @@ export function AgentListView({
             onClick={() => onSelect(agent.id)}
             aria-label={`${agent.name}，${statusLabel[agent.status]}`}
           >
-            <div className="ab-card-top">
-              <div className="ab-avatar" aria-hidden="true">
-                {agent.name.slice(0, 1)}
-              </div>
+            <div className="ab-card-head">
+              <div className="ab-card-name" title={agent.name}>{agent.name}</div>
               <span className={`ab-status-badge ${statusClass[agent.status]}`}>{statusLabel[agent.status]}</span>
             </div>
 
-            <div className="ab-card-name">{agent.name}</div>
-            {agent.description && <div className="ab-card-desc">{agent.description}</div>}
+            <div className={`ab-card-desc${agent.description ? '' : ' is-empty'}`}>
+              {agent.description || '暂无描述'}
+            </div>
 
             <div className="ab-card-stats">
-              <span>{agent.pluginCount} 插件</span>
-              <span>{agent.knowledgeBaseCount} 知识库</span>
+              <span><strong>{agent.pluginCount}</strong> 插件</span>
+              <span className="ab-card-stats-divider" aria-hidden="true" />
+              <span><strong>{agent.knowledgeBaseCount}</strong> 知识库</span>
             </div>
 
             <div className="ab-card-actions">

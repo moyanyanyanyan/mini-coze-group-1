@@ -34,8 +34,14 @@ export const ErrorCode = {
   // ---- 通用兜底（任何模块都可能用到）----
   VALIDATION_FAILED: 'VALIDATION_FAILED',
   NOT_FOUND: 'NOT_FOUND',
-    CONFLICT: 'CONFLICT',
+  CONFLICT: 'CONFLICT',
   INTERNAL_ERROR: 'INTERNAL_ERROR',
+
+  // ---- 模型管理 ----
+  /** Agent 保存时引用了不存在或已停用的模型 */
+  MODEL_NOT_AVAILABLE: 'MODEL_NOT_AVAILABLE',
+  /** 模型仍被 Agent 引用，不能删除 */
+  MODEL_IN_USE: 'MODEL_IN_USE',
   // ---- 聊天 ----
   /** 同一会话正在生成中，又来了一条新消息 */
   CONVERSATION_BUSY: 'CONVERSATION_BUSY',
@@ -60,6 +66,10 @@ export const DEFAULT_CODE_BY_STATUS: Record<number, ErrorCode> = {
 
 /** 白名单，用于校验业务代码传进来的 code 是不是合法值 */
 const VALID_CODES = new Set<string>(Object.values(ErrorCode));
+
+export function isErrorCode(value: unknown): value is ErrorCode {
+  return typeof value === 'string' && VALID_CODES.has(value);
+}
 
 /**
  * 决定最终 code：优先用业务指定的，没有就按状态码兜底，

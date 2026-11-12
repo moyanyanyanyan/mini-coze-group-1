@@ -17,6 +17,8 @@ const plan: PublicStreamPlan = {
     name: 'Agent',
     systemPrompt: '',
     model: 'model',
+    provider: 'deepseek',
+    upstreamModel: 'model',
     temperature: 0.7,
     maxTokens: 1024,
     knowledgeBaseIds: [],

@@ -6,4 +6,4 @@ export type IconName =
   | 'plug'
   | 'workflow'
   | 'send'
-  | 'api' | 'chevronDown' | 'close' | 'plus' | 'more' | 'check' | 'menu' | 'panel' | 'stop' | 'arrowDown' | 'play' | 'repeat';
+  | 'api' | 'chevronDown' | 'close' | 'plus' | 'more' | 'check' | 'menu' | 'panel' | 'stop' | 'arrowDown' | 'play' | 'repeat' | 'model';

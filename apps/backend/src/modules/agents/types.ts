@@ -1,3 +1,5 @@
+import type { ModelProvider } from '../models/model-config.mapper';
+
 export type AgentStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
 
 export interface CurrentUserPayload {
@@ -11,6 +13,8 @@ export interface RuntimeAgentConfig {
   name: string;
   systemPrompt: string;
   model: string;
+  provider: ModelProvider;
+  upstreamModel: string;
   temperature: number;
   maxTokens: number;
   knowledgeBaseIds: string[];
