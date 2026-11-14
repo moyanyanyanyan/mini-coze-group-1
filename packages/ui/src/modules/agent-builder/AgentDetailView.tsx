@@ -53,8 +53,21 @@ export function AgentDetailView({
 }: AgentDetailViewProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<'publish' | 'withdraw' | 'leave' | null>(null);
+  const [basicInfoOpen, setBasicInfoOpen] = useState(false);
+  const [basicInfoDraft, setBasicInfoDraft] = useState({ name: '', description: '' });
   const previewRef = useRef<HTMLElement>(null);
   useOverlayFocus(previewRef, previewOpen, () => setPreviewOpen(false));
+
+  const openBasicInfo = () => {
+    setBasicInfoDraft({ name: form.name, description: form.description });
+    setBasicInfoOpen(true);
+  };
+
+  const confirmBasicInfo = () => {
+    update('name', basicInfoDraft.name.trim());
+    update('description', basicInfoDraft.description.trim());
+    setBasicInfoOpen(false);
+  };
   const pluginPickerItems: PickerItem[] = useMemo(
     () => plugins.map((p) => ({ id: p.pluginId, title: p.title, description: p.content })),
     [plugins],
@@ -131,6 +144,9 @@ export function AgentDetailView({
         </button>
         <div className="ab-detail-title-row">
           <h2 className="ab-detail-title">{form.name || '未命名智能体'}</h2>
+          <button type="button" className="ab-edit-chip" onClick={openBasicInfo} aria-label="编辑基础信息">
+            <Icon name="edit" width={14} height={14} />
+          </button>
           <span className={`ab-status-badge status-${agent.status.toLowerCase()}`}>{statusLabel[agent.status]}</span>
         </div>
         <div className="ab-detail-actions">
@@ -187,41 +203,18 @@ export function AgentDetailView({
             <h3 className="ab-editor-heading">人设与回复逻辑</h3>
           </div>
 
-          <div className="ab-editor-fields">
-            <div className="ab-field">
-              <label className="ab-label" htmlFor="agent-name">名称</label>
-              <input
-                id="agent-name"
-                className="ab-input"
-                type="text"
-                value={form.name}
-                onChange={(e) => update('name', e.target.value)}
-                maxLength={50}
-              />
-            </div>
-
-            <div className="ab-field">
-              <label className="ab-label" htmlFor="agent-description">描述</label>
+          <div className="ab-editor-left-body">
+            <div className="ab-editor-prompt">
+              <label className="ab-label" htmlFor="agent-system-prompt">回复逻辑</label>
               <textarea
-                id="agent-description"
-                className="ab-textarea"
-                value={form.description}
-                onChange={(e) => update('description', e.target.value)}
-                rows={2}
+                id="agent-system-prompt"
+                className="ab-textarea ab-editor-prompt-input"
+                value={form.systemPrompt}
+                onChange={(e) => update('systemPrompt', e.target.value)}
+                placeholder="描述智能体的角色、要完成的任务，以及回复时应遵循的规则。"
               />
+              <div className="ab-editor-prompt-foot">{form.systemPrompt.length} 字</div>
             </div>
-          </div>
-
-          <div className="ab-editor-prompt">
-            <label className="ab-label" htmlFor="agent-system-prompt">回复逻辑</label>
-            <textarea
-              id="agent-system-prompt"
-              className="ab-textarea ab-editor-prompt-input"
-              value={form.systemPrompt}
-              onChange={(e) => update('systemPrompt', e.target.value)}
-              placeholder="描述智能体的角色、要完成的任务，以及回复时应遵循的规则。"
-            />
-            <div className="ab-editor-prompt-foot">{form.systemPrompt.length} 字</div>
           </div>
         </section>
 
@@ -538,6 +531,60 @@ export function AgentDetailView({
               {selectedVersionError && <div className="ab-versions-empty ab-versions-error">{selectedVersionError}</div>}
               {selectedVersion && <VersionSnapshot snapshot={selectedVersion.snapshot} plugins={plugins} knowledgeBases={knowledgeBases} />}
             </div>
+          </div>
+        </div>
+      )}
+
+      {basicInfoOpen && (
+        <div className="ab-modal-backdrop" onClick={() => setBasicInfoOpen(false)} role="dialog" aria-modal="true" aria-label="编辑基础信息">
+          <div className="ab-modal" onClick={(e) => e.stopPropagation()}>
+            <header className="ab-modal-header">
+              <h3 className="ab-modal-title">编辑基础信息</h3>
+              <button className="ab-modal-close" onClick={() => setBasicInfoOpen(false)} aria-label="关闭">×</button>
+            </header>
+            <form
+              onSubmit={(e) => { e.preventDefault(); confirmBasicInfo(); }}
+            >
+              <div className="ab-field">
+                <label className="ab-label" htmlFor="basic-name">
+                  名称 <span className="ab-required">*</span>
+                </label>
+                <input
+                  id="basic-name"
+                  className="ab-input"
+                  type="text"
+                  value={basicInfoDraft.name}
+                  maxLength={50}
+                  placeholder="客服助手"
+                  autoFocus
+                  onChange={(e) => setBasicInfoDraft((d) => ({ ...d, name: e.target.value }))}
+                />
+                <span className="ab-field-hint">{basicInfoDraft.name.length}/50</span>
+              </div>
+              <div className="ab-field">
+                <label className="ab-label" htmlFor="basic-description">描述（可选）</label>
+                <textarea
+                  id="basic-description"
+                  className="ab-textarea"
+                  value={basicInfoDraft.description}
+                  rows={3}
+                  maxLength={200}
+                  placeholder="自动回复常见问题"
+                  onChange={(e) => setBasicInfoDraft((d) => ({ ...d, description: e.target.value }))}
+                />
+                <span className="ab-field-hint">{basicInfoDraft.description.length}/200</span>
+              </div>
+              <footer className="ab-modal-footer">
+                <button type="button" className="ab-btn ab-btn-ghost" onClick={() => setBasicInfoOpen(false)}>取消</button>
+                <button
+                  type="submit"
+                  className="ab-btn ab-btn-primary"
+                  disabled={!basicInfoDraft.name.trim()}
+                >
+                  保存
+                </button>
+              </footer>
+            </form>
           </div>
         </div>
       )}
