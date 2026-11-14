@@ -38,4 +38,12 @@ describe('feature registry', () => {
     expect(getWorkspaceFeature('/workspace/workflows/workflow-1')?.id).toBe('workflow');
     expect(getWorkspaceFeature('/workspace/workflows-invalid')).toBeUndefined();
   });
+
+  it('registers operations in navigation and supports nested detail routes', () => {
+    expect(getWorkspaceFeature('/workspace/operations/agents/agent-1/conversations/c-1')?.id).toBe('operations');
+    expect(getWorkspaceFeature('/workspace/operations/knowledge/kb-1/documents/task-1')?.id).toBe('operations');
+    expect(getWorkspaceFeature('/workspace/operations-invalid')).toBeUndefined();
+    expect(workspaceNavigation.some(feature => feature.id === 'operations')).toBe(true);
+    expect(landingModules.some(feature => feature.id === 'operations')).toBe(false);
+  });
 });

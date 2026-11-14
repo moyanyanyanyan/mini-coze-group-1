@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./operations": "./src/modules/operations/index.ts",
     "./sdk-docs": "./src/modules/publish-sdk/sdk-docs/index.ts",
     "./landing": "./src/modules/landing/index.ts",
     "./workspace": "./src/modules/workspace/index.ts",

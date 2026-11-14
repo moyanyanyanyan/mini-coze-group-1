@@ -1,3 +1,4 @@
+import { OperationsPage, operationsManifest } from '../features/operations';
 import { AgentBuilderPage, agentBuilderManifest } from '../features/agent-builder';
 import { AgentChatPage, agentChatManifest } from '../features/agent-chat';
 import { KnowledgePage, knowledgeManifest } from '../features/knowledge';
@@ -48,6 +49,12 @@ export const workspaceFeatures: readonly FeatureDefinition[] = [
     ...publishSdkManifest,
     Component: PublishSdkPage,
     showInLanding: true,
+    showInNavigation: true,
+  },
+  {
+    ...operationsManifest,
+    Component: OperationsPage,
+    showInLanding: false,
     showInNavigation: true,
   },
 ];

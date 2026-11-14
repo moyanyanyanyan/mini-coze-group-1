@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react';
+import { operationsManifest } from './features/operations/operations.manifest';
 import { getWorkspaceFeature } from './app/feature-registry';
 import { LoginPage, RegisterPage } from './features/auth';
 import { LandingPage } from './features/landing/LandingPage';
@@ -27,7 +28,7 @@ export function App() {
 
   if (feature) {
     const Page = feature.Component;
-    return <WorkspaceLayout pathname={pathname}><Page key={search ?? ''} /></WorkspaceLayout>;
+    return <WorkspaceLayout pathname={pathname}><Page key={feature.route === operationsManifest.route ? pathname : search ?? ''} /></WorkspaceLayout>;
   }
 
   return <LandingPage />;
