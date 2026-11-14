@@ -41,6 +41,14 @@ export interface AgentDetailViewProps {
   onConfirmKnowledge: (ids: string[]) => void;
   openVersionDetail: (id: string) => void;
   closeVersionDetail: () => void;
+  /** 测试对话：发送一条消息。返回的 promise 解决时表示 run.completed 或 run.failed 已到 */
+  onTestSend: (content: string, handlers: {
+    onDelta: (chunk: string) => void;
+    onCompleted: (content: string) => void;
+    onFailed: (message: string) => void;
+  }) => Promise<void>;
+  /** 测试对话：停止生成 */
+  onTestStop: () => void;
 }
 
 export function AgentDetailView({
@@ -49,12 +57,15 @@ export function AgentDetailView({
   versions, versionsLoading, versionsError, versionDetailOpen, selectedVersion,
   selectedVersionLoading, selectedVersionError, onBack, onSave, onStatusTransition,
   toggleKb, togglePlugin, onOpenPicker, onClosePicker, onConfirmPlugins, onConfirmKnowledge,
-  openVersionDetail, closeVersionDetail,
+  openVersionDetail, closeVersionDetail, onTestSend, onTestStop,
 }: AgentDetailViewProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<'publish' | 'withdraw' | 'leave' | null>(null);
   const [basicInfoOpen, setBasicInfoOpen] = useState(false);
   const [basicInfoDraft, setBasicInfoDraft] = useState({ name: '', description: '' });
+  const [testMessages, setTestMessages] = useState<{ role: 'user' | 'assistant'; content: string; status?: 'running' | 'done' }[]>([]);
+  const [testStreaming, setTestStreaming] = useState(false);
+  const [testDraft, setTestDraft] = useState('');
   const previewRef = useRef<HTMLElement>(null);
   useOverlayFocus(previewRef, previewOpen, () => setPreviewOpen(false));
 
@@ -67,6 +78,61 @@ export function AgentDetailView({
     update('name', basicInfoDraft.name.trim());
     update('description', basicInfoDraft.description.trim());
     setBasicInfoOpen(false);
+  };
+
+  const sendTestMessage = async () => {
+    const content = testDraft.trim();
+    if (!content || testStreaming) return;
+    setTestDraft('');
+    const userMsg = { role: 'user' as const, content };
+    const pendingMsg = { role: 'assistant' as const, content: '', status: 'running' as const };
+    setTestMessages((prev) => [...prev, userMsg, pendingMsg]);
+    setTestStreaming(true);
+
+    try {
+      await onTestSend(content, {
+        onDelta: (chunk) => {
+          setTestMessages((prev) =>
+            prev.map((m, i) =>
+              i === prev.length - 1 && m.status === 'running'
+                ? { ...m, content: m.content + chunk }
+                : m,
+            ),
+          );
+        },
+        onCompleted: (finalContent) => {
+          setTestMessages((prev) =>
+            prev.map((m, i) =>
+              i === prev.length - 1 ? { ...m, content: finalContent || m.content, status: 'done' as const } : m,
+            ),
+          );
+        },
+        onFailed: (message) => {
+          setTestMessages((prev) =>
+            prev.map((m, i) =>
+              i === prev.length - 1
+                ? { ...m, content: `⚠️ ${message}`, status: 'done' as const }
+                : m,
+            ),
+          );
+        },
+      });
+    } catch (err) {
+      setTestMessages((prev) =>
+        prev.map((m, i) =>
+          i === prev.length - 1
+            ? { ...m, content: `⚠️ ${err instanceof Error ? err.message : '测试对话失败'}`, status: 'done' as const }
+            : m,
+        ),
+      );
+    } finally {
+      setTestStreaming(false);
+    }
+  };
+
+  const stopTestMessage = () => {
+    onTestStop();
+    setTestStreaming(false);
   };
   const pluginPickerItems: PickerItem[] = useMemo(
     () => plugins.map((p) => ({ id: p.pluginId, title: p.title, description: p.content })),
@@ -417,6 +483,78 @@ export function AgentDetailView({
             </div>
           </CollapsibleSection>
         </aside>
+
+        <aside className="ab-editor-test" aria-label="预览与调试">
+          <div className="ab-editor-head-row">
+            <h3 className="ab-editor-heading">预览与调试</h3>
+          </div>
+
+          <div className="ab-chat-panel">
+            <div className="ab-chat-messages">
+              {testMessages.length === 0 && (
+                <div className="ab-chat-empty">
+                  <div className="ab-chat-empty-avatar">{(form.name || '助').slice(0, 1)}</div>
+                  <div className="ab-chat-empty-text">
+                    {form.openingMessage || `你好，我是${form.name || '智能助手'}，有什么可以帮你？`}
+                  </div>
+                  <div className="ab-chat-empty-hint">在下方输入消息开始测试对话。</div>
+                </div>
+              )}
+              {testMessages.map((m, idx) => (
+                <div key={idx} className={`ab-chat-row${m.role === 'user' ? ' ab-chat-row--user' : ''}`}>
+                  {m.role === 'assistant' && <div className="ab-chat-avatar">{(form.name || '助').slice(0, 1)}</div>}
+                  <div className={`ab-chat-bubble${m.role === 'user' ? ' ab-chat-bubble--user' : ''}`}>
+                    {m.status === 'running' && !m.content ? (
+                      <span className="ab-chat-dots">
+                        <span /><span /><span />
+                      </span>
+                    ) : (
+                      m.content
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <form
+              className="ab-chat-composer"
+              onSubmit={(e) => { e.preventDefault(); sendTestMessage(); }}
+            >
+              <textarea
+                className="ab-chat-input"
+                value={testDraft}
+                rows={1}
+                placeholder={testStreaming ? '正在回复…' : `给 ${form.name || '智能体'} 发送测试消息…`}
+                disabled={testStreaming}
+                onChange={(e) => setTestDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                    e.preventDefault();
+                    sendTestMessage();
+                  }
+                }}
+              />
+              {testStreaming ? (
+                <button type="button" className="ab-chat-send ab-chat-send--stop" onClick={stopTestMessage} aria-label="停止生成">
+                  <Icon name="stop" />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  className="ab-chat-send"
+                  disabled={!testDraft.trim()}
+                  aria-label="发送"
+                >
+                  <Icon name="send" width={16} height={16} />
+                </button>
+              )}
+            </form>
+            <div className="ab-chat-footer">
+              {saveState === 'dirty' && (
+                <span className="ab-chat-footer-warn">⚠️ 配置未保存，测试不反映最新改动。</span>
+              )}
+            </div>
+          </div>
+        </aside>
       </div>
 
       {previewOpen && (
@@ -436,62 +574,56 @@ export function AgentDetailView({
             <Icon name="close" />
           </button>
         </div>
-            <div className="ab-section ab-preview">
-              <h3 className="ab-section-title">开场白预览</h3>
-              <div className="ab-preview-bubble">
-                {form.openingMessage || <span className="ab-preview-empty">（未设置开场白）</span>}
-              </div>
-            </div>
 
-            <div className="ab-section">
-              <h3 className="ab-section-title">绑定概览</h3>
-              <div className="ab-stat-row">
-                <span>插件</span><strong>{enabledPluginCount}/{agent.pluginBindings.length}</strong>
-              </div>
-              <div className="ab-stat-row">
-                <span>知识库</span><strong>{enabledKbCount}/{agent.knowledgeBaseBindings.length}</strong>
-              </div>
-              <div className="ab-stat-row">
-                <span>工作流</span><strong>{agent.workflowBindings.filter((b) => b.enabled).length}/{agent.workflowBindings.length}</strong>
-              </div>
-            </div>
+        <div className="ab-section">
+          <h3 className="ab-section-title">绑定概览</h3>
+          <div className="ab-stat-row">
+            <span>插件</span><strong>{enabledPluginCount}/{agent.pluginBindings.length}</strong>
+          </div>
+          <div className="ab-stat-row">
+            <span>知识库</span><strong>{enabledKbCount}/{agent.knowledgeBaseBindings.length}</strong>
+          </div>
+          <div className="ab-stat-row">
+            <span>工作流</span><strong>{agent.workflowBindings.filter((b) => b.enabled).length}/{agent.workflowBindings.length}</strong>
+          </div>
+        </div>
 
-            <div className="ab-section">
-              <h3 className="ab-section-title">版本历史</h3>
-              {versionsLoading && <div className="ab-versions-empty">加载中…</div>}
-              {versionsError && <div className="ab-versions-empty ab-versions-error">{versionsError}</div>}
-              {!versionsLoading && !versionsError && versions.length === 0 && (
-                <div className="ab-versions-empty">暂无版本记录</div>
-              )}
-              {!versionsLoading && !versionsError && versions.length > 0 && (
-                <ul className="ab-versions-list">
-                  {versions.map((v, idx) => (
-                    <li key={v.id} className="ab-version-item">
-                      <button
-                        type="button"
-                        className="ab-version-btn"
-                        onClick={() => openVersionDetail(v.id)}
-                        title="查看此版本快照"
-                      >
-                        <span className="ab-version-num">v{v.version}</span>
-                      </button>
-                      <span className="ab-version-time">
-                        {new Date(v.createdAt).toLocaleString()}
-                      </span>
-                      {idx === 0 && agent.status === 'ACTIVE' && (
-                        <span className="ab-version-current">当前</span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+        <div className="ab-section">
+          <h3 className="ab-section-title">版本历史</h3>
+          {versionsLoading && <div className="ab-versions-empty">加载中…</div>}
+          {versionsError && <div className="ab-versions-empty ab-versions-error">{versionsError}</div>}
+          {!versionsLoading && !versionsError && versions.length === 0 && (
+            <div className="ab-versions-empty">暂无版本记录</div>
+          )}
+          {!versionsLoading && !versionsError && versions.length > 0 && (
+            <ul className="ab-versions-list">
+              {versions.map((v, idx) => (
+                <li key={v.id} className="ab-version-item">
+                  <button
+                    type="button"
+                    className="ab-version-btn"
+                    onClick={() => openVersionDetail(v.id)}
+                    title="查看此版本快照"
+                  >
+                    <span className="ab-version-num">v{v.version}</span>
+                  </button>
+                  <span className="ab-version-time">
+                    {new Date(v.createdAt).toLocaleString()}
+                  </span>
+                  {idx === 0 && agent.status === 'ACTIVE' && (
+                    <span className="ab-version-current">当前</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
-            <div className="ab-meta">
-              <div>创建于 {new Date(agent.createdAt).toLocaleString()}</div>
-              <div>最后更新 {new Date(agent.updatedAt).toLocaleString()}</div>
-            </div>
-          </aside>
+        <div className="ab-meta">
+          <div>创建于 {new Date(agent.createdAt).toLocaleString()}</div>
+          <div>最后更新 {new Date(agent.updatedAt).toLocaleString()}</div>
+        </div>
+      </aside>
 
       {pickerOpen === 'plugin' && (
         <BindingPickerModal

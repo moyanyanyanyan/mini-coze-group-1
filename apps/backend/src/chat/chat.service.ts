@@ -493,7 +493,8 @@ export class ChatService {
       return { userMessage, assistantMessage };
     });
 
-    const { contextLimit = MAX_HISTORY_TURNS, ...runtimeConfig } = input.agentConfig;
+    const { contextLimit = MAX_HISTORY_TURNS, provider, upstreamModel, model, ...runtimeRest } = input.agentConfig;
+    const runtimeConfig = { ...runtimeRest, model: upstreamModel || model };
     const history = await this.buildHistory(input.conversationId, contextLimit, [
       turn.userMessage.id,
       turn.assistantMessage.id,

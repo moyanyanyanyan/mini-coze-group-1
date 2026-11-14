@@ -4,6 +4,7 @@ import {
   contextLimitOptions,
   getAgentVersion,
   listAgentVersions,
+  updateAgent,
   type AgentVersionDetail,
   type AgentVersionSummary,
   type Agent,
@@ -13,6 +14,7 @@ import {
   type PluginSummary,
   type UpdateAgentInput,
 } from './agent.api';
+import { createConversation, deleteConversation, streamMessage } from '../agent-chat/api/chat-api';
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 type PickerKind = 'plugin' | 'knowledge';
@@ -183,6 +185,81 @@ export function AgentDetailController({
 
   const availableKnowledgeBases = knowledgeBases.filter((kb) => kb.status === 'ACTIVE');
 
+  const testConvIdRef = useRef<string | null>(null);
+  const testAbortRef = useRef<AbortController | null>(null);
+
+  const saveFormForTest = async () => {
+    const input: UpdateAgentInput = {
+      name: form.name,
+      description: form.description,
+      systemPrompt: form.systemPrompt,
+      model: form.model,
+      temperature: form.temperature,
+      maxTokens: form.maxTokens,
+      contextLimit: form.contextLimit,
+      openingMessage: form.openingMessage,
+    };
+    await updateAgent(agent.id, input);
+  };
+
+  const sendTestMessage = async (
+    content: string,
+    handlers: {
+      onDelta: (chunk: string) => void;
+      onCompleted: (content: string) => void;
+      onFailed: (message: string) => void;
+    },
+  ) => {
+    if (dirty) {
+      try {
+        await saveFormForTest();
+      } catch {
+        handlers.onFailed('保存失败，请先修复再测试');
+        return;
+      }
+    }
+
+    testAbortRef.current?.abort();
+    if (testConvIdRef.current) {
+      try { await deleteConversation(testConvIdRef.current).catch(() => null); } catch { /* 忽略 */ }
+    }
+
+    let conversationId: string;
+    try {
+      const conv = await createConversation(agent.id);
+      conversationId = conv.id;
+      testConvIdRef.current = conversationId;
+    } catch (err) {
+      handlers.onFailed(err instanceof Error ? err.message : '创建测试会话失败');
+      return;
+    }
+
+    const controller = new AbortController();
+    testAbortRef.current = controller;
+    try {
+      await streamMessage(conversationId, content, {
+        onDelta: handlers.onDelta,
+        onCompleted: handlers.onCompleted,
+        onFailed: (code, message) => handlers.onFailed(message || code),
+      }, controller.signal);
+    } catch (err) {
+      if (controller.signal.aborted) {
+        handlers.onCompleted('已停止生成。');
+      } else {
+        handlers.onFailed(err instanceof Error ? err.message : '请求失败');
+      }
+    } finally {
+      if (testAbortRef.current === controller) {
+        testAbortRef.current = null;
+      }
+    }
+  };
+
+  const stopTestMessage = () => {
+    testAbortRef.current?.abort();
+    testAbortRef.current = null;
+  };
+
   const confirmPlugins = async (ids: string[]) => {
     const bindings = ids.map((pluginId) => ({
       pluginId,
@@ -236,6 +313,8 @@ export function AgentDetailController({
       onConfirmKnowledge={confirmKnowledge}
       openVersionDetail={openVersionDetail}
       closeVersionDetail={closeVersionDetail}
+      onTestSend={sendTestMessage}
+      onTestStop={stopTestMessage}
     />
   );
 }

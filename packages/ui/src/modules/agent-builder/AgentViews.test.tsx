@@ -29,6 +29,7 @@ const detailProps: AgentDetailViewProps = {
   onBack: noop, onSave: noop, onStatusTransition: noop, toggleKb: noop, togglePlugin: noop,
   onOpenPicker: noop, onClosePicker: noop, onConfirmPlugins: noop, onConfirmKnowledge: noop,
   openVersionDetail: noop, closeVersionDetail: noop,
+  onTestSend: async () => {}, onTestStop: noop,
 };
 
 describe('agent builder views', () => {
