@@ -1,11 +1,21 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { KnowledgeView } from '@minicoze/ui/knowledge';
 import { useConfirm } from '@minicoze/ui/hooks';
-import { createKnowledgeBase, createTextDocument, getKnowledgeWorkspaceId, deleteKnowledgeBase, deleteKnowledgeDocument, listDocumentChunks, listKnowledgeBases, listKnowledgeDocuments, previewKnowledgeSearch, retryKnowledgeDocument, updateKnowledgeBaseStatus, uploadDocumentFile, type KnowledgeBase, type KnowledgeChunkPage, type KnowledgeDocument, type KnowledgeSearchResult } from './knowledge.api';
+import { KnowledgeCenterPage } from './KnowledgeCenterPage';
+import { createKnowledgeBase, createTextDocument, getKnowledgeWorkspaceId, deleteKnowledgeBase, deleteKnowledgeDocument, getKnowledgeDocumentContent, listKnowledgeBases, listKnowledgeDocuments, previewKnowledgeSearch, retryKnowledgeDocument, updateKnowledgeBaseStatus, uploadDocumentFile, type KnowledgeBase, type KnowledgeDocument, type KnowledgeSearchResult } from './knowledge.api';
+import { navigate, usePathname } from '../../shared/routing/navigation';
 
 
 
 export function KnowledgePage() {
+  const pathname = usePathname();
+  const detailPrefix = '/workspace/knowledge/';
+  if (!pathname.startsWith(detailPrefix)) return <KnowledgeCenterPage />;
+  const knowledgeBaseId = decodeURIComponent(pathname.slice(detailPrefix.length));
+  return <KnowledgeDetailPage knowledgeBaseId={knowledgeBaseId} />;
+}
+
+function KnowledgeDetailPage({ knowledgeBaseId }: { knowledgeBaseId: string }) {
   const { confirm, confirmation } = useConfirm();
   const [workspaceId, setWorkspaceId] = useState('');
   const [items, setItems] = useState<KnowledgeBase[]>([]);
@@ -16,7 +26,7 @@ export function KnowledgePage() {
   const [creatingBase, setCreatingBase] = useState(false);
   const [error, setError] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'documents' | 'chunks' | 'search'>('documents');
+  const [activeTab, setActiveTab] = useState<'documents' | 'search'>('documents');
   const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
   const [documentError, setDocumentError] = useState('');
   const [documentLoading, setDocumentLoading] = useState(false);
@@ -30,12 +40,13 @@ export function KnowledgePage() {
   const [documentText, setDocumentText] = useState('');
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
-  const [chunkPage, setChunkPage] = useState(1);
-  const [chunks, setChunks] = useState<KnowledgeChunkPage | null>(null);
-  const [chunkLoading, setChunkLoading] = useState(false);
-  const [chunkError, setChunkError] = useState('');
+  const [documentDrawerOpen, setDocumentDrawerOpen] = useState(false);
+  const [documentContent, setDocumentContent] = useState<string | null>(null);
+  const [documentContentLoading, setDocumentContentLoading] = useState(false);
+  const [documentContentError, setDocumentContentError] = useState('');
   const [query, setQuery] = useState('');
   const [searchResult, setSearchResult] = useState<KnowledgeSearchResult | null>(null);
+  const [contentByDocumentId, setContentByDocumentId] = useState<Record<string, string>>({});
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -55,17 +66,14 @@ export function KnowledgePage() {
     let active = true;
     listKnowledgeBases(workspaceId)
       .then((result) => { if (!active) return;
-        const params = new URLSearchParams(window.location.search);
-        const target = params.get('id');
         setItems(result);
-        const selected = target ? result.find(item => item.id === target) : result[0];
+        const selected = result.find(item => item.id === knowledgeBaseId);
         setSelectedId(selected?.id ?? null);
-        if (target && !selected) setError('知识库不存在或无权访问');
-        setCreatingBase(params.get('action') === 'new'); })
+        if (!selected) setError('知识库不存在或无权访问'); })
       .catch((cause: unknown) => { if (active) setError(getMessage(cause)); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [workspaceId]);
+  }, [workspaceId, knowledgeBaseId]);
 
   const hasProcessing = documents.some((document) => document.status === 'PROCESSING');
   useEffect(() => {
@@ -73,8 +81,9 @@ export function KnowledgePage() {
     setActiveTab('documents');
     setAddingDocument(false);
     setSelectedDocumentId(null);
-    setChunkPage(1);
-    setChunks(null);
+    setDocumentDrawerOpen(false);
+    setDocumentContent(null);
+    setDocumentContentError('');
     setSearchResult(null);
     setSearchError('');
     setSearching(false);
@@ -93,8 +102,6 @@ export function KnowledgePage() {
     const refresh = () => listKnowledgeDocuments(selectedId, workspaceId)
       .then((result) => { if (active) {
         setDocuments(result);
-        setSelectedDocumentId((current) => current && result.some((document) => document.id === current && document.status === 'READY')
-          ? current : result.find((document) => document.status === 'READY')?.id ?? null);
         setDocumentError('');
       } })
       .catch((cause: unknown) => { if (active) setDocumentError(getMessage(cause)); })
@@ -105,21 +112,22 @@ export function KnowledgePage() {
   }, [workspaceId, selectedId, selectedBaseStatus, hasProcessing]);
 
   useEffect(() => {
-    if (!workspaceId || !selectedId || selectedBaseStatus !== 'ACTIVE' || !selectedDocumentId) {
-      setChunks(null);
-      setChunkLoading(false);
-      setChunkError('');
+    const selectedDocumentStatus = documents.find((document) => document.id === selectedDocumentId)?.status;
+    if (!workspaceId || !selectedDocumentId || !documentDrawerOpen || selectedDocumentStatus !== 'READY') {
+      setDocumentContent(null);
+      setDocumentContentLoading(false);
+      setDocumentContentError('');
       return;
     }
     let active = true;
-    setChunkLoading(true);
-    setChunkError('');
-    listDocumentChunks(selectedId, selectedDocumentId, workspaceId, chunkPage)
-      .then((result) => { if (active) setChunks(result); })
-      .catch((cause: unknown) => { if (active) { setChunks(null); setChunkError(getMessage(cause)); } })
-      .finally(() => { if (active) setChunkLoading(false); });
+    setDocumentContentLoading(true);
+    setDocumentContentError('');
+    getKnowledgeDocumentContent(selectedDocumentId, workspaceId)
+      .then((result) => { if (active) setDocumentContent(result.content); })
+      .catch((cause: unknown) => { if (active) { setDocumentContent(null); setDocumentContentError(getMessage(cause)); } })
+      .finally(() => { if (active) setDocumentContentLoading(false); });
     return () => { active = false; };
-  }, [workspaceId, selectedId, selectedBaseStatus, selectedDocumentId, chunkPage]);
+  }, [workspaceId, selectedDocumentId, documentDrawerOpen, documents]);
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -220,8 +228,8 @@ export function KnowledgePage() {
       if (selectedId === document.knowledgeBaseId) {
         const remaining = await listKnowledgeDocuments(selectedId, workspaceId);
         setDocuments(remaining);
-        setSelectedDocumentId((current) => current === document.id ? remaining.find((item) => item.status === 'READY')?.id ?? null : current);
-        setChunkPage(1);
+        setSelectedDocumentId((current) => current === document.id ? null : current);
+        setDocumentDrawerOpen((current) => current && selectedDocumentId !== document.id);
         searchGenerationRef.current += 1;
         setSearchResult(null);
         setSearching(false);
@@ -238,11 +246,18 @@ export function KnowledgePage() {
     if (!selectedId || selectedBaseStatus !== 'ACTIVE' || !query.trim() || searching) return;
     setSearching(true);
     setSearchError('');
-    setSearchResult(null);
     const generation = ++searchGenerationRef.current;
     try {
       const result = await previewKnowledgeSearch(selectedId, workspaceId, query.trim());
-      if (searchGenerationRef.current === generation) setSearchResult(result);
+      if (searchGenerationRef.current === generation) {
+        setSearchResult(result);
+        const documentIds = [...new Set(result.hits.map((hit) => hit.documentId))];
+        const contents = await Promise.all(documentIds.map(async (documentId) => {
+          try { return [documentId, (await getKnowledgeDocumentContent(documentId, workspaceId)).content] as const; }
+          catch { return null; }
+        }));
+        if (searchGenerationRef.current === generation) setContentByDocumentId(Object.fromEntries(contents.filter((entry): entry is readonly [string, string] => entry !== null)));
+      }
     } catch (cause) {
       if (searchGenerationRef.current === generation) setSearchError(getMessage(cause));
     } finally {
@@ -263,12 +278,13 @@ export function KnowledgePage() {
       documentState={{
         activeTab, documents, documentError, documentLoading, documentSaving, deletingDocumentId,
         addingDocument, sourceMode, documentTitle, documentText, selectedDocumentId, selectedDocument,
-        readyDocuments, hasProcessing,
+        documentDrawerOpen, readyDocuments, hasProcessing,
       }}
-      chunkState={{ chunkPage, chunks, chunkLoading, chunkError }}
-      searchState={{ query, searchResult, searching, searchError, canSearch: Boolean(query.trim()) }}
+      documentContentState={{ content: documentContent, loading: documentContentLoading, error: documentContentError }}
+      searchState={{ query, searchResult, contentByDocumentId, searching, searchError, canSearch: Boolean(query.trim()) }}
       confirmation={confirmation}
       fileInputRef={fileInputRef}
+      onBackToCenter={() => navigate('/workspace/knowledge')}
       actions={{
         onSelectBase: setSelectedId,
         onToggleCreate: () => setCreatingBase((current) => !current),
@@ -286,13 +302,13 @@ export function KnowledgePage() {
         onDocumentFileChange: setDocumentFile,
         handleDocumentSubmit,
         handleRetry,
-        onViewDocumentChunks: (id) => { setSelectedDocumentId(id); setChunkPage(1); setActiveTab('chunks'); },
+        onViewDocumentChunks: (id) => { setSelectedDocumentId(id); setDocumentDrawerOpen(true); },
+        onCloseDocumentDrawer: () => setDocumentDrawerOpen(false),
         handleDeleteDocument: (id) => {
           const document = documents.find((item) => item.id === id);
           if (document) void handleDeleteDocument(document);
         },
-        onSelectedDocumentChange: (id) => { setSelectedDocumentId(id); setChunkPage(1); },
-        onChunkPageChange: setChunkPage,
+        onSelectedDocumentChange: setSelectedDocumentId,
         onQueryChange: setQuery,
         handleSearch,
       }}

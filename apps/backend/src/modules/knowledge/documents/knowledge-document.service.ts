@@ -74,6 +74,14 @@ export class KnowledgeDocumentService implements OnModuleInit {
     return this.publicDocument(document);
   }
 
+  async content(id: string, workspaceId: string) {
+    const document = await this.prisma.knowledgeDocument.findUnique({
+      where: { id }, select: { id: true, knowledgeBase: { select: { workspaceId: true } }, rawText: true },
+    });
+    if (!document || document.knowledgeBase.workspaceId !== workspaceId?.trim()) throw new NotFoundException('文档不存在');
+    return { documentId: document.id, content: document.rawText ?? '' };
+  }
+
   async retry(id: string, workspaceId: string) {
     const document = await this.prisma.knowledgeDocument.findUnique({ where: { id }, include: { knowledgeBase: true } });
     if (!document || document.knowledgeBase.workspaceId !== workspaceId?.trim()) throw new NotFoundException('文档不存在');

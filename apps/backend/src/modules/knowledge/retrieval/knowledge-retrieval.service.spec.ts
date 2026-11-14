@@ -29,8 +29,8 @@ describe('KnowledgeRetrievalService', () => {
     ]);
     prisma.knowledgeChunk.findFirst.mockResolvedValueOnce({ id: 'chunk-1' }).mockResolvedValueOnce(null);
     embedding.embed.mockResolvedValue({ model: 'model@revision', vectors: [Array(512).fill(0.01)] });
-    const first = { chunkId: 'chunk-1', knowledgeBaseId: 'kb-1', documentId: 'doc-1', documentTitle: 'A', content: 'A', score: 0.7 };
-    const second = { chunkId: 'chunk-2', knowledgeBaseId: 'kb-2', documentId: 'doc-2', documentTitle: 'B', content: 'B', score: 0.9 };
+    const first = { chunkId: 'chunk-1', knowledgeBaseId: 'kb-1', documentId: 'doc-1', documentTitle: 'A', content: 'A', startOffset: 10, endOffset: 20, score: 0.7 };
+    const second = { chunkId: 'chunk-2', knowledgeBaseId: 'kb-2', documentId: 'doc-2', documentTitle: 'B', content: 'B', startOffset: 0, endOffset: 8, score: 0.9 };
     prisma.$queryRaw.mockResolvedValueOnce([first]).mockResolvedValueOnce([second]);
 
     await expect(service.searchAuthorized(['kb-1', 'kb-2'], '报销标准', 5)).resolves.toEqual({ status: 'HIT', hits: [second, first] });

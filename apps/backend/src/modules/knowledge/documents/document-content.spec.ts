@@ -12,6 +12,10 @@ describe('document content extraction', () => {
     );
   });
 
+  it('normalizes TXT line endings to the coordinate system used by chunking', () => {
+    expect(extractDocumentText('TXT', Buffer.from('第一行\r\n第二行\r第三行'))).toBe('第一行\n第二行\n第三行');
+  });
+
   it('distinguishes invalid JSON from an empty result', () => {
     expect(() => extractDocumentText('JSON', Buffer.from('{broken'))).toThrow(
       new DocumentContentError('INVALID_JSON', 'JSON 文件格式无效'),

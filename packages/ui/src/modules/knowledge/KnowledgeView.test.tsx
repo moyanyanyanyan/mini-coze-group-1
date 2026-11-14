@@ -18,17 +18,19 @@ function props(): KnowledgeViewProps {
     documentState: { activeTab: 'documents', documents: [document], documentError: '', documentLoading: false,
       documentSaving: false, deletingDocumentId: null, addingDocument: false, sourceMode: 'text',
       documentTitle: '', documentText: '', selectedDocumentId: document.id, selectedDocument: document,
-      readyDocuments: [document], hasProcessing: false },
-    chunkState: { chunkPage: 1, chunks: null, chunkLoading: false, chunkError: '' },
-    searchState: { query: '', searchResult: null, searching: false, searchError: '', canSearch: false },
+      documentDrawerOpen: false, readyDocuments: [document], hasProcessing: false },
+    documentContentState: { content: '第一段识别内容', loading: false, error: '' },
+    searchState: { query: '', searchResult: null, contentByDocumentId: {}, searching: false, searchError: '', canSearch: false },
     confirmation: <span>确认弹窗插槽</span>, fileInputRef: createRef<HTMLInputElement>(),
+    onBackToCenter: noop,
     actions: {
       onSelectBase: noop, onToggleCreate: noop, onStartCreate: noop, onNameChange: noop,
       onDescriptionChange: noop, handleCreate: noop, handleToggleBaseStatus: noop, handleDeleteBase: noop,
       onActiveTabChange: noop, onToggleDocumentForm: noop, onSourceModeChange: noop,
       onDocumentTitleChange: noop, onDocumentTextChange: noop, onDocumentFileChange: noop,
       handleDocumentSubmit: noop, handleRetry: noop, onViewDocumentChunks: noop,
-      handleDeleteDocument: noop, onSelectedDocumentChange: noop, onChunkPageChange: noop,
+      onCloseDocumentDrawer: noop,
+      handleDeleteDocument: noop, onSelectedDocumentChange: noop,
       onQueryChange: noop, handleSearch: noop,
     },
   };
@@ -42,6 +44,7 @@ describe('knowledge view', () => {
     expect(html).toContain('确认弹窗插槽');
     expect(html).toContain('知识库已停用');
     expect(html).toContain('重新启用');
+    expect(html).not.toContain('knowledge-sidebar');
     expect(html).not.toContain('role="tablist"');
     expect(html).not.toContain('提交资料');
   });
@@ -55,21 +58,19 @@ describe('knowledge view', () => {
     ];
     const html = renderToStaticMarkup(<KnowledgeView {...input} />);
     expect(html).toMatch(/disabled="" title="请等待文档处理完成">删除知识库/);
-    expect(html).toMatch(/disabled="" title="请等待文档处理完成">删除文档/);
-    expect(html).toContain('向量化失败');
+    expect(html).toMatch(/disabled="" title="请等待资料处理完成">删除/);
+    expect(html).toContain('资料暂时无法处理');
     expect(html).toContain('重新处理');
   });
 
-  it('renders supplied chunk pagination and safely escapes document content', () => {
+  it('renders complete document content in the drawer and safely escapes it', () => {
     const input = props();
-    input.documentState.activeTab = 'chunks';
-    input.chunkState.chunks = { total: 2, pageSize: 1,
-      items: [{ id: 'chunk-1', position: 0, startOffset: 0, endOffset: 10, content: '<script>test</script>' }] };
+    input.documentState.documentDrawerOpen = true;
+    input.documentContentState.content = '<script>识别内容</script>';
     const html = renderToStaticMarkup(<KnowledgeView {...input} />);
-    expect(html).toContain('片段 1');
-    expect(html).toContain('&lt;script&gt;test&lt;/script&gt;');
-    expect(html).toContain('第 1 / 2 页');
-    expect(html).toMatch(/disabled="">上一页/);
+    expect(html).toContain('识别内容');
+    expect(html).toContain('&lt;script&gt;识别内容&lt;/script&gt;');
+    expect(html).not.toContain('内容片段 1');
   });
 
   it('distinguishes pending, failed and empty retrieval states', () => {
@@ -82,6 +83,6 @@ describe('knowledge view', () => {
     expect(renderToStaticMarkup(<KnowledgeView {...input} />)).toContain('role="alert">检索失败');
     input.searchState.searchError = '';
     input.searchState.searchResult = { status: 'NO_HIT', hits: [] };
-    expect(renderToStaticMarkup(<KnowledgeView {...input} />)).toContain('没有可检索的片段');
+    expect(renderToStaticMarkup(<KnowledgeView {...input} />)).toContain('暂未找到相关资料');
   });
 });

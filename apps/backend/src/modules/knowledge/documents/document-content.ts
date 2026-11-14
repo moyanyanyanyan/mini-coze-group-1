@@ -38,7 +38,7 @@ export function extractDocumentText(sourceType: 'TEXT' | 'TXT' | 'JSON', bytes: 
   }
 
   if (sourceType !== 'JSON') {
-    const text = decoded.trim();
+    const text = decoded.replace(/\r\n?/g, '\n').trim();
     if (!text) throw new DocumentContentError('EMPTY_CONTENT', '资料内容不能为空');
     return text;
   }

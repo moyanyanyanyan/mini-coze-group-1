@@ -22,6 +22,11 @@ export interface KnowledgeDocument {
   updatedAt: string;
 }
 
+export interface KnowledgeDocumentContent {
+  documentId: string;
+  content: string;
+}
+
 export interface KnowledgeChunkPreview {
   id: string;
   position: number;
@@ -44,6 +49,8 @@ export interface KnowledgeSearchHit {
   documentId: string;
   documentTitle: string;
   content: string;
+  startOffset: number | null;
+  endOffset: number | null;
   score: number;
 }
 
@@ -115,6 +122,12 @@ export async function deleteKnowledgeDocument(documentId: string, workspaceId: s
   const params = new URLSearchParams({ workspaceId });
   const response = await fetch(`${apiBase}/documents/${encodeURIComponent(documentId)}?${params}`, { method: 'DELETE', credentials: 'include' });
   await readResponse<{ id: string }>(response);
+}
+
+export async function getKnowledgeDocumentContent(documentId: string, workspaceId: string): Promise<KnowledgeDocumentContent> {
+  const params = new URLSearchParams({ workspaceId });
+  const response = await fetch(`${apiBase}/documents/${encodeURIComponent(documentId)}/content?${params}`, { credentials: 'include' });
+  return readResponse<KnowledgeDocumentContent>(response);
 }
 
 export async function listDocumentChunks(knowledgeBaseId: string, documentId: string, workspaceId: string, page: number): Promise<KnowledgeChunkPage> {

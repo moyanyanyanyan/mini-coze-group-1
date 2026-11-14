@@ -22,6 +22,11 @@ export class KnowledgeDocumentController {
     return { code: 200, message: 'ok', data: await this.documents.get(id, resolveKnowledgeWorkspace(request, workspaceId)) };
   }
 
+  @Get('documents/:id/content')
+  async content(@Req() request: Request, @Param('id') id: string, @Query('workspaceId') workspaceId: string) {
+    return { code: 200, message: 'ok', data: await this.documents.content(id, resolveKnowledgeWorkspace(request, workspaceId)) };
+  }
+
   @Delete('documents/:id')
   async remove(@Req() request: Request, @Param('id') id: string, @Query('workspaceId') workspaceId: string) {
     return { code: 200, message: 'ok', data: await this.documents.remove(id, resolveKnowledgeWorkspace(request, workspaceId)) };

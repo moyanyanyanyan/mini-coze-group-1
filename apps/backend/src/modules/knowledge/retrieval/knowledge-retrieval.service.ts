@@ -9,6 +9,8 @@ export interface KnowledgeHit {
   documentId: string;
   documentTitle: string;
   content: string;
+  startOffset: number;
+  endOffset: number;
   score: number;
 }
 
@@ -76,7 +78,7 @@ export class KnowledgeRetrievalService {
     for (const knowledgeBaseId of ids) {
       const rows = await this.prisma.$queryRaw<KnowledgeHit[]>(Prisma.sql`
           SELECT c.id AS "chunkId", c."knowledgeBaseId", c."documentId",
-                 d.title AS "documentTitle", c.content,
+                 d.title AS "documentTitle", c.content, c."startOffset", c."endOffset",
                  (1 - (${distance}))::double precision AS score
           FROM "KnowledgeChunk" c
           JOIN "KnowledgeChunkVector" v ON v."chunkId" = c.id

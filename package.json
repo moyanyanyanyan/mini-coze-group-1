@@ -7,7 +7,7 @@
     "dev": "concurrently -n web,backend,agent -c cyan,green,yellow \"pnpm dev:web\" \"pnpm dev:backend\" \"pnpm dev:agent\"",
     "dev:web": "pnpm --filter @minicoze/web dev",
     "dev:backend": "pnpm --filter @minicoze/backend start:dev",
-    "dev:agent": "cd apps/agent && python -m app.main",
+    "dev:agent": "node scripts/agent-python.cjs --cwd apps/agent -m app.main",
     "build": "pnpm -r --if-present build",
     "typecheck": "pnpm -r --if-present typecheck && pnpm typecheck:agent",
     "typecheck:agent": "node scripts/agent-python.cjs -m compileall -q apps/agent/app",
