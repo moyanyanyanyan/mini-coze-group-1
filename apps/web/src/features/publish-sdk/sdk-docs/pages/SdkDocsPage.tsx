@@ -55,7 +55,46 @@ export function SdkDocsPage() {
               通过 MiniCoze 公开 API 调用 API Key 绑定的已发布 Agent。
               TypeScript SDK 支持非流式 Run 和逐事件消费的 Stream。
             </p>
+            <div className="api-doc-hero-facts" aria-label="API 核心信息">
+              <div>
+                <span>Base URL</span>
+                <code>{'{BASE_URL}'}</code>
+              </div>
+              <div>
+                <span>Authentication</span>
+                <strong>Bearer Token</strong>
+              </div>
+              <div>
+                <span>API</span>
+                <strong>Run / Stream</strong>
+              </div>
+              <div>
+                <span>SDK</span>
+                <strong>TypeScript SDK</strong>
+              </div>
+            </div>
           </header>
+
+          <nav className="api-doc-endpoint-overview" aria-label="API 接口速览">
+            <a href="#run-sync">
+              <div className="api-doc-endpoint-overview__meta">
+                <span className="api-doc-method">POST</span>
+                <span>JSON</span>
+              </div>
+              <code>/api/v1/run</code>
+              <p>普通调用，等待 Agent 完成后一次性返回完整结果。</p>
+              <span className="api-doc-card-link">查看接口 <span aria-hidden="true">→</span></span>
+            </a>
+            <a href="#stream">
+              <div className="api-doc-endpoint-overview__meta">
+                <span className="api-doc-method">POST</span>
+                <span>SSE</span>
+              </div>
+              <code>/api/v1/stream</code>
+              <p>流式调用，实时接收文本、工具及终态事件。</p>
+              <span className="api-doc-card-link">查看接口 <span aria-hidden="true">→</span></span>
+            </a>
+          </nav>
 
           <DocSection section={API_DOC_SECTIONS[0]}>
             <p>
@@ -111,10 +150,11 @@ export function SdkDocsPage() {
           </DocSection>
 
           <DocSection section={API_DOC_SECTIONS[1]}>
-            <p>
-              公开接口通过
-              <code>Authorization: Bearer ${'{API_KEY}'}</code> 传递密钥。
-            </p>
+            <div className="api-doc-auth-method">
+              <span>Authorization</span>
+              <code>Bearer ${'{API_KEY}'}</code>
+              <small>每个公开 Run / Stream 请求都必须携带</small>
+            </div>
             <ul className="api-doc-list">
               <li>不要将真实 API Key 硬编码在公开前端代码、仓库或客户端可访问的环境中。</li>
               <li>生产环境应使用适合服务端的安全配置保存密钥。</li>
@@ -166,10 +206,14 @@ export function SdkDocsPage() {
             <ParameterTable />
             <h3>请求示例</h3>
             <CodeBlock sample={RUN_REQUEST_SAMPLE} onNotice={handleNotice} />
-            <h3>成功响应示例</h3>
-            <CodeBlock sample={RUN_RESPONSE_SAMPLE} onNotice={handleNotice} />
-            <h3>常见错误响应示例</h3>
-            <CodeBlock sample={RUN_ERROR_SAMPLE} onNotice={handleNotice} />
+            <div className="api-doc-response api-doc-response--success">
+              <h3>成功响应示例 <span>HTTP 200</span></h3>
+              <CodeBlock sample={RUN_RESPONSE_SAMPLE} onNotice={handleNotice} />
+            </div>
+            <div className="api-doc-response api-doc-response--error">
+              <h3>错误响应示例 <span>HTTP 4xx / 5xx</span></h3>
+              <CodeBlock sample={RUN_ERROR_SAMPLE} onNotice={handleNotice} />
+            </div>
             <Callout>
               成功响应使用 <code>{'{ code, message, data }'}</code> 信封，
               错误响应的数字 code 与 HTTP 状态码一致。
@@ -241,8 +285,17 @@ export function SdkDocsPage() {
                 </thead>
                 <tbody>
                   {SSE_EVENTS.map((event) => (
-                    <tr key={event.name}>
-                      <td><code>{event.name}</code></td>
+                    <tr
+                      className={`api-doc-event-row${event.name === 'run.completed' ? ' is-success' : ''}${event.name === 'run.failed' ? ' is-error' : ''}`}
+                      key={event.name}
+                    >
+                      <td>
+                        <div className="api-doc-event-name">
+                          <code>{event.name}</code>
+                          {event.name === 'run.completed' && <span>成功终态</span>}
+                          {event.name === 'run.failed' && <span>失败终态</span>}
+                        </div>
+                      </td>
                       <td>{event.description}</td>
                       <td><code>{event.data}</code></td>
                     </tr>
@@ -336,10 +389,14 @@ export function SdkDocsPage() {
 
             <h3>请求参数</h3>
             <ParameterTable />
-            <h3>成功响应</h3>
-            <CodeBlock sample={RUN_RESPONSE_SAMPLE} onNotice={handleNotice} />
-            <h3>错误响应</h3>
-            <CodeBlock sample={RUN_ERROR_SAMPLE} onNotice={handleNotice} />
+            <div className="api-doc-response api-doc-response--success">
+              <h3>成功响应 <span>HTTP 200</span></h3>
+              <CodeBlock sample={RUN_RESPONSE_SAMPLE} onNotice={handleNotice} />
+            </div>
+            <div className="api-doc-response api-doc-response--error">
+              <h3>错误响应 <span>HTTP 4xx / 5xx</span></h3>
+              <CodeBlock sample={RUN_ERROR_SAMPLE} onNotice={handleNotice} />
+            </div>
             <h3>Runtime 错误码映射</h3>
             <div className="api-doc-table-wrap">
               <table className="api-doc-table">
@@ -352,8 +409,8 @@ export function SdkDocsPage() {
                 <tbody>
                   {RUNTIME_ERRORS.map((item) => (
                     <tr key={item.code}>
-                      <td><code>{item.code}</code></td>
-                      <td><code>{item.httpStatus}</code></td>
+                      <td><code className="api-doc-code-chip">{item.code}</code></td>
+                      <td><code className={`api-doc-status-code ${statusTone(item.httpStatus)}`}>{item.httpStatus}</code></td>
                     </tr>
                   ))}
                 </tbody>
@@ -372,7 +429,7 @@ export function SdkDocsPage() {
                 <tbody>
                   {HTTP_STATUSES.map((item) => (
                     <tr key={item.status}>
-                      <td><code>{item.status}</code></td>
+                      <td><code className={`api-doc-status-code ${statusTone(Number(item.status))}`}>{item.status}</code></td>
                       <td>{item.meaning}</td>
                       <td>{item.note}</td>
                     </tr>
@@ -445,7 +502,16 @@ function ParameterTable({ rows = REQUEST_PARAMETERS }: { rows?: typeof REQUEST_P
         <tbody>
           {rows.map((row) => (
             <tr key={row.name}>
-              <td><code>{row.name}</code></td>
+              <td>
+                <div className="api-doc-param-name">
+                  <code>{row.name}</code>
+                  {rows === REQUEST_PARAMETERS && (
+                    <span className={row.type.endsWith('?') ? 'is-optional' : 'is-required'}>
+                      {row.type.endsWith('?') ? '可选' : '必填'}
+                    </span>
+                  )}
+                </div>
+              </td>
               <td><code>{row.type}</code></td>
               <td>{row.description}</td>
             </tr>
@@ -454,6 +520,12 @@ function ParameterTable({ rows = REQUEST_PARAMETERS }: { rows?: typeof REQUEST_P
       </table>
     </div>
   );
+}
+
+function statusTone(status: number) {
+  if (status >= 500) return 'is-error';
+  if (status >= 400) return 'is-warning';
+  return 'is-success';
 }
 
 function Callout({
