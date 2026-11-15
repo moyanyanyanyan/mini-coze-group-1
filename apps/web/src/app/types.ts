@@ -8,7 +8,9 @@ export type IconName =
   | 'plug'
   | 'workflow'
   | 'send'
-  | 'api';
+  | 'api'
+  | 'plus'
+  | 'trash';
 
 export interface FeatureManifest {
   id: string;

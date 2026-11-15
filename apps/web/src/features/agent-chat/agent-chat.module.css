@@ -2,17 +2,197 @@
   position: relative;
   z-index: 1;
   display: grid;
-  /* 头部和输入区固定，中间消息区自己滚 */
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  /* 左：历史对话；右：聊天主体（头部/消息区/输入区三段，消息区自己滚） */
+  grid-template-columns: 268px minmax(0, 1fr);
   height: 100vh;
+  min-height: 0;
   padding: 0;
 }
 
-/* 三个区域共用一条 860px 的中轴，聊天像文档一样立起来 */
+/* —— 左侧历史对话 —— */
+.history {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  min-height: 0;
+  padding: 24px 10px 18px 22px;
+  border-right: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.28));
+}
+
+.historyHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-right: 8px;
+}
+
+.historyTitle {
+  color: var(--ink-500);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.historyNew {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 26px;
+  padding: 0 10px 0 7px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  color: var(--ink-700);
+  background: var(--surface-raised);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 140ms ease, color 140ms ease;
+}
+
+.historyNew svg {
+  width: 13px;
+  height: 13px;
+}
+
+.historyNew:hover:not(:disabled) {
+  border-color: var(--violet-400);
+  color: var(--violet-700);
+}
+
+.historyNew:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.historyList {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 6px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.historyItem {
+  display: flex;
+  align-items: stretch;
+  border-radius: var(--radius-sm);
+}
+
+.historyItem:hover {
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.historyItemActive {
+  background: var(--violet-50);
+  box-shadow: inset 2px 0 0 var(--violet-600);
+}
+
+.historyOpen {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  padding: 8px 6px 8px 10px;
+  border: 0;
+  color: inherit;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.historyOpen:disabled {
+  cursor: default;
+}
+
+.historyName {
+  overflow: hidden;
+  color: var(--ink-800);
+  font-size: 13px;
+  font-weight: 550;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.historyItemActive .historyName {
+  color: var(--violet-800);
+}
+
+.historyMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  color: var(--ink-400);
+  font-size: 11px;
+}
+
+.historyAgent {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.historyTime {
+  flex: none;
+  font-family: var(--font-mono);
+}
+
+.historyDelete {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--ink-400);
+  background: none;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 140ms ease, color 140ms ease;
+}
+
+.historyDelete svg {
+  width: 14px;
+  height: 14px;
+}
+
+.historyItem:hover .historyDelete {
+  opacity: 1;
+}
+
+.historyDelete:hover:not(:disabled) {
+  color: var(--danger-600);
+  background: var(--danger-100);
+}
+
+.historyDelete:disabled {
+  cursor: not-allowed;
+}
+
+.historyEmpty {
+  margin: 8px 4px;
+  color: var(--ink-400);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+/* 右侧聊天主体 */
+.chat {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: 0;
+}
+
+/* 三个区域共用一条中轴，聊天像文档一样立起来 */
 .header,
 .stream,
 .footer {
-  width: min(860px, calc(100% - 48px));
+  width: min(820px, calc(100% - 56px));
   margin-inline: auto;
 }
 
@@ -26,12 +206,30 @@
   border-bottom: 1px solid var(--line);
 }
 
+.heading {
+  flex: 1;
+  min-width: 0;
+}
+
 .title {
   margin: 0;
+  overflow: hidden;
   color: var(--ink-900);
   font-size: 20px;
   font-weight: 680;
   letter-spacing: -0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 智能体下拉：和正文同一行，轻量不加框 */
+.agentPicker {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-500);
+  font-size: 13px;
 }
 
 .subtitle {
@@ -73,9 +271,19 @@
   display: grid;
   align-content: start;
   gap: 20px;
-  padding: 26px 0 20px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--line-strong) transparent;
+  min-height: 0;
+  padding: 26px 6px 20px;
+  overscroll-behavior: contain;
+  /* 彻底不显示滚动条：滚轮 / 触屏 / 键盘 / 拖拽内容区照样能滚，只是没有那条视觉轨 */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.stream::-webkit-scrollbar,
+.historyList::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 /* —— 空状态 —— */
@@ -172,11 +380,171 @@
 
 /* AI：白底细边框，回答是阅读主体，要像卡片一样干净 */
 .bubbleAssistant {
+  max-width: min(680px, 88%);
   border-color: var(--line);
   border-radius: 4px 14px 14px 14px;
   color: var(--ink-800);
   background: var(--surface-raised);
   box-shadow: var(--shadow-xs);
+}
+
+/* 失败 / 已停止这类状态说明，弱化处理不抢正文 */
+.bubbleHint {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink-400);
+  font-size: 12px;
+}
+
+/* —— 模型输出的 markdown：渲染成排版，不露源码 —— */
+.markdown {
+  /* 气泡上的 pre-wrap 只服务用户手打的换行，渲染区必须关掉，否则段间距翻倍 */
+  white-space: normal;
+  font-size: 14px;
+  line-height: 1.78;
+}
+
+.markdown > :first-child {
+  margin-top: 0;
+}
+
+.markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown p {
+  margin: 0 0 10px;
+}
+
+.markdown h1,
+.markdown h2,
+.markdown h3,
+.markdown h4,
+.markdown h5,
+.markdown h6 {
+  margin: 18px 0 8px;
+  color: var(--ink-900);
+  font-weight: 650;
+  line-height: 1.45;
+  letter-spacing: -0.01em;
+}
+
+.markdown h1 { font-size: 18px; }
+.markdown h2 { font-size: 16px; }
+.markdown h3 { font-size: 15px; }
+.markdown h4,
+.markdown h5,
+.markdown h6 { font-size: 14px; }
+
+.markdown ul,
+.markdown ol {
+  margin: 0 0 10px;
+  padding-left: 22px;
+}
+
+.markdown li {
+  margin: 3px 0;
+}
+
+.markdown li > p {
+  margin: 0;
+}
+
+.markdown strong {
+  color: var(--ink-900);
+  font-weight: 650;
+}
+
+.markdown em {
+  font-style: italic;
+}
+
+.markdown del {
+  color: var(--ink-500);
+}
+
+.markdown a {
+  color: var(--violet-700);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.markdown a:hover {
+  color: var(--violet-800);
+}
+
+/* 行内代码 */
+.markdown code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  color: var(--ink-800);
+  background: var(--surface-sunken);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
+
+/* 代码块：独立滚动，别把气泡撑破 */
+.markdown pre {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.markdown pre code {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 12.5px;
+  line-height: 1.6;
+  white-space: pre;
+}
+
+.markdown blockquote {
+  margin: 0 0 10px;
+  padding: 2px 0 2px 12px;
+  border-left: 3px solid var(--line-strong);
+  color: var(--ink-600);
+}
+
+.markdown hr {
+  margin: 16px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.markdown table {
+  width: 100%;
+  margin: 0 0 12px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.markdown th,
+.markdown td {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  text-align: left;
+}
+
+.markdown th {
+  background: var(--surface-sunken);
+  font-weight: 600;
+}
+
+.markdown img {
+  max-width: 100%;
+  border-radius: var(--radius-sm);
+}
+
+/* 知识库引用来源 */
+.citations {
+  margin: 6px 0 0 40px;
+  color: var(--ink-500);
+  font-size: 12px;
+  line-height: 1.7;
 }
 
 .bubblePending {
@@ -353,15 +721,22 @@
   border: 0;
 }
 
+/* 窄屏：历史对话收起来，聊天占满整行 */
+@media (max-width: 1100px) {
+  .page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .history {
+    display: none;
+  }
+}
+
 @media (max-width: 760px) {
   .header,
   .stream,
   .footer {
     width: calc(100% - 32px);
-  }
-
-  .page {
-    grid-template-rows: auto minmax(0, 1fr) auto;
   }
 
   .bubble {
