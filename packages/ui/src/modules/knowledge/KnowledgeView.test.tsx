@@ -23,9 +23,11 @@ function props(): KnowledgeViewProps {
     searchState: { query: '', searchResult: null, contentByDocumentId: {}, searching: false, searchError: '', canSearch: false },
     confirmation: <span>确认弹窗插槽</span>, fileInputRef: createRef<HTMLInputElement>(),
     onBackToCenter: noop,
+    editDialogOpen: false, editName: '', editDescription: '', editSaving: false,
+    onEditNameChange: noop, onEditDescriptionChange: noop, onEditSubmit: noop, onCloseEditDialog: noop,
     actions: {
       onSelectBase: noop, onToggleCreate: noop, onStartCreate: noop, onNameChange: noop,
-      onDescriptionChange: noop, handleCreate: noop, handleToggleBaseStatus: noop, handleDeleteBase: noop,
+      onDescriptionChange: noop, handleCreate: noop, handleToggleBaseStatus: noop, onEditKnowledgeBase: noop, handleDeleteBase: noop,
       onActiveTabChange: noop, onToggleDocumentForm: noop, onSourceModeChange: noop,
       onDocumentTitleChange: noop, onDocumentTextChange: noop, onDocumentFileChange: noop,
       handleDocumentSubmit: noop, handleRetry: noop, onViewDocumentChunks: noop,
@@ -47,6 +49,11 @@ describe('knowledge view', () => {
     expect(html).not.toContain('knowledge-sidebar');
     expect(html).not.toContain('role="tablist"');
     expect(html).not.toContain('提交资料');
+  });
+
+  it('places knowledge base editing in the management menu', () => {
+    const html = renderToStaticMarkup(<KnowledgeView {...props()} />);
+    expect(html).toContain('编辑知识库');
   });
 
   it('prevents deletion while documents are processing and shows failure details', () => {

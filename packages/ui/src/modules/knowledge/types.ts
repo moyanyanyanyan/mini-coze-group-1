@@ -84,6 +84,7 @@ export interface KnowledgeActions {
   onDescriptionChange: (value: string) => void;
   handleCreate: (event: FormEvent<HTMLFormElement>) => void;
   handleToggleBaseStatus: () => void;
+  onEditKnowledgeBase: () => void;
   handleDeleteBase: () => void;
   onActiveTabChange: (tab: KnowledgeTab) => void;
   onToggleDocumentForm: () => void;
@@ -110,6 +111,14 @@ export interface KnowledgeViewProps {
   confirmation: ReactNode;
   fileInputRef: RefObject<HTMLInputElement | null>;
   onBackToCenter: () => void;
+  editDialogOpen: boolean;
+  editName: string;
+  editDescription: string;
+  editSaving: boolean;
+  onEditNameChange: (value: string) => void;
+  onEditDescriptionChange: (value: string) => void;
+  onEditSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onCloseEditDialog: () => void;
 }
 
 export interface KnowledgeCenterAction {
@@ -118,10 +127,12 @@ export interface KnowledgeCenterAction {
   onDescriptionChange: (value: string) => void;
   handleCreate: (event: FormEvent<HTMLFormElement>) => void;
   onOpenDetail: (id: string) => void;
+  onOpenEdit: (id: string) => void;
 }
 
 export interface KnowledgeCenterViewProps {
   items: KnowledgeBaseItem[];
+  editingItem: KnowledgeBaseItem | null;
   loading: boolean;
   error: string;
   name: string;

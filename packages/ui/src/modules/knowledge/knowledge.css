@@ -161,7 +161,12 @@
 .knowledge-center-empty { display: grid; justify-items: center; gap: 8px; min-height: 250px; text-align: center; }
 .knowledge-center-empty h3 { margin: 0; font-size: 20px; }
 .knowledge-center-empty p { margin: 0 0 12px; color: var(--ink-600); }
-.knowledge-center-create { max-width: 620px; margin-bottom: 28px; }
+.knowledge-modal-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 24px; background: rgba(20, 18, 32, .42); }
+.knowledge-modal { width: min(100%, 560px); max-height: min(90vh, 680px); overflow: auto; padding: 26px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface, #fff); box-shadow: 0 24px 70px rgba(20, 18, 32, .2); }
+.knowledge-modal-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+.knowledge-modal-header h2 { margin: 0; font-size: 22px; }
+.knowledge-modal-close { width: 32px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--ink-500); font-size: 24px; line-height: 1; cursor: pointer; }
+.knowledge-modal-close:hover { background: var(--violet-50); color: var(--ink-900); }
 .knowledge-center-create-actions { display: flex; gap: 10px; }
 .knowledge-center-create-actions button:last-child { padding: 0 18px; border: 1px solid var(--line-strong); border-radius: 9px; background: #fff; color: var(--ink-700); font: inherit; cursor: pointer; }
 .knowledge-detail-breadcrumb { display: flex; align-items: center; gap: 9px; margin-bottom: 20px; color: var(--ink-500); font-size: 13px; }

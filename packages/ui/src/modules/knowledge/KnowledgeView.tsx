@@ -6,6 +6,7 @@ import './knowledge.css';
 
 export function KnowledgeView({
   catalog, documentState, documentContentState, searchState, actions, confirmation, fileInputRef, onBackToCenter,
+  editDialogOpen, editName, editDescription, editSaving, onEditNameChange, onEditDescriptionChange, onEditSubmit, onCloseEditDialog,
 }: KnowledgeViewProps) {
   const { error, selectedId, selectedBase, selectedBaseStatus, deletingBase, updatingBaseStatus } = catalog;
   const { activeTab, documents, documentError, documentLoading, documentSaving, deletingDocumentId,
@@ -21,7 +22,7 @@ export function KnowledgeView({
     return matchesQuery && matchesStatus;
   });
   const groupedSearchResults = searchResult?.status === 'HIT' ? groupSearchResults(searchResult.hits, contentByDocumentId) : [];
-  const { handleToggleBaseStatus, handleDeleteBase, onActiveTabChange, onToggleDocumentForm,
+  const { handleToggleBaseStatus, onEditKnowledgeBase, handleDeleteBase, onActiveTabChange, onToggleDocumentForm,
     onSourceModeChange, onDocumentTitleChange, onDocumentTextChange, onDocumentFileChange,
     handleDocumentSubmit, handleRetry, onViewDocumentChunks, handleDeleteDocument,
     onCloseDocumentDrawer, onQueryChange, handleSearch } = actions;
@@ -31,10 +32,26 @@ export function KnowledgeView({
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [documentDrawerOpen, onCloseDocumentDrawer]);
+  useEffect(() => {
+    if (!editDialogOpen) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape' && !editSaving) onCloseEditDialog(); };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [editDialogOpen, editSaving, onCloseEditDialog]);
 
   return (
     <section className="feature-page knowledge-page" aria-label="知识库">
       {confirmation}
+      {editDialogOpen && <div className="knowledge-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !editSaving) onCloseEditDialog(); }}>
+        <form className="knowledge-modal knowledge-form knowledge-create-form" role="dialog" aria-modal="true" aria-labelledby="edit-knowledge-dialog-title" onSubmit={onEditSubmit} onMouseDown={(event) => event.stopPropagation()}>
+          <div className="knowledge-modal-header"><h2 id="edit-knowledge-dialog-title">编辑知识库</h2><button type="button" className="knowledge-modal-close" aria-label="关闭弹窗" onClick={onCloseEditDialog} disabled={editSaving}>×</button></div>
+          <label htmlFor="edit-knowledge-name">名称</label>
+          <input id="edit-knowledge-name" value={editName} onChange={(event) => onEditNameChange(event.target.value)} maxLength={50} required />
+          <label htmlFor="edit-knowledge-description">说明</label>
+          <textarea id="edit-knowledge-description" value={editDescription} onChange={(event) => onEditDescriptionChange(event.target.value)} maxLength={200} rows={3} />
+          <div className="knowledge-center-create-actions"><button type="submit" disabled={editSaving || !editName.trim()}>{editSaving ? '保存中…' : '保存修改'}</button><button type="button" onClick={onCloseEditDialog} disabled={editSaving}>取消</button></div>
+        </form>
+      </div>}
       <div className="knowledge-content">
         <div className="knowledge-detail-breadcrumb"><button type="button" onClick={onBackToCenter}>← 返回知识库中心</button><span>知识库</span><span>/</span><strong>{selectedBase?.name ?? '知识库详情'}</strong></div>
         <div className="knowledge-workbench knowledge-detail-workbench">
@@ -46,6 +63,7 @@ export function KnowledgeView({
                   {selectedBaseStatus === 'ACTIVE' ? <div className="knowledge-workbench-stats"><span><strong>{documents.length}</strong> 全部资料</span><span className="is-ready"><strong>{documents.filter((document) => document.status === 'READY').length}</strong> 可检索</span><span className="is-processing"><strong>{documents.filter((document) => document.status === 'PROCESSING').length}</strong> 处理中</span><span className="is-failed"><strong>{documents.filter((document) => document.status === 'FAILED').length}</strong> 处理失败</span></div> : <span className="knowledge-status is-disabled">已停用 · 资料保留</span>}
                 </div>
                 <ActionMenu key={selectedId} label="管理知识库">
+                  <button className="knowledge-status-toggle" type="button" onClick={onEditKnowledgeBase}>编辑知识库</button>
                   <button className="knowledge-status-toggle" type="button" disabled={updatingBaseStatus || deletingBase} onClick={() => void handleToggleBaseStatus()}>{updatingBaseStatus ? '更新中…' : selectedBaseStatus === 'DISABLED' ? '重新启用' : '停用知识库'}</button>
                   <button className="knowledge-delete" type="button" disabled={deletingBase || updatingBaseStatus || hasProcessing} title={hasProcessing ? '请等待文档处理完成' : undefined} onClick={() => void handleDeleteBase()}>{deletingBase ? '删除中…' : '删除知识库'}</button>
                 </ActionMenu>

@@ -170,6 +170,13 @@ export async function updateKnowledgeBaseStatus(knowledgeBaseId: string, workspa
   return readResponse<KnowledgeBase>(response);
 }
 
+export async function updateKnowledgeBase(knowledgeBaseId: string, input: { workspaceId: string; name: string; description: string }): Promise<KnowledgeBase> {
+  const response = await fetch(`${apiBase}/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}`, {
+    method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+  });
+  return readResponse<KnowledgeBase>(response);
+}
+
 export async function deleteKnowledgeBase(knowledgeBaseId: string, workspaceId: string): Promise<void> {
   const params = new URLSearchParams({ workspaceId });
   const response = await fetch(`${apiBase}/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}?${params}`, { method: 'DELETE', credentials: 'include' });

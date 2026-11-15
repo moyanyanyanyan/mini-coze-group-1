@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query, Req
 import type { Request } from 'express';
 import { CreateKnowledgeBaseDto } from './dto/create-knowledge-base.dto';
 import { UpdateKnowledgeBaseStatusDto } from './dto/update-knowledge-base-status.dto';
+import { UpdateKnowledgeBaseDto } from './dto/update-knowledge-base.dto';
 import { resolveKnowledgeWorkspace } from './knowledge-local-access';
 import { KnowledgeWorkspaceGuard } from './knowledge-workspace.guard';
 import { KnowledgeService } from './knowledge.service';
@@ -28,6 +29,12 @@ export class KnowledgeController {
   async updateStatus(@Req() request: Request, @Param('id') id: string, @Body() body: UpdateKnowledgeBaseStatusDto) {
     const workspaceId = resolveKnowledgeWorkspace(request, body.workspaceId);
     return { code: 200, message: 'ok', data: await this.knowledge.updateStatus(id, workspaceId, body.status) };
+  }
+
+  @Patch(':id')
+  async update(@Req() request: Request, @Param('id') id: string, @Body() body: UpdateKnowledgeBaseDto) {
+    const workspaceId = resolveKnowledgeWorkspace(request, body.workspaceId);
+    return { code: 200, message: 'ok', data: await this.knowledge.update(id, workspaceId, body.name, body.description) };
   }
 
   @Delete(':id')

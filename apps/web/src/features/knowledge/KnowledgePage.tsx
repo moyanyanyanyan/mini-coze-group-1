@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { KnowledgeView } from '@minicoze/ui/knowledge';
 import { useConfirm } from '@minicoze/ui/hooks';
 import { KnowledgeCenterPage } from './KnowledgeCenterPage';
-import { createKnowledgeBase, createTextDocument, getKnowledgeWorkspaceId, deleteKnowledgeBase, deleteKnowledgeDocument, getKnowledgeDocumentContent, listKnowledgeBases, listKnowledgeDocuments, previewKnowledgeSearch, retryKnowledgeDocument, updateKnowledgeBaseStatus, uploadDocumentFile, type KnowledgeBase, type KnowledgeDocument, type KnowledgeSearchResult } from './knowledge.api';
+import { createKnowledgeBase, createTextDocument, getKnowledgeWorkspaceId, deleteKnowledgeBase, deleteKnowledgeDocument, getKnowledgeDocumentContent, listKnowledgeBases, listKnowledgeDocuments, previewKnowledgeSearch, retryKnowledgeDocument, updateKnowledgeBase, updateKnowledgeBaseStatus, uploadDocumentFile, type KnowledgeBase, type KnowledgeDocument, type KnowledgeSearchResult } from './knowledge.api';
 import { navigate, usePathname } from '../../shared/routing/navigation';
 
 
@@ -23,6 +23,10 @@ function KnowledgeDetailPage({ knowledgeBaseId }: { knowledgeBaseId: string }) {
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
   const [creatingBase, setCreatingBase] = useState(false);
   const [error, setError] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -269,6 +273,34 @@ function KnowledgeDetailPage({ knowledgeBaseId }: { knowledgeBaseId: string }) {
   const selectedBase = items.find((item) => item.id === selectedId);
   const readyDocuments = documents.filter((document) => document.status === 'READY');
 
+  function handleOpenEdit() {
+    if (!selectedBase) return;
+    setEditName(selectedBase.name);
+    setEditDescription(selectedBase.description);
+    setEditDialogOpen(true);
+  }
+
+  function handleCloseEdit() {
+    if (editSaving) return;
+    setEditDialogOpen(false);
+  }
+
+  async function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedId || !workspaceId || !editName.trim() || editSaving) return;
+    setEditSaving(true);
+    setError('');
+    try {
+      const updated = await updateKnowledgeBase(selectedId, { workspaceId, name: editName.trim(), description: editDescription.trim() });
+      setItems((current) => current.map((item) => item.id === updated.id ? updated : item));
+      setEditDialogOpen(false);
+    } catch (cause) {
+      setError(getMessage(cause));
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
   return (
     <KnowledgeView
       catalog={{
@@ -284,6 +316,14 @@ function KnowledgeDetailPage({ knowledgeBaseId }: { knowledgeBaseId: string }) {
       searchState={{ query, searchResult, contentByDocumentId, searching, searchError, canSearch: Boolean(query.trim()) }}
       confirmation={confirmation}
       fileInputRef={fileInputRef}
+      editDialogOpen={editDialogOpen}
+      editName={editName}
+      editDescription={editDescription}
+      editSaving={editSaving}
+      onEditNameChange={setEditName}
+      onEditDescriptionChange={setEditDescription}
+      onEditSubmit={handleEditSubmit}
+      onCloseEditDialog={handleCloseEdit}
       onBackToCenter={() => navigate('/workspace/knowledge')}
       actions={{
         onSelectBase: setSelectedId,
@@ -293,6 +333,7 @@ function KnowledgeDetailPage({ knowledgeBaseId }: { knowledgeBaseId: string }) {
         onDescriptionChange: setDescription,
         handleCreate,
         handleToggleBaseStatus,
+        onEditKnowledgeBase: handleOpenEdit,
         handleDeleteBase,
         onActiveTabChange: setActiveTab,
         onToggleDocumentForm: () => setAddingDocument(!addingDocument),

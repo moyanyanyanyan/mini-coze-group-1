@@ -7,8 +7,8 @@ const noop = () => undefined;
 
 function props(): KnowledgeCenterViewProps {
   return {
-    items: [], loading: false, error: '', name: '', description: '', saving: false, creatingBase: false, canCreate: false,
-    actions: { onToggleCreate: noop, onNameChange: noop, onDescriptionChange: noop, handleCreate: noop, onOpenDetail: noop },
+    items: [], editingItem: null, loading: false, error: '', name: '', description: '', saving: false, creatingBase: false, canCreate: false,
+    actions: { onToggleCreate: noop, onNameChange: noop, onDescriptionChange: noop, handleCreate: noop, onOpenDetail: noop, onOpenEdit: noop },
   };
 }
 
@@ -27,5 +27,24 @@ describe('knowledge center view', () => {
     expect(html).toContain('员工手册');
     expect(html).toContain('进入知识库');
     expect(html).not.toContain('份资料');
+  });
+
+  it('renders the create form as a modal dialog', () => {
+    const input = props();
+    input.creatingBase = true;
+    input.canCreate = true;
+    const html = renderToStaticMarkup(<KnowledgeCenterView {...input} />);
+    expect(html).toContain('role="dialog"');
+    expect(html).toContain('aria-modal="true"');
+    expect(html).toContain('关闭弹窗');
+    expect(html).toContain('knowledge-modal-backdrop');
+  });
+
+  it('keeps card actions focused on entering the knowledge base', () => {
+    const input = props();
+    input.items = [{ id: 'kb-1', name: '员工手册', description: '团队资料', status: 'ACTIVE' }];
+    const html = renderToStaticMarkup(<KnowledgeCenterView {...input} />);
+    expect(html).toContain('进入知识库');
+    expect(html).not.toContain('编辑知识库');
   });
 });
