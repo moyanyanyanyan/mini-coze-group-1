@@ -152,6 +152,11 @@ describe('PluginRegistry', () => {
         tags: row.tags,
         configSchema: row.configSchema,
         tools: row.tools,
+        kind: 'builtin',
+        authType: 'none',
+        endpoint: null,
+        connectionStatus: 'connected',
+        lastError: null,
       })),
     );
     expect(registry.listToolsByPluginIds([selected.catalog.pluginId])).toEqual(

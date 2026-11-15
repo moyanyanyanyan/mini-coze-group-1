@@ -1,84 +1,61 @@
-import { CATEGORY_META, CATEGORY_ORDER, PluginCard, type MarketPlugin, type PluginCategory } from './PluginCard';
+import { CATEGORY_META, CATEGORY_ORDER, PluginCard } from './PluginCard';
+import type { MarketPlugin } from './types';
+import { LinkIcon } from './plugin-icons';
 import './plugins.css';
 
 export interface PluginsViewProps {
   loading: boolean;
   error: string | null;
-  query: string;
-  category: PluginCategory | 'all';
-  filteredMarket: MarketPlugin[];
-  onQueryChange: (value: string) => void;
-  onCategoryChange: (value: PluginCategory | 'all') => void;
-  onRetry: () => void;
-  onClearFilters: () => void;
+  market: MarketPlugin[];
+  toast: string | null;
+  onOpenAdd: () => void;
 }
 
-export function PluginsView({
-  loading, error, query, category, filteredMarket, onQueryChange, onCategoryChange, onRetry, onClearFilters,
-}: PluginsViewProps) {
+export function PluginsView({ loading, error, market, toast, onOpenAdd }: PluginsViewProps) {
   return (
     <section className="feature-page plugins-page" aria-label="插件市场">
       <header className="pm-header">
         <div className="pm-header-inner">
-          <div>
-            <h1>插件</h1>
-            <p>浏览内置能力，在智能体编辑页选择并绑定使用。</p>
+          <span className="pm-header-brand">插件</span>
+          <div className="pm-header-actions">
+            <button
+              type="button"
+              className="pm-button pm-button-primary pm-button-header"
+              onClick={onOpenAdd}
+            >
+              <LinkIcon />
+              通过 URL 添加插件
+            </button>
           </div>
         </div>
       </header>
 
       <main className="pm-main">
-        <div className="pm-toolbar">
-          <input
-            className="pm-search"
-            type="search"
-            value={query}
-            onChange={(event) => onQueryChange(event.target.value)}
-            placeholder="搜索插件名称或能力"
-            aria-label="搜索插件"
-          />
-          <div className="pm-filters" aria-label="插件分类">
-            <button type="button" className={category === 'all' ? 'is-active' : ''} onClick={() => onCategoryChange('all')}>全部</button>
-            {CATEGORY_ORDER.map((item) => (
-              <button key={item} type="button" className={category === item ? 'is-active' : ''} onClick={() => onCategoryChange(item)}>
-                {CATEGORY_META[item]}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="pm-grid pm-skeleton-grid" aria-label="正在加载插件">
-            {Array.from({ length: 6 }, (_, index) => <div className="pm-skeleton" key={index} />)}
-          </div>
-        ) : null}
-        {error ? (
-          <p className="pm-status pm-status-error">加载失败：{error} <button onClick={() => onRetry()}>重试</button></p>
-        ) : null}
-        {!loading && !error && filteredMarket.length === 0 ? (
-          <div className="pm-empty">
-            <strong>没有找到匹配的插件</strong>
-            <span>调整搜索词或分类后再试。</span>
-            <button onClick={() => { onClearFilters(); }}>清空筛选</button>
-          </div>
+        {loading ? <p className="pm-status">加载插件目录中…</p> : null}
+        {error ? <p className="pm-status pm-status-error">加载失败：{error}</p> : null}
+        {!loading && !error && market.length === 0 ? (
+          <p className="pm-status">当前没有可用插件，点击右上角「通过 URL 添加插件」接入远程 MCP 服务。</p>
         ) : null}
 
         {!loading &&
           !error &&
-          (
-              <section className="pm-section" aria-label="插件列表">
+          CATEGORY_ORDER.map((category) => {
+            const plugins = market.filter((plugin) => plugin.category === category);
+            if (plugins.length === 0) return null;
+            return (
+              <section key={category} className="pm-section">
+                <h2>{CATEGORY_META[category]}</h2>
                 <div className="pm-grid">
-                  {filteredMarket.map((plugin) => (
-                    <PluginCard
-                      key={plugin.pluginId}
-                      plugin={plugin}
-                    />
+                  {plugins.map((plugin) => (
+                    <PluginCard key={plugin.pluginId} plugin={plugin} />
                   ))}
                 </div>
               </section>
-            )}
+            );
+          })}
       </main>
 
+      {toast ? <div className="pm-toast" role="status">{toast}</div> : null}
     </section>
   );
 }

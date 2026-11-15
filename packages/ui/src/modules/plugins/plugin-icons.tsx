@@ -7,6 +7,8 @@ function base(props: PIconProps) {
     'aria-hidden': true as const,
     fill: 'none',
     viewBox: '0 0 24 24',
+    width: 16,
+    height: 16,
     stroke: 'currentColor',
     strokeWidth: 2,
     strokeLinecap: 'round' as const,
@@ -36,17 +38,7 @@ export function ClockIcon(props: PIconProps) {
   );
 }
 
-/** 上传插件包（lucide upload） */
-export function UploadIcon(props: PIconProps) {
-  return (
-    <svg {...base(props)}>
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <path d="m17 8-5-5-5 5" />
-      <path d="M12 3v12" />
-    </svg>
-  );
-}
-
+/** 计算器 */
 export function CalculatorIcon(props: PIconProps) {
   return (
     <svg {...base(props)}>
@@ -56,11 +48,23 @@ export function CalculatorIcon(props: PIconProps) {
   );
 }
 
+/** 网页抓取 */
 export function WebIcon(props: PIconProps) {
   return (
     <svg {...base(props)}>
       <circle cx="12" cy="12" r="9" />
       <path d="M3 12h18M12 3c2.2 2.5 3.3 5.5 3.3 9S14.2 18.5 12 21M12 3C9.8 5.5 8.7 8.5 8.7 12s1.1 6.5 3.3 9" />
+    </svg>
+  );
+}
+
+/** 远程服务（lucide globe） */
+export function GlobeIcon(props: PIconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M2 12h20" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
     </svg>
   );
 }
@@ -75,8 +79,19 @@ export function CloseIcon(props: PIconProps) {
   );
 }
 
+/** 通过 URL 添加（lucide link） */
+export function LinkIcon(props: PIconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    </svg>
+  );
+}
+
 export function getPluginIcon(kind: string) {
   if (kind === 'time') return ClockIcon;
+  if (kind === 'globe') return GlobeIcon;
   if (kind === 'calculator') return CalculatorIcon;
   if (kind === 'web') return WebIcon;
   return EchoIcon;

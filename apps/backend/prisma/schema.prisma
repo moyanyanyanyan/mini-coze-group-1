@@ -163,8 +163,8 @@ model Message {
 ///
 /// - 内置插件由代码中的统一注册表在启动时 upsert 进表，
 ///   目录元数据以此处为准；执行器仍走对应的内置代码类。
-/// - 用户自定义插件（kind = http）由 POST /api/plugins 写入，
-///   执行时由 HttpExecutor 按 endpoint 转发请求。
+/// - 用户自定义插件（kind = http / mcp）由 POST /api/plugins 写入，
+///   http 由 HttpExecutor 按 endpoint 转发，mcp 由 McpExecutor 经 JSON-RPC 调用。
 model Plugin {
   id           Int      @id @default(autoincrement())
   /// 全局唯一插件 ID，形如 plugin_echo / plugin_weather
@@ -178,10 +178,18 @@ model Plugin {
   configSchema Json     @default("{}")
   /// PluginToolDefinition[]，与目录同源
   tools        Json
-  /// builtin | http
+  /// builtin | http | mcp
   kind         String   @default("builtin")
-  /// kind = http 时必填，工具执行时 POST 到该地址
+  /// kind = http/mcp 时必填，工具执行时请求该地址
   endpoint     String?
+  /// none | bearer | api_key；MCP/HTTP 插件访问远端服务时的鉴权方式
+  authType     String   @default("none")
+  /// 鉴权凭证（bearer token 或 api key），none 时为空；阶段项目明文存库
+  authCredential String?
+  /// unknown | connected | error，最近一次握手/连接状态
+  connectionStatus String @default("unknown")
+  /// 最近一次连接失败原因，成功后清空
+  lastError    String?
   /// 运行时是否可用；false 时不进入目录与允许列表
   enabled      Boolean  @default(true)
   createdAt    DateTime @default(now())
