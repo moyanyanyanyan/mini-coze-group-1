@@ -18,7 +18,7 @@ def definition():
     return json.loads(
         (
             Path(__file__).resolve().parents[3] / "docs/workflows/example.workflow.json"
-        ).read_text()
+        ).read_text(encoding="utf-8")
     )
 
 

@@ -62,11 +62,15 @@ export const landingModules = workspaceFeatures.filter(
 
 export function getWorkspaceFeature(pathname: string) {
   const candidates = workspaceFeatures
-    .filter(
-      (feature) =>
-        pathname === feature.route ||
-        pathname.startsWith(`${feature.route}/`),
-    )
+    .filter((feature) => {
+      if (pathname === feature.route) {
+        return true;
+      }
+      // 一级路由（/workspace 本身）只做精确匹配：
+      // 否则 /workspace/任意地址 都会被它兜住，未知路由永远落不到兜底页
+      const isIndexRoute = feature.route.split('/').filter(Boolean).length === 1;
+      return !isIndexRoute && pathname.startsWith(`${feature.route}/`);
+    })
     .sort((a, b) => b.route.length - a.route.length);
   return candidates[0];
 }
