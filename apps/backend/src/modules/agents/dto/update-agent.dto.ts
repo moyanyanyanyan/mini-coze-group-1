@@ -34,6 +34,10 @@ export class UpdateAgentDto {
   model?: string;
 
   @IsOptional()
+  @IsString()
+  modelConfigId?: string | null;
+
+  @IsOptional()
   @IsNumber()
   @Min(0)
   @Max(2)

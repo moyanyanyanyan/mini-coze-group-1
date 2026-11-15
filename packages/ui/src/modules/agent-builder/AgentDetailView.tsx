@@ -291,12 +291,14 @@ export function AgentDetailView({
 
             <div className="ab-field-grid">
               <div className="ab-field">
-                <label className="ab-label" htmlFor="agent-model">模型</label>
-                <select id="agent-model" className="ab-input" value={form.model} onChange={(e) => update('model', e.target.value)}>
+                <label className="ab-label" htmlFor="agent-model">模型配置</label>
+                <select id="agent-model" className="ab-input" value={form.modelConfigId} onChange={(e) => update('modelConfigId', e.target.value)}>
+                  {!form.modelConfigId && <option value="">未绑定模型配置</option>}
                   {modelOptions.map((o) => (
                     <option key={o.value} value={o.value}>{o.label}</option>
                   ))}
                 </select>
+                <small className="ab-field-hint">调用地址与 Key 由「模型管理」统一维护，修改后对已发布版本同样生效。</small>
               </div>
 
               <div className="ab-field">

@@ -7,6 +7,7 @@ export interface AgentFormValues {
   description: string;
   systemPrompt: string;
   model: string;
+  modelConfigId: string;
   temperature: number;
   maxTokens: number;
   contextLimit: number;

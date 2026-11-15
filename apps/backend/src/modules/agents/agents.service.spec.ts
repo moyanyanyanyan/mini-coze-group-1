@@ -9,7 +9,7 @@ import {
 import { AgentsService } from './agents.service';
 
 function createService(prisma: Record<string, unknown>, knowledgeIds: string[] = []) {
-  return new AgentsService(prisma as never, { findByIds: async () => knowledgeIds.map((id) => ({ id })) } as never, {} as never);
+  return new AgentsService(prisma as never, { findByIds: async () => knowledgeIds.map((id) => ({ id })) } as never, {} as never, {} as never);
 }
 
 const publishedConfig = {

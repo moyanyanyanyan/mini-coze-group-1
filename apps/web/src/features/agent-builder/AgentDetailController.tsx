@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AgentDetailView } from '@minicoze/ui/agent-builder';
 import {
-  modelOptions,
+  listChatModelOptions,
   contextLimitOptions,
   getAgentVersion,
   listAgentVersions,
@@ -50,6 +50,7 @@ export function AgentDetailController({
   const [pluginSaving, setPluginSaving] = useState(false);
   const [pluginSaveError, setPluginSaveError] = useState<string | null>(null);
   const pluginSavePending = useRef(false);
+  const [modelOptions, setModelOptions] = useState<{ value: string; label: string }[]>([]);
   const [pickerOpen, setPickerOpen] = useState<PickerKind | null>(null);
   const [versions, setVersions] = useState<AgentVersionSummary[]>([]);
   const [versionsLoading, setVersionsLoading] = useState(false);
@@ -108,11 +109,29 @@ export function AgentDetailController({
     description: agent.description ?? '',
     systemPrompt: agent.systemPrompt,
     model: agent.model,
+    modelConfigId: agent.modelConfigId ?? '',
     temperature: agent.temperature,
     maxTokens: agent.maxTokens,
     contextLimit: agent.contextLimit,
     openingMessage: agent.openingMessage ?? '',
   });
+
+  useEffect(() => {
+    let active = true;
+    listChatModelOptions()
+      .then((items) => {
+        if (!active) return;
+        setModelOptions(items.map((item) => ({
+          value: item.id,
+          label: `${item.name} · ${item.modelIdentifier}`,
+        })));
+      })
+      .catch(() => {
+        if (!active) return;
+        setModelOptions([]);
+      });
+    return () => { active = false; };
+  }, []);
 
   const update = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => {
     setForm((f) => ({ ...f, [key]: value }));

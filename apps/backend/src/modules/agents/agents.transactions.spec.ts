@@ -44,7 +44,7 @@ function setup(status = 'ACTIVE') {
   const prisma = { $transaction: jest.fn(async (operation: (client: typeof tx) => Promise<unknown>) => operation(tx)) };
   const service = new AgentsService(prisma as never, {} as never, {
     findByIds: jest.fn(async (ids: string[]) => ids.map((pluginId) => ({ pluginId }))),
-  } as never);
+  } as never, {} as never);
   return { service, prisma, tx, agent };
 }
 

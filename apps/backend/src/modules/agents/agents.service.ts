@@ -25,7 +25,8 @@ import {
   KnowledgeCatalogPort,
 } from './ports/knowledge-catalog.port';
 import { PLUGIN_CATALOG_PORT, PluginCatalogPort } from './ports/plugin-catalog.port';
-import type { CurrentUserPayload, PublicAgentConfig } from './types';
+import type { CurrentUserPayload, PublicAgentConfig, RuntimeAgentConfig } from './types';
+import { ModelConfigsService } from '../model-configs/model-configs.service';
 
 @Injectable()
 export class AgentsService {
@@ -33,9 +34,14 @@ export class AgentsService {
     private readonly prisma: PrismaService,
     @Inject(KNOWLEDGE_CATALOG_PORT) private readonly knowledgeCatalog: KnowledgeCatalogPort,
     @Inject(PLUGIN_CATALOG_PORT) private readonly pluginCatalog: PluginCatalogPort,
+    private readonly modelConfigs: ModelConfigsService,
   ) {}
 
   async create(dto: CreateAgentDto, user: CurrentUserPayload) {
+    // 绑定与运行时都校验模型配置归属，避免凭配置 ID 越权使用他人模型。
+    const boundConfig = dto.modelConfigId
+      ? await this.modelConfigs.resolveForBinding(user.id, dto.modelConfigId)
+      : null;
     const agent = await this.prisma.agent.create({
       data: {
         ownerId: user.id,
@@ -44,7 +50,11 @@ export class AgentsService {
         description: dto.description,
         avatarUrl: dto.avatarUrl,
         systemPrompt: dto.systemPrompt ?? '',
-        model: dto.model ?? process.env.DEEPSEEK_MODEL ?? 'deepseek-ai/DeepSeek-V4.1-Flash',
+        model: boundConfig?.modelIdentifier
+          ?? dto.model
+          ?? process.env.DEEPSEEK_MODEL
+          ?? 'deepseek-ai/DeepSeek-V4.1-Flash',
+        modelConfigId: boundConfig?.id,
         temperature: dto.temperature ?? 0.7,
         maxTokens: dto.maxTokens ?? 4096,
         contextLimit: dto.contextLimit ?? 20,
@@ -127,7 +137,8 @@ export class AgentsService {
     if (!agent) throw new NotFoundException('Agent 不存在');
     if (agent.status === 'ARCHIVED') throw new NotFoundException('Agent 已归档');
     if (agent.ownerId !== userId) throw new ForbiddenException('无权访问此 Agent');
-    return buildAgentConfig(toAgentDetail(agent));
+    const config = buildAgentConfig(toAgentDetail(agent));
+    return this.attachModelConnection(config, agent.ownerId, agent.modelConfigId);
   }
 
   async getPublicAgent(agentId: string): Promise<PublicAgentConfig> {
@@ -139,6 +150,7 @@ export class AgentsService {
         status: true,
         currentVersionId: true,
         contextLimit: true,
+        modelConfigId: true,
       },
     });
 
@@ -186,11 +198,18 @@ export class AgentsService {
       agentId: agent.id,
       ownerId: agent.ownerId,
       status: agent.status,
-      config,
+      config: await this.attachModelConnection(
+        config,
+        agent.ownerId,
+        config.modelConfigId ?? agent.modelConfigId,
+      ),
     };
   }
 
   async update(agentId: string, dto: UpdateAgentDto, user: CurrentUserPayload) {
+    const boundConfig = dto.modelConfigId
+      ? await this.modelConfigs.resolveForBinding(user.id, dto.modelConfigId)
+      : null;
     return this.withAgentTransaction(agentId, async (tx) => {
       const existing = await this.assertAgentWritable(agentId, user.id, tx);
 
@@ -202,6 +221,7 @@ export class AgentsService {
         dto.name !== undefined ||
         dto.systemPrompt !== undefined ||
         dto.model !== undefined ||
+        dto.modelConfigId !== undefined ||
         dto.temperature !== undefined ||
         dto.maxTokens !== undefined ||
         dto.contextLimit !== undefined ||
@@ -218,7 +238,10 @@ export class AgentsService {
           description: dto.description,
           avatarUrl: dto.avatarUrl,
           systemPrompt: dto.systemPrompt,
-          model: dto.model,
+          ...(boundConfig ? { model: boundConfig.modelIdentifier } : { model: dto.model }),
+          ...(dto.modelConfigId !== undefined
+            ? { modelConfigId: dto.modelConfigId || null }
+            : {}),
           temperature: dto.temperature,
           maxTokens: dto.maxTokens,
           contextLimit: dto.contextLimit,
@@ -237,6 +260,28 @@ export class AgentsService {
 
       return toAgentDetail(agent);
     });
+  }
+
+  /** 运行时把模型配置解析为连接信息；Key 只进入内存请求体。 */
+  private async attachModelConnection(
+    config: RuntimeAgentConfig,
+    ownerId: string,
+    modelConfigId?: string | null,
+  ): Promise<RuntimeAgentConfig> {
+    if (!modelConfigId) {
+      return config;
+    }
+    const connection = await this.modelConfigs.resolveConnection(ownerId, modelConfigId);
+    return {
+      ...config,
+      model: connection.model,
+      connection: {
+        protocol: connection.protocol,
+        model: connection.model,
+        baseUrl: connection.baseUrl,
+        apiKey: connection.apiKey,
+      },
+    };
   }
 
   async remove(agentId: string, user: CurrentUserPayload) {

@@ -24,6 +24,10 @@ export class CreateAgentDto {
   model?: string;
 
   @IsOptional()
+  @IsString()
+  modelConfigId?: string;
+
+  @IsOptional()
   @IsNumber()
   @Min(0)
   @Max(2)
