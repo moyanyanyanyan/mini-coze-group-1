@@ -18,7 +18,7 @@ export function Sidebar() {
           </NavLink>
         ))}
       </nav>
-      <div className={styles.footer}>MiniCoze v0.1</div>
+      <div className={styles.footer}>织跃 v0.1</div>
     </aside>
   );
 }

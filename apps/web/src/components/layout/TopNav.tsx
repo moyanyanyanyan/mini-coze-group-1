@@ -10,7 +10,7 @@ export function TopNav({ username, onLogout }: TopNavProps) {
     <header className={styles.topNav}>
       <div className={styles.brand}>
         <span className={styles.dot} />
-        <span className={styles.logo}>MiniCoze</span>
+        <span className={styles.logo}>织跃</span>
         <span className={styles.workspace}>我的工作区</span>
       </div>
 
