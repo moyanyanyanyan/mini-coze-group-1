@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { KnowledgeRetrievalService } from '../retrieval/knowledge-retrieval.service';
 
@@ -27,10 +27,7 @@ export class KnowledgePreviewService {
 
   async search(knowledgeBaseId: string, workspaceId: string, query: string) {
     await this.assertBase(knowledgeBaseId, workspaceId);
-    if (typeof query !== 'string' || !query.trim() || query.length > 8000) {
-      throw new BadRequestException('问题长度必须为 1～8000 字符');
-    }
-    return this.retrieval.searchAuthorized([knowledgeBaseId], query.trim(), 5);
+    return this.retrieval.searchAuthorized([knowledgeBaseId], query, 5);
   }
 
   private async assertBase(id: string, workspaceId: string) {

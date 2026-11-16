@@ -1,10 +1,19 @@
 // src/features/workflow-editor/types/workflow.ts
 
-export type NodeType = 'start' | 'llm' | 'end';
+export type NodeType = 'start' | 'llm' | 'end' | 'condition' | 'loop';
 
+export type FieldType =
+  | 'string'
+  | 'number'
+  | 'boolean'
+  | 'array<string>'
+  | 'array<number>'
+  | 'array<boolean>';
+
+// ---------- Start ----------
 export interface StartInput {
   name: string;
-  type: 'string' | 'number' | 'boolean';
+  type: FieldType;
   required: boolean;
   description?: string;
   defaultValue?: unknown;
@@ -15,6 +24,7 @@ export interface StartNodeData {
   inputs: StartInput[];
 }
 
+// ---------- LLM ----------
 export interface LlmNodeData {
   label?: string;
   model: string;
@@ -25,10 +35,11 @@ export interface LlmNodeData {
   outputs?: Array<{ name: 'text'; type: 'string' }>;
 }
 
+// ---------- End ----------
 export interface EndOutput {
   name: string;
-  type: 'string' | 'number' | 'boolean';
-  valueFrom: string;
+  type: FieldType;
+  valueFrom: string[];
 }
 
 export interface EndNodeData {
@@ -36,7 +47,72 @@ export interface EndNodeData {
   outputs: EndOutput[];
 }
 
-export type NodeData = StartNodeData | LlmNodeData | EndNodeData;
+// ---------- Condition ----------
+export type ConditionLogic = 'and' | 'or';
+
+export type ConditionOperator =
+  | 'eq'
+  | 'ne'
+  | 'contains'
+  | 'not_contains'
+  | 'empty'
+  | 'not_empty'
+  | 'gt'
+  | 'gte'
+  | 'lt'
+  | 'lte';
+
+export type ConditionRight =
+  | { type: 'literal'; value: string | number | boolean }
+  | { type: 'ref'; value: string };
+
+export interface ConditionItem {
+  left: string;
+  op: ConditionOperator;
+  right?: ConditionRight;
+}
+
+export interface ConditionBranch {
+  id: string;
+  logic: ConditionLogic;
+  conditions: ConditionItem[];
+}
+
+export interface ConditionNodeData {
+  label?: string;
+  branches: ConditionBranch[];
+}
+
+// ---------- Loop ----------
+export interface LoopBody {
+  nodes: WorkflowNode[];
+  edges: WorkflowEdge[];
+}
+
+export type LoopMode = 'array' | 'count';
+
+export interface LoopOutput {
+  name: string;
+  type: FieldType;
+  valueFrom: string[];
+}
+
+export interface LoopNodeData {
+  label?: string;
+  mode: LoopMode;
+  items?: string;
+  count?: number | null;
+  body: LoopBody;
+  outputs: LoopOutput[];
+}
+
+// ---------- 节点 / 边 ----------
+export type NodeData =
+  | StartNodeData
+  | LlmNodeData
+  | EndNodeData
+  | ConditionNodeData
+  | LoopNodeData;
 
 export interface WorkflowNode {
   id: string;
@@ -59,6 +135,7 @@ export interface WorkflowDefinition {
   edges: WorkflowEdge[];
 }
 
+// ---------- Workflow 列表项（←←← 之前漏了） ----------
 export interface Workflow {
   id: string;
   workspaceId: string;
@@ -73,6 +150,7 @@ export interface Workflow {
   updatedAt: string;
 }
 
+// ---------- 运行时 ----------
 export interface NodeResult {
   nodeId: string;
   type: NodeType;
@@ -81,6 +159,8 @@ export interface NodeResult {
   output?: unknown;
   error?: { code: string; message: string } | null;
   durationMs?: number;
+  parentId?: string;
+  iteration?: number;
 }
 
 export interface WorkflowRunResult {

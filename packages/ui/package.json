@@ -1,0 +1,45 @@
+{
+  "name": "@minicoze/ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./sdk-docs": "./src/modules/publish-sdk/sdk-docs/index.ts",
+    "./landing": "./src/modules/landing/index.ts",
+    "./workspace": "./src/modules/workspace/index.ts",
+    "./workflow-editor": "./src/modules/workflow-editor/index.ts",
+    "./agent-chat": "./src/modules/agent-chat/index.ts",
+    "./knowledge": "./src/modules/knowledge/index.ts",
+    "./plugins": "./src/modules/plugins/index.ts",
+    "./agent-builder": "./src/modules/agent-builder/index.ts",
+    "./auth": "./src/modules/auth/index.ts",
+    "./components": "./src/components/index.ts",
+    "./hooks": "./src/hooks/index.ts",
+    "./layouts": "./src/layouts/index.ts",
+    "./api-management": "./src/modules/publish-sdk/api-management/index.ts",
+    "./theme.css": "./src/theme/base.css"
+  },
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@xyflow/react": "^12.12.0"
+  },
+  "peerDependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.2",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.5"
+  }
+}

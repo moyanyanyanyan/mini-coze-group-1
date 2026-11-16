@@ -5,9 +5,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsBoolean,
-  IsInt,
-  Min,
-  IsObject,
+  Equals,
   ValidateNested,
   ArrayMaxSize,
 } from 'class-validator';
@@ -21,18 +19,15 @@ export class PluginBindingItemDto {
   @IsBoolean()
   enabled?: boolean = true;
 
-  @IsOptional()
-  @IsBoolean()
-  autoInvoke?: boolean = true;
+  // 保留字段声明用于明确拒绝请求，避免 whitelist 静默丢弃后返回成功。
+  @Equals(undefined, { message: 'MVP 不支持设置 autoInvoke，请仅提交 pluginId 和 enabled' })
+  autoInvoke?: never;
 
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  sortOrder?: number = 0;
+  @Equals(undefined, { message: 'MVP 不支持设置 sortOrder，请仅提交 pluginId 和 enabled' })
+  sortOrder?: never;
 
-  @IsOptional()
-  @IsObject()
-  config?: Record<string, unknown>;
+  @Equals(undefined, { message: 'MVP 不支持设置 config，请仅提交 pluginId 和 enabled' })
+  config?: never;
 }
 
 export class ReplacePluginBindingsDto {

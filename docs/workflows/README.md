@@ -8,20 +8,15 @@
 - 尚未完成真实数据库验收：没有生成或提交 migration。
 - 已合入 Runtime 分支 `codex/feature/wangyiheng/agent-runtime`（775b3db），Agent 启动时注入 `app.state.workflow_complete`（`app/workflow/runtime_adapter.py: runtime_complete`）。真实模型验收仍阻塞：DeepSeek 与 SiliconFlow 账号均返回 402 余额不足。
 - 尚未与同学实际联调，以下协调清单供负责人发送和约时间。自动测试不能替代真实模型、数据库和编辑器验收。
-- 鉴权、发布、版本、SSE、运行取消接口不在本次交付中。`currentVersionId` 始终为 null。
+- 已接入 JWT 登录鉴权及账号隔离；发布、版本、SSE、运行取消接口尚未实现。`currentVersionId` 始终为 null。
 
 ## 启动与数据库部署
 
-沿用仓库 README 安装依赖和启动三个服务。仅限本地开发，在根 `.env` 加：
+沿用仓库 README 安装依赖和启动三个服务。配置沿用 `DATABASE_URL`、`JWT_SECRET`、`AGENT_SERVICE_URL`（默认 http://localhost:8000）、`PORT`（3000）。不要提交 `.env`。
 
-```dotenv
-WORKFLOW_DEV_MODE=true
-```
+所有工作流接口使用现有 JWT 鉴权，支持登录 Cookie 或 Authorization Bearer；未登录返回 401。创建者和个人 workspace 均取当前用户 ID，列表仅返回本人数据，访问其他账号的工作流返回 404。创建请求可省略 workspaceId，若提供必须与当前用户 ID 相同。
 
-其他配置沿用 `DATABASE_URL`、`AGENT_SERVICE_URL`（默认 http://localhost:8000）、`PORT`（3000）。不要提交 `.env`。
-
-未显式打开开发开关，或 `NODE_ENV=production` 时，所有工作流业务接口返回 503。当前没有 JWT 权限隔离，所有本地调用共享服务端固定身份 `workflow-dev-user`、workspace `workflow-dev-workspace`；前端不需要 JWT，未来由真实 CurrentUser 替换。创建请求的 workspaceId 可省略，若提供必须为这个固定 workspace。禁止将此开发配置用于公开部署。
-
+旧版共享开发身份创建的数据保留在数据库中，但不会展示给普通账号，也不会自动分配所有者。
 领域模型位于 `apps/backend/prisma/schema/workflows.prisma`。遵循仓库约定：由集成人员将 Schema 合入集成分支后，针对开发数据库统一生成、审核和应用 migration：
 
 ```sh
@@ -38,7 +33,7 @@ Base URL：`http://localhost:3000/api`。Content-Type：`application/json`。前
 
 | 方法/路径 | 请求 | 响应 |
 |---|---|---|
-| POST /workflows | `{ "name":"问答", "description":"可选", "workspaceId":"workflow-dev-workspace" }` | 201；完整 Workflow，draftDefinition=null、status=DRAFT、currentVersionId=null |
+| POST /workflows | `{ "name":"问答", "description":"可选" }` | 201；完整 Workflow，draftDefinition=null、status=DRAFT、currentVersionId=null |
 | GET /workflows | page=1，size=10（1–50），keyword 可选，status 可选 | 200；`{items,total,page,size}`，列表项含 nodeCount、currentVersionId，不含 draftDefinition |
 | GET /workflows/:id | 无 | 200；完整 Workflow，包括 draftDefinition |
 | PUT /workflows/:id/draft | `{ "definition": WorkflowDefinition }` | 200；`{id,updatedAt}` |
@@ -54,9 +49,9 @@ Workflow 公共字段：id、workspaceId、creatorId、name、description、stat
 
 ### Definition 和草稿
 
-完整可复制示例见 [example.workflow.json](example.workflow.json)。顶层 `{version:"1.0",nodes:[],edges:[]}`，仅一个 Start、一个 LLM、一个 End，最多 50 节点的通用上限仍保留校验。执行顺序由边决定，不依赖数组顺序。
+完整可复制示例见 [example.workflow.json](example.workflow.json)，条件分支与循环样例见 [example.condition.workflow.json](example.condition.workflow.json)、[example.loop.workflow.json](example.loop.workflow.json)。顶层 `{version:"1.0",nodes:[],edges:[]}`，Start、End 各一个，LLM、condition、loop 数量不限，最多 50 节点（含循环体）。执行顺序由边决定，不依赖数组顺序。Week3 新增的条件节点、循环节点、数组类型、候选 valueFrom、新错误码和运行结果字段以 [week3-workflow-nodes-spec.md](week3-workflow-nodes-spec.md) 为准，本节只描述原有节点。
 
-- Start：inputs 至少一个，name 唯一且符合标识符规则，type 为 string/number/boolean，required 为布尔值。未提供的可选输入不会生成输出字段；若后续引用该缺失值，会报告节点失败。defaultValue 是 UI 元数据，本轮不由服务端补值。
+- Start：inputs 至少一个，name 唯一且符合标识符规则，type 为 string/number/boolean，required 为布尔值。未提供的可选输入不会生成输出字段；后续引用该缺失值时取 null（插入 prompt 为空串，条件 `empty` 为真，End 输出 null）。defaultValue 是 UI 元数据，本轮不由服务端补值。
 - LLM：model 非空，且必须在 Runtime 允许列表内（`DEEPSEEK_MODEL` 与 `DEEPSEEK_ALLOWED_MODELS`），否则节点失败为 LLM_UNAVAILABLE；团队默认 deepseek-flash（不再使用 deepseek-chat）；temperature 默认 0.7、范围 0–2；maxTokens 默认 2048、整数 1–8192。systemPrompt 默认空；userPromptTemplate 必填且非空，两者均支持 `{{nodeId.field}}`。若提供 outputs 必须是 `[{"name":"text","type":"string"}]`。输出允许额外 usage 和 finishReason（`length` 表示被截断），但变量只允许引用 text。
 - End：outputs 至少一个，name 合法且唯一；type 为上述三种；valueFrom 是 `nodeId.field`，不带花括号，引用字段类型必须与声明一致。
 - 节点 id 允许英文、数字、下划线、连字符；引用只允许上游已声明字段。不支持表达式、嵌套属性、默认值或花括号内空白。
@@ -72,7 +67,7 @@ Workflow 公共字段：id、workspaceId、creatorId、name、description、stat
 {"valid":false,"errors":[{"code":"INVALID_REFERENCE","message":"INVALID_REFERENCE: data.userPromptTemplate","nodeId":"node-llm-1","edgeId":null,"field":"data.userPromptTemplate"}]}
 ```
 
-前端按 code 识别错误、nodeId/edgeId 高亮、field 定位表单；不要解析 message。校验覆盖 R01–R24，并增加 LLM 数量固定为一、字段类型、required 布尔类型和 End 输出类型匹配检查。非法引用示例：把样例中 userPromptTemplate 改为 `{{node-end-1.result}}`。
+前端按 code 识别错误、nodeId/edgeId 高亮、field 定位表单；不要解析 message。校验覆盖 R01–R24，并增加字段类型、required 布尔类型和 End 输出类型匹配检查；Week3 起不再限制 LLM 数量，`GRAPH_NOT_SINGLE_CHAIN` 不再产生。非法引用示例：把样例中 userPromptTemplate 改为 `{{node-end-1.result}}`。
 
 `/run` 在创建运行记录前验证 Definition 和 input：图非法返回 422 + WORKFLOW_INVALID；输入缺失/类型错误返回 400 + INVALID_INPUT。两者使用现有全局异常格式并保留 details：
 
@@ -100,7 +95,7 @@ Workflow 公共字段：id、workspaceId、creatorId、name、description、stat
 }
 ```
 
-已开始执行后的节点失败返回 HTTP 200 + FAILED，保留前序结果；失败节点 error.code 为 LLM_TIMEOUT、LLM_UNAVAILABLE 或 NODE_EXECUTION_FAILED；顶层 error 为 NODE_EXECUTION_FAILED 并含 nodeId。后续节点 SKIPPED，output=null。LLM 超时 60 秒，NestJS 每次内部请求超时 75 秒，不自动重试。
+已开始执行后的节点失败返回 HTTP 200 + FAILED，保留前序结果；失败节点 error.code 为 LLM_TIMEOUT、LLM_UNAVAILABLE、NODE_EXECUTION_FAILED，或 Week3 新增的 REFERENCE_NOT_EXECUTED、WORKFLOW_STEP_LIMIT_EXCEEDED、WORKFLOW_TIMEOUT；顶层 error 为 NODE_EXECUTION_FAILED 并含 nodeId。未执行的节点（失败之后或未走到的分支）为 SKIPPED，output=null。单次 LLM 超时 60 秒；单次运行总时长上限 `WORKFLOW_RUN_TIMEOUT_SECONDS`（默认 270，Agent 与 NestJS 共用）；NestJS 调 `/run` 的超时为该值加 30 秒，其他内部请求 75 秒，不自动重试。节点记录中 condition 的比较值和 loop 的 items 超过 500 字符会截断展示，不影响实际执行。
 
 Python 不可达、超时或响应异常发生在创建记录之后：返回 FAILED、顶层 WORKFLOW_SERVICE_UNAVAILABLE，nodeResults=[]（服务端无法确认执行到哪个节点，不伪造结果）。每个正常返回的终态先更新数据库再返回。数据库故障可能导致写入终态失败并返回 500；进程被强制停止可能留下 RUNNING，自动恢复任务属于后续工作。
 
@@ -136,7 +131,7 @@ pnpm --filter @minicoze/backend build
 
 本次自动结果：Python 21 项、NestJS 8 项通过，Prisma validate/generate、后端类型检查和构建通过。NestJS HTTP 测试使用 Repository/Agent 桩，覆盖真实 DTO、Controller、Service 和异常过滤器，尚不证明 PostgreSQL 读写。Python 测试使用固定返回的异步 Provider，不调用真实模型。
 
-真实服务就绪后可运行 `.venv/bin/python docs/workflows/smoke.py`，自动创建并保留一条验收工作流，验证 HTTP 保存、加载、校验和成功运行；这不证明 Provider 实际使用了哪家模型，须核对 Runtime 配置。
+真实服务就绪后设置环境变量 `WORKFLOW_SMOKE_TOKEN` 为当前账号的有效 JWT，再运行 `.venv/bin/python docs/workflows/smoke.py`，自动创建并保留一条验收工作流，验证 HTTP 保存、加载、校验和成功运行；这不证明 Provider 实际使用了哪家模型，须核对 Runtime 配置。
 
 22 日中午前须人工完成：
 
@@ -151,11 +146,11 @@ pnpm --filter @minicoze/backend build
 
 ## 建议集中发出的对齐信息（尚未发送）
 
-博美佳：采用附件新版 version/userPromptTemplate/valueFrom、PUT /draft、大写状态；请先保存再运行。文档与样例在本目录，开发固定 workspaceId 如上。预约 22 日上午完成保存加载、校验定位和真实运行验收。
+博美佳：采用附件新版 version/userPromptTemplate/valueFrom、PUT /draft、大写状态；请先保存再运行。文档与样例在本目录，个人 workspaceId 规则如上。预约 22 日上午完成保存加载、校验定位和真实运行验收。
 
 王一恒：请确认上面的非流式异步签名和 usage/异常语义，争取 21 日中午前提供公开入口，21 日下午一起完成真实 DeepSeek 调用。没有 Runtime 实现时，真实验收明确处于阻塞状态。
 
-组长：请安排集成分支 migration 执行人，确认内部 token 的统一方案；本轮鉴权暂缓，工作流接口只在显式打开开发开关时提供服务。请审核公共异常过滤器保留 details 的小改动。
+组长：请安排集成分支 migration 执行人，确认内部 token 的统一方案；工作流接口现已接入 JWT 账号隔离。请审核公共异常过滤器保留 details 的小改动。
 
 周五 23:59 前的协作定稿应包含参与人、最终接口、三方代码提交、真实联调结果和 Week3 遗留项。当前文件为实现交付说明，不能作为已完成三方联调的证明。
 

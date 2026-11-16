@@ -1,3 +1,5 @@
+import { API_BASE } from '../../shared/api/http';
+
 export type AgentStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
 
 export const modelOptions = [
@@ -105,12 +107,10 @@ export interface KnowledgeBindingItemInput {
   config?: { topK?: number; minScore?: number } | null;
 }
 
+/** MVP 仅支持绑定和启停，历史配置只读。 */
 export interface PluginBindingItemInput {
   pluginId: string;
   enabled?: boolean;
-  autoInvoke?: boolean;
-  sortOrder?: number;
-  config?: Record<string, unknown> | null;
 }
 
 export interface ReplaceKnowledgeBindingsInput {
@@ -126,8 +126,6 @@ interface ApiEnvelope<T> {
   message: string;
   data: T;
 }
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '';
 
 async function getCurrentUserId(): Promise<string> {
   const response = await fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' });
@@ -147,8 +145,9 @@ async function readResponse<T>(response: Response): Promise<T> {
   return body.data;
 }
 
-export async function listAgents(): Promise<AgentListResponse> {
-  const response = await fetch(`${API_BASE}/api/agents`, { credentials: 'include' });
+export async function listAgents(params = new URLSearchParams()): Promise<AgentListResponse> {
+  const query = params.toString();
+  const response = await fetch(`${API_BASE}/api/agents${query ? '?' + query : ''}`, { credentials: 'include' });
   return readResponse<AgentListResponse>(response);
 }
 
@@ -216,4 +215,30 @@ export async function listKnowledgeBases(): Promise<KnowledgeBaseSummary[]> {
 export async function listPlugins(): Promise<PluginSummary[]> {
   const response = await fetch(`${API_BASE}/api/plugins`, { credentials: 'include' });
   return readResponse<PluginSummary[]>(response);
+}
+
+export interface AgentVersionSummary {
+  id: string;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AgentVersionDetail extends AgentVersionSummary {
+  snapshot: Record<string, unknown>;
+}
+
+export async function listAgentVersions(agentId: string): Promise<AgentVersionSummary[]> {
+  const response = await fetch(`${API_BASE}/api/agents/${encodeURIComponent(agentId)}/versions`, {
+    credentials: 'include',
+  });
+  return readResponse<AgentVersionSummary[]>(response);
+}
+
+export async function getAgentVersion(agentId: string, versionId: string): Promise<AgentVersionDetail> {
+  const response = await fetch(
+    `${API_BASE}/api/agents/${encodeURIComponent(agentId)}/versions/${encodeURIComponent(versionId)}`,
+    { credentials: 'include' },
+  );
+  return readResponse<AgentVersionDetail>(response);
 }

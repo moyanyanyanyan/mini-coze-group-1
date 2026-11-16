@@ -6,10 +6,17 @@ import { KnowledgeDocumentService } from '../src/modules/knowledge/documents/kno
 describe('Knowledge deletion cascade (e2e)', () => {
   const prisma = new PrismaClient();
   const workspaceId = `ws-delete-test-${randomUUID()}`;
+  let remainingBaseId: string | undefined;
+  let agentId: string | undefined;
   let knowledgeBaseId: string | undefined;
 
   afterAll(async () => {
     if (knowledgeBaseId) await prisma.knowledgeBase.deleteMany({ where: { id: knowledgeBaseId } });
+    if (agentId) {
+      await prisma.knowledgeBaseAgentBinding.deleteMany({ where: { agentId } });
+      await prisma.agent.delete({ where: { id: agentId } });
+    }
+    if (remainingBaseId) await prisma.knowledgeBase.deleteMany({ where: { id: remainingBaseId } });
     await prisma.$disconnect();
   });
 
@@ -41,10 +48,19 @@ describe('Knowledge deletion cascade (e2e)', () => {
     `;
     expect(firstVectors[0].count).toBe(0n);
 
+    const agent = await prisma.agent.create({ data: { ownerId: workspaceId, workspaceId, name: 'delete-test', systemPrompt: '' } });
+    agentId = agent.id;
+    const remainingBase = await prisma.knowledgeBase.create({ data: { workspaceId, name: 'Keep this binding' } });
+    remainingBaseId = remainingBase.id;
+    await prisma.knowledgeBaseAgentBinding.createMany({ data: [
+      { agentId, knowledgeBaseId: base.id }, { agentId, knowledgeBaseId: remainingBase.id },
+    ] });
     const second = await createIndexedDocument();
     const knowledgeService = new KnowledgeService(prisma as never);
     await knowledgeService.remove(base.id, workspaceId);
     knowledgeBaseId = undefined;
+    expect(await prisma.knowledgeBaseAgentBinding.findMany({ where: { agentId }, select: { knowledgeBaseId: true } }))
+      .toEqual([{ knowledgeBaseId: remainingBase.id }]);
     expect(await prisma.knowledgeBase.count({ where: { id: base.id } })).toBe(0);
     expect(await prisma.knowledgeDocument.count({ where: { id: second.documentId } })).toBe(0);
     expect(await prisma.knowledgeChunk.count({ where: { id: second.chunkId } })).toBe(0);
