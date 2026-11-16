@@ -914,3 +914,49 @@
     transition: none;
   }
 }
+
+/* 快速开始：分步内容 */
+.api-doc-step {
+  display: grid;
+  gap: 2px;
+}
+
+.api-doc-step + .api-doc-step {
+  margin-top: 34px;
+  padding-top: 30px;
+  border-top: 1px solid var(--line);
+}
+
+.api-doc-step > h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+}
+
+.api-doc-step > h3 + p {
+  margin: 0 0 14px;
+  color: var(--ink-700);
+  font-size: 13px;
+  line-height: 1.85;
+}
+
+.api-doc-step-index {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  color: var(--violet-700);
+  border: 1px solid var(--violet-200);
+  border-radius: 50%;
+  background: var(--violet-50);
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 10px;
+}
+
+.api-doc-section h4 {
+  margin: 22px 0 10px;
+  color: var(--ink-800);
+  font-size: 13px;
+  font-weight: 650;
+}

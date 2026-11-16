@@ -48,13 +48,115 @@ export interface RuntimeErrorRow {
 
 export const API_DOC_SECTIONS: readonly DocSection[] = [
   { id: 'quick-start', label: '快速开始' },
-  { id: 'api-key-usage', label: 'API Key 使用说明' },
-  { id: 'run-sync', label: '非流式 Run' },
+  { id: 'integration-choice', label: '接入方式选择' },
+  { id: 'run-sync', label: 'Run 普通调用' },
   { id: 'stream', label: 'Stream 流式调用' },
-  { id: 'typescript-sdk', label: 'TypeScript SDK' },
+  { id: 'example-project', label: '可运行示例' },
   { id: 'api-reference', label: 'API 参考' },
-  { id: 'faq', label: '常见问题' },
+  { id: 'errors-faq', label: '错误与常见问题' },
 ];
+
+/* ------------------------------------------------------------------ */
+/* 快速开始                                                            */
+/* ------------------------------------------------------------------ */
+
+export const SDK_INSTALL_SAMPLE: CodeSample = {
+  id: 'sdk-install',
+  label: '安装 SDK',
+  language: 'bash',
+  code: 'npm install @minicoze/sdk',
+};
+
+export const SDK_INSTALL_FALLBACK_SAMPLE: CodeSample = {
+  id: 'sdk-install-fallback',
+  label: '本地 tarball 安装',
+  language: 'bash',
+  code: 'npm install https://github.com/moyanyanyanyan/mini-coze-group-1/releases/download/v0.1.0/minicoze-sdk-0.1.0.tgz',
+};
+
+export const ENV_SAMPLE: CodeSample = {
+  id: 'env',
+  label: '环境变量',
+  language: 'bash',
+  code: `# .env —— 只放在服务端，不要提交到 Git
+MINICOZE_BASE_URL=https://your-minicoze-host
+MINICOZE_API_KEY=mk_live_在这里填入你的Key`,
+};
+
+export const SDK_INIT_SAMPLE: CodeSample = {
+  id: 'sdk-init',
+  label: '初始化客户端',
+  language: 'typescript',
+  code: `import { MiniCozeClient } from '@minicoze/sdk';
+
+const baseURL = process.env.MINICOZE_BASE_URL;
+const apiKey = process.env.MINICOZE_API_KEY;
+
+if (!baseURL || !apiKey) {
+  throw new Error('缺少 MINICOZE_BASE_URL 或 MINICOZE_API_KEY 环境变量');
+}
+
+const client = new MiniCozeClient({
+  baseURL,           // 必填：MiniCoze 服务地址，必须以 http/https 开头
+  apiKey,            // 必填：Bearer 鉴权用的 API Key
+  timeoutMs: 30_000, // 可选：默认 30000ms
+});`,
+};
+
+export const FIRST_RUN_SAMPLE: CodeSample = {
+  id: 'first-run',
+  label: '第一次调用',
+  language: 'typescript',
+  code: `import { MiniCozeClient } from '@minicoze/sdk';
+
+const client = new MiniCozeClient({
+  baseURL: process.env.MINICOZE_BASE_URL ?? '',
+  apiKey: process.env.MINICOZE_API_KEY ?? '',
+});
+
+const result = await client.run({
+  message: '你好，介绍一下你自己',
+});
+
+// run() 直接返回 RunResult，不需要再拆 code/message/data 信封
+console.log(result.content);        // Agent 的完整回答
+console.log(result.conversationId); // 下次续聊时传给 conversationId
+console.log(result.runId);          // 本次运行 ID，排查问题时用`,
+};
+
+export const SDK_ERROR_SAMPLE: CodeSample = {
+  id: 'sdk-error',
+  label: '异常处理',
+  language: 'typescript',
+  code: `import {
+  MiniCozeAbortError,
+  MiniCozeHTTPError,
+  MiniCozeNetworkError,
+  MiniCozeTimeoutError,
+} from '@minicoze/sdk';
+
+try {
+  const result = await client.run({ message: '你好' });
+  console.log(result.content);
+} catch (error) {
+  if (error instanceof MiniCozeHTTPError) {
+    // 服务端已返回 HTTP 错误，例如 401 Key 无效、403 Agent 不可调用
+    console.error('HTTP', error.httpStatus, error.errorCode ?? '', error.message);
+  } else if (error instanceof MiniCozeTimeoutError) {
+    console.error('超过 ' + error.timeoutMs + 'ms 未完成');
+  } else if (error instanceof MiniCozeAbortError) {
+    console.error('请求已取消');
+  } else if (error instanceof MiniCozeNetworkError) {
+    console.error('网络不可用', error.message);
+  } else {
+    throw error;
+  }
+}`,
+};
+
+/* ------------------------------------------------------------------ */
+/* Run / Stream                                                        */
+/* ------------------------------------------------------------------ */
 
 const curlRunCode = [
   'curl -X POST "${BASE_URL}/api/v1/run" \\',
@@ -68,7 +170,7 @@ const curlRunCode = [
 const typescriptRunCode = `import { MiniCozeClient } from '@minicoze/sdk';
 
 const client = new MiniCozeClient({
-  baseURL: 'http://127.0.0.1:3000',
+  baseURL: process.env.MINICOZE_BASE_URL ?? '',
   apiKey: process.env.MINICOZE_API_KEY ?? '',
 });
 
@@ -81,16 +183,16 @@ console.log(result.conversationId);`;
 
 export const QUICK_START_SAMPLES: readonly CodeSample[] = [
   {
+    id: 'sdk',
+    label: 'TypeScript SDK（推荐）',
+    language: 'typescript',
+    code: typescriptRunCode,
+  },
+  {
     id: 'curl',
     label: 'curl',
     language: 'bash',
     code: curlRunCode,
-  },
-  {
-    id: 'typescript',
-    label: 'TypeScript SDK',
-    language: 'typescript',
-    code: typescriptRunCode,
   },
 ];
 
@@ -154,52 +256,59 @@ export const STREAM_REQUEST_SAMPLE: CodeSample = {
 
 export const STREAM_SDK_SAMPLE: CodeSample = {
   id: 'stream-sdk',
-  label: 'TypeScript SDK 流式接口',
+  label: 'TypeScript SDK 流式调用',
   language: 'typescript',
-  code: `import { MiniCozeClient, MiniCozeStreamError } from '@minicoze/sdk';
+  code: `import { MiniCozeClient, MiniCozeAbortError, MiniCozeTimeoutError } from '@minicoze/sdk';
 
 const client = new MiniCozeClient({
-  baseURL: 'http://127.0.0.1:3000',
+  baseURL: process.env.MINICOZE_BASE_URL ?? '',
   apiKey: process.env.MINICOZE_API_KEY ?? '',
 });
 
 const controller = new AbortController();
+process.on('SIGINT', () => controller.abort());
 
 try {
   for await (const event of client.stream(
-    { message: '你好' },
+    { message: '用三句话介绍 MiniCoze' },
     { signal: controller.signal },
   )) {
-    if (event.type === 'message.delta') {
-      process.stdout.write(event.data.content);
-    }
-    if (event.type === 'tool.started') {
-      console.log('工具开始:', event.data.toolName);
-    }
-    if (event.type === 'tool.completed') {
-      console.log('工具结束:', event.data.toolName, event.data.status);
-    }
-    if (event.type === 'run.completed') {
-      console.log('\\n完成:', event.data.content);
-    }
-    if (event.type === 'run.failed') {
-      console.error(event.data.code, event.data.message);
+    switch (event.type) {
+      case 'message.delta':
+        process.stdout.write(event.data.content);
+        break;
+      case 'tool.started':
+        console.log('\\n工具开始:', event.data.toolName);
+        break;
+      case 'tool.completed':
+        console.log('工具结束:', event.data.toolName, event.data.status);
+        break;
+      case 'run.completed':
+        console.log('\\n完成:', event.data.content);
+        break;
+      case 'run.failed':
+        console.error('\\n失败:', event.data.code, event.data.message);
+        break;
     }
   }
 } catch (error) {
-  if (error instanceof MiniCozeStreamError) {
-    console.error('Stream 失败', error.message);
+  if (error instanceof MiniCozeAbortError) {
+    console.log('\\n已取消');
+  } else if (error instanceof MiniCozeTimeoutError) {
+    console.error('\\n流式调用超时');
+  } else {
+    throw error;
   }
-}
-
-// 需要提前结束时调用 controller.abort()`,
+}`,
 };
 
 export const STREAM_RESPONSE_SAMPLE: CodeSample = {
   id: 'stream-response',
   label: 'SSE 响应示例',
   language: 'text',
-  code: `id: run_example:1
+  code: `: stream-open
+
+id: run_example:1
 event: run.started
 data: {"runId":"run_example","conversationId":"conversation_example","seq":1,"timestamp":"2026-11-04T00:00:00Z","type":"run.started","data":{"assistantMessageId":"assistant_message_example"}}
 
@@ -210,41 +319,6 @@ data: {"runId":"run_example","conversationId":"conversation_example","seq":2,"ti
 id: run_example:3
 event: run.completed
 data: {"runId":"run_example","conversationId":"conversation_example","seq":3,"timestamp":"2026-11-04T00:00:02Z","type":"run.completed","data":{"runId":"run_example","conversationId":"conversation_example","assistantMessageId":"assistant_message_example","status":"completed","content":"你好！","finishReason":"stop","usage":null,"citations":[],"toolResults":[]}}`,
-};
-
-export const SDK_INSTALL_SAMPLE: CodeSample = {
-  id: 'sdk-install',
-  label: 'GitHub Release 安装',
-  language: 'bash',
-  code: 'npm install https://github.com/moyanyanyanyan/mini-coze-group-1/releases/download/v0.1.0/minicoze-sdk-0.1.0.tgz',
-};
-
-export const SDK_INIT_SAMPLE: CodeSample = {
-  id: 'sdk-init',
-  label: '客户端初始化',
-  language: 'typescript',
-  code: `import { MiniCozeClient } from '@minicoze/sdk';
-
-const client = new MiniCozeClient({
-  baseURL: 'http://127.0.0.1:3000',
-  apiKey: process.env.MINICOZE_API_KEY ?? '',
-});`,
-};
-
-export const SDK_ERROR_SAMPLE: CodeSample = {
-  id: 'sdk-error',
-  label: '基本错误处理',
-  language: 'typescript',
-  code: `import { MiniCozeHTTPError } from '@minicoze/sdk';
-
-try {
-  const result = await client.run({ message: '你好' });
-  console.log(result.content);
-} catch (error) {
-  if (error instanceof MiniCozeHTTPError) {
-    console.error(error.httpStatus, error.message);
-  }
-}`,
 };
 
 export const TOOL_EVENTS_SAMPLE: CodeSample = {
@@ -265,7 +339,7 @@ data: {"runId":"run_example","conversationId":"conversation_example","seq":6,"ti
 
 id: run_example:7
 event: tool.completed
-data: {"runId":"run_example","conversationId":"conversation_example","seq":7,"timestamp":"2026-11-04T00:00:06Z","type":"tool.completed","data":{"toolCallId":"call_2","toolName":"echo_text","status":"succeeded","output":{"text":"ok"}}}`,
+data: {"runId":"run_example","conversationId":"conversation_example","seq":7,"timestamp":"2026-11-04T00:00:06Z","type":"tool.completed","data":{"toolCallId":"call_2","toolName":"echo_text","status":"succeeded","output":{"text":"ok"}}}`, 
 };
 
 export const STREAM_FAILED_EVENT_SAMPLE: CodeSample = {
@@ -277,6 +351,120 @@ event: run.failed
 data: {"runId":"run_example","conversationId":"conversation_example","seq":8,"timestamp":"2026-11-04T00:00:07Z","type":"run.failed","data":{"code":"MODEL_UNAVAILABLE","message":"模型服务请求失败","retryable":true}}`,
 };
 
+/* ------------------------------------------------------------------ */
+/* 可运行示例项目                                                       */
+/* ------------------------------------------------------------------ */
+
+export const EXAMPLE_TREE_SAMPLE: CodeSample = {
+  id: 'example-tree',
+  label: '项目结构',
+  language: 'text',
+  code: `minicoze-quickstart/
+├── package.json
+├── .env
+├── src/
+│   ├── client.ts
+│   ├── run.ts
+│   └── stream.ts
+└── .env.example`,
+};
+
+export const EXAMPLE_PACKAGE_SAMPLE: CodeSample = {
+  id: 'example-package',
+  label: 'package.json',
+  language: 'json',
+  code: `{
+  "name": "minicoze-quickstart",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "run": "node --env-file=.env --import tsx src/run.ts",
+    "stream": "node --env-file=.env --import tsx src/stream.ts"
+  },
+  "dependencies": {
+    "@minicoze/sdk": "^0.1.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0"
+  }
+}`,
+};
+
+export const EXAMPLE_CLIENT_SAMPLE: CodeSample = {
+  id: 'example-client',
+  label: 'src/client.ts',
+  language: 'typescript',
+  code: `import { MiniCozeClient } from '@minicoze/sdk';
+
+const baseURL = process.env.MINICOZE_BASE_URL;
+const apiKey = process.env.MINICOZE_API_KEY;
+
+if (!baseURL || !apiKey) {
+  throw new Error('缺少 MINICOZE_BASE_URL 或 MINICOZE_API_KEY');
+}
+
+export const client = new MiniCozeClient({ baseURL, apiKey });`,
+};
+
+export const EXAMPLE_RUN_SAMPLE: CodeSample = {
+  id: 'example-run',
+  label: 'src/run.ts',
+  language: 'typescript',
+  code: `import { client } from './client.js';
+
+const result = await client.run({ message: '你好，介绍一下你自己' });
+
+console.log('runId:', result.runId);
+console.log('回答:', result.content);
+console.log('会话:', result.conversationId);`,
+};
+
+export const EXAMPLE_STREAM_SAMPLE: CodeSample = {
+  id: 'example-stream',
+  label: 'src/stream.ts',
+  language: 'typescript',
+  code: `import { MiniCozeAbortError } from '@minicoze/sdk';
+import { client } from './client.js';
+
+const controller = new AbortController();
+process.on('SIGINT', () => controller.abort());
+
+try {
+  for await (const event of client.stream(
+    { message: '用三句话介绍 MiniCoze' },
+    { signal: controller.signal },
+  )) {
+    if (event.type === 'message.delta') {
+      process.stdout.write(event.data.content);
+    } else if (event.type === 'run.completed') {
+      console.log('\\n完成:', event.data.content);
+    } else if (event.type === 'run.failed') {
+      console.error('\\n失败:', event.data.code, event.data.message);
+    }
+  }
+} catch (error) {
+  if (error instanceof MiniCozeAbortError) {
+    console.log('\\n已取消');
+  } else {
+    throw error;
+  }
+}`,
+};
+
+export const EXAMPLE_COMMANDS_SAMPLE: CodeSample = {
+  id: 'example-commands',
+  label: '运行命令',
+  language: 'bash',
+  code: `npm install
+cp .env.example .env   # Windows: copy .env.example .env
+npm run run
+npm run stream`,
+};
+
+/* ------------------------------------------------------------------ */
+/* 参考表                                                              */
+/* ------------------------------------------------------------------ */
+
 export const REQUEST_PARAMETERS: readonly ParameterRow[] = [
   {
     name: 'message',
@@ -286,24 +474,24 @@ export const REQUEST_PARAMETERS: readonly ParameterRow[] = [
   {
     name: 'conversationId',
     type: 'string?',
-    description: '可选。提供时继续已有会话；省略时创建新会话。',
+    description: '可选。提供时继续已有会话；省略时自动创建新会话。',
   },
 ];
 
 export const SSE_EVENTS: readonly EventRow[] = [
   {
     name: 'run.started',
-    description: '本轮运行开始，必须是第一个业务事件。',
+    description: '本轮运行开始，永远是第一个业务事件。',
     data: '{ assistantMessageId: string }',
   },
   {
     name: 'knowledge.result',
-    description: '知识库上下文校验通过后返回脱敏引用。',
+    description: '知识库校验完成后返回脱敏引用，可能不出现。',
     data: "{ status: 'matched' | 'no_match'; citations: Array<{ knowledgeBaseId, documentId, chunkId, title, position? }> }",
   },
   {
     name: 'message.delta',
-    description: '模型文本增量，可出现多次。',
+    description: '模型文本增量，可出现多次，拼接即为最终回答。',
     data: '{ content: string }',
   },
   {
@@ -323,41 +511,79 @@ export const SSE_EVENTS: readonly EventRow[] = [
   },
   {
     name: 'run.failed',
-    description: '唯一失败终态，SSE 的 HTTP 连接可能仍为 200。',
+    description: '唯一失败终态，此时 SSE 的 HTTP 连接可能仍是 200。',
     data: '{ code: string; message: string; retryable: boolean }',
+  },
+];
+
+export const SDK_EXPORTS: readonly ParameterRow[] = [
+  {
+    name: 'MiniCozeClient',
+    type: 'class',
+    description: '唯一入口。new MiniCozeClient({ baseURL, apiKey, timeoutMs? })，提供 run() 和 stream()。',
+  },
+  {
+    name: 'MiniCozeSDKError',
+    type: 'class',
+    description: '以下所有错误类的基类，带 httpStatus / errorCode / traceId 可选字段。',
+  },
+  {
+    name: 'MiniCozeHTTPError',
+    type: 'class',
+    description: '服务端返回非 2xx 时抛出，含 httpStatus、errorCode、traceId。',
+  },
+  {
+    name: 'MiniCozeNetworkError / MiniCozeTimeoutError / MiniCozeAbortError',
+    type: 'class',
+    description: '网络失败、超时（含 timeoutMs）、调用方 AbortSignal 取消。',
+  },
+  {
+    name: 'MiniCozeResponseParseError / MiniCozeStreamError',
+    type: 'class',
+    description: '响应或流式事件结构不符合协议时抛出。',
+  },
+  {
+    name: 'parseSSEStream / SSEParser',
+    type: 'function / class',
+    description: '底层 SSE 解析工具，仅在自定义协议处理时需要，一般直接用 stream()。',
+  },
+  {
+    name: 'MiniCozeClientOptions / RunParams / RunOptions / RunResult / RunUsage / StreamOptions / RunStreamEvent / RunCitation',
+    type: 'types',
+    description: '对外导出的 TypeScript 类型，见 API 参考中的字段说明。',
   },
 ];
 
 export const SDK_TYPES: readonly ParameterRow[] = [
   {
     name: 'MiniCozeClientOptions',
-    type: 'object',
-    description: '包含必填 baseURL、apiKey 和可选 timeoutMs。',
+    type: '{ baseURL: string; apiKey: string; timeoutMs?: number }',
+    description: 'baseURL 必填且必须是 http/https；apiKey 必填；timeoutMs 默认 30000。',
   },
   {
     name: 'RunParams',
-    type: 'object',
-    description: '包含必填 message 和可选 conversationId。',
+    type: '{ message: string; conversationId?: string }',
+    description: 'message 不能为空；conversationId 提供时必须是已存在的会话。',
   },
   {
     name: 'RunOptions',
-    type: 'object',
-    description: '包含可选 signal 和单次 timeoutMs。',
+    type: '{ signal?: AbortSignal; timeoutMs?: number }',
+    description: '单次覆盖超时；run() 默认 190000ms。',
   },
   {
     name: 'RunResult',
     type: 'object',
-    description: '非流式 Run 的结构化结果。',
+    description: 'runId、conversationId、assistantMessageId、status、content、finishReason、usage、citations、toolResults。',
   },
   {
     name: 'StreamOptions',
-    type: 'object',
-    description: '包含可选 signal 和单次 timeoutMs，Stream 默认超时 190000ms。',
+    type: 'RunOptions',
+    description: '与 RunOptions 相同，stream() 默认 190000ms。',
   },
   {
     name: 'RunStreamEvent',
     type: 'union',
-    description: 'SDK 流式接口返回的七类 Runtime SSE 事件。',
+    description: '七类事件，每类都带 runId、conversationId、seq、timestamp、sseId。',
   },
 ];
 
@@ -379,8 +605,8 @@ export const ENDPOINTS: readonly EndpointRow[] = [
 export const HTTP_STATUSES: readonly StatusRow[] = [
   { status: '200', meaning: 'Run 成功或 Stream 已建立', note: 'Stream 建立后的业务失败通过 run.failed 事件返回。' },
   { status: '400', meaning: '请求参数或 Runtime 输入无效', note: '响应 code 为数字 400。' },
-  { status: '401', meaning: 'API Key 无效或已撤销', note: '响应 code 为数字 401。' },
-  { status: '403', meaning: 'Agent 未发布、已归档或无调用权限', note: '响应 code 为数字 403。' },
+  { status: '401', meaning: 'API Key 缺失、无效或已撤销', note: '响应 code 为数字 401。' },
+  { status: '403', meaning: 'Agent 未发布、已归档，或 Key 与 Agent 所有者不匹配', note: '响应 code 为数字 403。' },
   { status: '404', meaning: '会话或发布资源不存在', note: '响应 code 为数字 404。' },
   { status: '500', meaning: '消息持久化或服务内部错误', note: '响应 code 为数字 500。' },
   { status: '502', meaning: 'Runtime HTTP 或响应协议异常', note: '响应 code 为数字 502。' },
@@ -391,27 +617,35 @@ export const HTTP_STATUSES: readonly StatusRow[] = [
 export const FAQ_ITEMS: readonly FaqItem[] = [
   {
     question: '调用时需要传 agentId 吗？',
-    answer: '不需要。API Key 经 Guard 校验后会反查绑定的 Agent，请求体和查询参数都不能覆盖这个 Agent。',
+    answer: '不需要。API Key 创建时就绑定了具体 Agent，后端只认这个绑定关系，请求体和查询参数都不能覆盖它。',
   },
   {
-    question: '如何继续已有会话？',
-    answer: '在请求体或 SDK RunParams 中提供 conversationId。会话必须属于该 Agent 的 owner。',
+    question: '如何继续同一段对话？',
+    answer: '使用上一次返回的 conversationId 再次调用 run() 或 stream()。该会话必须属于当前 API Key 绑定的 Agent。',
   },
   {
     question: 'SDK 的超时是多少？',
-    answer: 'run() 和 stream() 默认整轮超时均为 190000ms，可通过单次调用 options.timeoutMs 覆盖；两者都支持 AbortSignal。',
+    answer: 'MiniCozeClient 的 timeoutMs 默认 30000ms；run() 与 stream() 默认整轮超时 190000ms，可用单次 options.timeoutMs 覆盖。',
   },
   {
-    question: 'API Key 鉴权如何使用？',
-    answer: 'API Key Guard 已接入公开 Run 和 Stream；无效或撤销 Key 返回 401，Agent 状态不允许调用时返回 403。',
+    question: '什么是 401 和 403 的区别？',
+    answer: '401 表示 API Key 本身不可用（缺失、格式错误、不存在或已撤销）；403 表示 Key 有效但 Agent 当前不可调用（草稿、归档、版本缺失或所有者不匹配）。',
   },
   {
-    question: 'Stream 和 SSE 事件是否已经可用？',
-    answer: '已可用。Stream 使用 POST /api/v1/stream，以 run.completed 或 run.failed 作为唯一终态。',
+    question: 'Stream 中途断开会怎样？',
+    answer: '客户端主动取消请用 AbortSignal（SDK 抛 MiniCozeAbortError）。如果是服务端异常中断，后端会在流内补发 run.failed；缺少终态的 EOF 视为失败，SDK 会抛 MiniCozeStreamError。',
   },
   {
     question: '工具调用失败会结束 Stream 吗？',
-    answer: '不会。只有 run.completed 和 run.failed 是 Run 终态；tool.completed.status=failed 只表示该次工具调用失败，后续仍可继续工具轮次或生成最终回答。',
+    answer: '不会。只有 run.completed 和 run.failed 是终态，tool.completed.status=failed 只表示该次工具调用失败。',
+  },
+  {
+    question: 'API Key 丢了怎么办？',
+    answer: '创建弹窗关闭后无法再查看完整 Key，只能删除旧 Key 并新建一个。请把 Key 放在服务端环境变量或密钥管理服务里。',
+  },
+  {
+    question: '可以在浏览器前端直接调用吗？',
+    answer: '不建议。API Key 是长期凭据，放在前端会被任何访客拿到，应通过你自己的服务端转发调用。',
   },
 ];
 

@@ -5,7 +5,15 @@ import { NoticeToast } from '../../../../shared/ui/NoticeToast';
 import {
   API_DOC_SECTIONS,
   ENDPOINTS,
+  ENV_SAMPLE,
+  EXAMPLE_CLIENT_SAMPLE,
+  EXAMPLE_COMMANDS_SAMPLE,
+  EXAMPLE_PACKAGE_SAMPLE,
+  EXAMPLE_RUN_SAMPLE,
+  EXAMPLE_STREAM_SAMPLE,
+  EXAMPLE_TREE_SAMPLE,
   FAQ_ITEMS,
+  FIRST_RUN_SAMPLE,
   HTTP_STATUSES,
   QUICK_START_SAMPLES,
   REQUEST_PARAMETERS,
@@ -14,7 +22,9 @@ import {
   RUN_REQUEST_SAMPLE,
   RUN_RESPONSE_SAMPLE,
   SDK_ERROR_SAMPLE,
+  SDK_EXPORTS,
   SDK_INIT_SAMPLE,
+  SDK_INSTALL_FALLBACK_SAMPLE,
   SDK_INSTALL_SAMPLE,
   SDK_TYPES,
   SSE_EVENTS,
@@ -28,6 +38,15 @@ import {
 import { CodeBlock } from '../components/CodeBlock';
 import { API_MANAGEMENT_ROUTE } from '../../api-management/router/routes';
 import '../styles/api-docs.css';
+
+const SDK_ERROR_ROWS = [
+  { name: 'MiniCozeHTTPError', when: '服务端返回非 2xx', detail: 'httpStatus、errorCode、traceId' },
+  { name: 'MiniCozeNetworkError', when: '无法建立连接或连接中断', detail: 'message、cause' },
+  { name: 'MiniCozeTimeoutError', when: '超过 timeoutMs 未完成', detail: 'timeoutMs' },
+  { name: 'MiniCozeAbortError', when: '调用方通过 AbortSignal 取消', detail: 'cause 为取消原因' },
+  { name: 'MiniCozeResponseParseError', when: '返回体不是合法 JSON 或结构不符', detail: 'message、cause' },
+  { name: 'MiniCozeStreamError', when: '流式事件不符合协议或缺少终态', detail: 'message、cause' },
+] as const;
 
 export function SdkDocsPage() {
   const [quickStartSample, setQuickStartSample] = useState(QUICK_START_SAMPLES[0].id);
@@ -49,11 +68,11 @@ export function SdkDocsPage() {
             <p className="api-doc-eyebrow">Develop / API / Documentation</p>
             <div className="api-doc-title-row">
               <h1 id="api-docs-title">API 文档</h1>
-              <span>Run + Stream</span>
+              <span>SDK v0.1.0</span>
             </div>
             <p>
-              通过 MiniCoze 公开 API 调用 API Key 绑定的已发布 Agent。
-              TypeScript SDK 支持非流式 Run 和逐事件消费的 Stream。
+              用一把 API Key 调用你发布在 MiniCoze 上的 Agent：一次性拿到完整回答，
+              或者逐字接收流式输出。按本页「快速开始」六步走完，你就能跑通第一次调用。
             </p>
             <div className="api-doc-hero-facts" aria-label="API 核心信息">
               <div>
@@ -61,16 +80,16 @@ export function SdkDocsPage() {
                 <code>{'{BASE_URL}'}</code>
               </div>
               <div>
-                <span>Authentication</span>
-                <strong>Bearer Token</strong>
+                <span>鉴权</span>
+                <strong>Bearer API Key</strong>
               </div>
               <div>
-                <span>API</span>
-                <strong>Run / Stream</strong>
+                <span>接口</span>
+                <strong>/api/v1/run · /api/v1/stream</strong>
               </div>
               <div>
                 <span>SDK</span>
-                <strong>TypeScript SDK</strong>
+                <strong>@minicoze/sdk</strong>
               </div>
             </div>
           </header>
@@ -83,7 +102,7 @@ export function SdkDocsPage() {
               </div>
               <code>/api/v1/run</code>
               <p>普通调用，等待 Agent 完成后一次性返回完整结果。</p>
-              <span className="api-doc-card-link">查看接口 <span aria-hidden="true">→</span></span>
+              <span className="api-doc-card-link">查看教程 <span aria-hidden="true">→</span></span>
             </a>
             <a href="#stream">
               <div className="api-doc-endpoint-overview__meta">
@@ -92,31 +111,159 @@ export function SdkDocsPage() {
               </div>
               <code>/api/v1/stream</code>
               <p>流式调用，实时接收文本、工具及终态事件。</p>
-              <span className="api-doc-card-link">查看接口 <span aria-hidden="true">→</span></span>
+              <span className="api-doc-card-link">查看教程 <span aria-hidden="true">→</span></span>
             </a>
           </nav>
 
           <DocSection section={API_DOC_SECTIONS[0]}>
             <p>
-              使用 curl 或 TypeScript SDK 调用 Run 或 Stream。请求不需要传
-              agentId，目标 Agent 由 API Key 绑定关系确定。
+              整个流程只有一件事要记住：<strong>API Key 绑定一个已发布的 Agent</strong>，
+              调用时不需要传 agentId。下面六步按顺序做即可。
             </p>
             <ol className="api-doc-steps">
-              <li>
-                <span>01</span>
-                准备 baseURL 和 API Key，并仅在服务端安全配置中使用。
-              </li>
-              <li>
-                <span>02</span>
-                确认目标 Agent 已经发布，并使用有效 API Key。
-              </li>
-              <li>
-                <span>03</span>
-                选择 curl 或 TypeScript SDK 示例，发起首次调用。
-              </li>
+              <li><span>01</span>安装 SDK</li>
+              <li><span>02</span>发布 Agent 并创建 API Key</li>
+              <li><span>03</span>把 Key 放进环境变量</li>
+              <li><span>04</span>初始化 MiniCozeClient</li>
+              <li><span>05</span>调用 client.run() 拿到回答</li>
+              <li><span>06</span>补上异常处理</li>
             </ol>
 
-            <div className="api-doc-tabs" role="tablist" aria-label="快速开始示例">
+            <div className="api-doc-step">
+              <h3><span className="api-doc-step-index">1</span>安装 SDK</h3>
+              <p>在 Node.js 项目里安装 TypeScript SDK（要求 Node 18+，推荐 20+）。</p>
+              <CodeBlock sample={SDK_INSTALL_SAMPLE} onNotice={handleNotice} />
+              <Callout>
+                当前版本 <code>0.1.0</code> 还没有发布到公共 npm registry。
+                如果 <code>npm install @minicoze/sdk</code> 拉不到包，先用 Release 里的 tarball 安装，
+                安装后的包名和 import 路径完全相同。
+              </Callout>
+              <CodeBlock sample={SDK_INSTALL_FALLBACK_SAMPLE} onNotice={handleNotice} />
+            </div>
+
+            <div className="api-doc-step">
+              <h3><span className="api-doc-step-index">2</span>创建 API Key</h3>
+              <p>
+                API Key 是调用公开 API 的长期凭据，一把 Key 只绑定一个 Agent：
+                调用 <code>run()</code> / <code>stream()</code> 时，后端通过 Key 反查出 Agent 和所属用户，
+                请求体里传什么都改不了目标。
+              </p>
+              <ol className="api-doc-list">
+                <li>先把 Agent 发布（草稿和归档状态的 Agent 调用会返回 403）。</li>
+                <li>进入「发布 / API Keys」页面，点击创建，选择要绑定的 Agent 并起个名字。</li>
+                <li>
+                  创建成功的弹窗里会显示完整 Key（形如 <code>mk_live_...</code>），
+                  <strong>请立即复制并保存</strong>——弹窗关闭后只能看到掩码，无法再次查看。
+                </li>
+              </ol>
+              <Callout tone="warning">
+                Key 只应保存在服务端环境变量或密钥管理服务中，不要写进代码、提交到 Git，
+                也不要放在浏览器前端。泄露后请到同一页面删除并重建。
+              </Callout>
+              <AppLink className="api-doc-text-link" to={API_MANAGEMENT_ROUTE}>
+                前往 API Keys 管理页面
+                <span aria-hidden="true">→</span>
+              </AppLink>
+            </div>
+
+            <div className="api-doc-step">
+              <h3><span className="api-doc-step-index">3</span>配置 API Key</h3>
+              <p>
+                用环境变量保存地址和 Key。示例项目通过 <code>.env</code> + Node 的
+                <code>--env-file</code> 读取，生产环境换成平台提供的密钥配置即可。
+              </p>
+              <CodeBlock sample={ENV_SAMPLE} onNotice={handleNotice} />
+              <p>
+                把 <code>.env</code> 加入 <code>.gitignore</code>；仓库里只保留
+                <code>.env.example</code> 这种占位文件。
+              </p>
+            </div>
+
+            <div className="api-doc-step">
+              <h3><span className="api-doc-step-index">4</span>初始化客户端</h3>
+              <CodeBlock sample={SDK_INIT_SAMPLE} onNotice={handleNotice} />
+              <ul className="api-doc-list">
+                <li><code>baseURL</code>：MiniCoze 服务地址，必填，必须是 http 或 https。</li>
+                <li><code>apiKey</code>：必填，构造时会校验非空。</li>
+                <li><code>timeoutMs</code>：可选，默认 30000ms；<code>run()</code> / <code>stream()</code> 各自的默认整轮超时是 190000ms。</li>
+              </ul>
+            </div>
+
+            <div className="api-doc-step">
+              <h3><span className="api-doc-step-index">5</span>发起第一次调用</h3>
+              <CodeBlock sample={FIRST_RUN_SAMPLE} onNotice={handleNotice} />
+              <h4>请求参数</h4>
+              <ParameterTable />
+              <h4>返回结果</h4>
+              <ul className="api-doc-list">
+                <li><code>content</code>：Agent 的完整回答，最常用。</li>
+                <li><code>conversationId</code>：本次会话 ID，下次想续聊时传回去。</li>
+                <li><code>runId</code> / <code>assistantMessageId</code>：排查问题时的定位 ID。</li>
+                <li><code>usage</code>：token 用量，可能为 <code>null</code>；<code>citations</code>、<code>toolResults</code>：知识库引用和工具结果，没有时是空数组。</li>
+              </ul>
+              <p>
+                SDK 已经帮你拆开 <code>{'{ code, message, data }'}</code> 信封并校验了字段，
+                所以 <code>run()</code> 直接返回 <code>RunResult</code>。
+              </p>
+            </div>
+
+            <div className="api-doc-step">
+              <h3><span className="api-doc-step-index">6</span>处理异常</h3>
+              <p>
+                网络失败、超时、取消、HTTP 错误和协议异常是不同情况，按类型分别处理，
+                不要一律当成同一种失败。
+              </p>
+              <CodeBlock sample={SDK_ERROR_SAMPLE} onNotice={handleNotice} />
+              <p>
+                更多错误类说明见本页最后的「错误与常见问题」。
+              </p>
+            </div>
+          </DocSection>
+
+          <DocSection section={API_DOC_SECTIONS[1]}>
+            <p>
+              同一个能力有两种接入方式，选一个就行：
+            </p>
+            <div className="api-doc-table-wrap">
+              <table className="api-doc-table">
+                <thead>
+                  <tr>
+                    <th>你的情况</th>
+                    <th>推荐方式</th>
+                    <th>原因</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>使用 JavaScript / TypeScript</td>
+                    <td><strong>TypeScript SDK</strong></td>
+                    <td>类型完整、自动处理 SSE 与错误分类，代码最少。</td>
+                  </tr>
+                  <tr>
+                    <td>使用 Python、Go、Java 等其他语言</td>
+                    <td>REST API</td>
+                    <td>普通 HTTP + Bearer 鉴权；Stream 只多一个 SSE 解析。</td>
+                  </tr>
+                  <tr>
+                    <td>希望自己控制 HTTP 客户端或已有网关</td>
+                    <td>REST API</td>
+                    <td>SDK 只封装了 fetch 这一层，直接用 curl 即可做同样的事。</td>
+                  </tr>
+                  <tr>
+                    <td>需要边生成边展示给用户</td>
+                    <td><code>stream()</code> / SSE</td>
+                    <td>逐事件返回，首字延迟更低。</td>
+                  </tr>
+                  <tr>
+                    <td>只要最终结果</td>
+                    <td><code>run()</code></td>
+                    <td>一次请求拿到完整回答，处理最简单。</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <h3>同一件事，两种写法</h3>
+            <div className="api-doc-tabs" role="tablist" aria-label="调用方式示例">
               {QUICK_START_SAMPLES.map((sample) => (
                 <button
                   type="button"
@@ -143,137 +290,64 @@ export function SdkDocsPage() {
               />
             </div>
             <Callout>
-              TypeScript 示例对应当前 <code>@minicoze/sdk</code> 的
-              <code>client.run()</code> 或 <code>client.stream()</code>；
-              SDK 通过 GitHub Release <code>v0.1.0</code> 分发。
+              SDK 是首选接入方式；REST 示例使用同样的路径、请求体和鉴权头，
+              可以对照着移植到其他语言。
             </Callout>
-          </DocSection>
-
-          <DocSection section={API_DOC_SECTIONS[1]}>
-            <div className="api-doc-auth-method">
-              <span>Authorization</span>
-              <code>Bearer ${'{API_KEY}'}</code>
-              <small>每个公开 Run / Stream 请求都必须携带</small>
-            </div>
-            <ul className="api-doc-list">
-              <li>不要将真实 API Key 硬编码在公开前端代码、仓库或客户端可访问的环境中。</li>
-              <li>生产环境应使用适合服务端的安全配置保存密钥。</li>
-              <li>如果密钥泄露或不再使用，应及时在 API Keys 管理页面删除。</li>
-            </ul>
-            <Callout tone="warning">
-              API Key 属于敏感凭据。文档、示例与日志中只应使用占位变量。
-              无效或撤销 Key 返回 401；Agent 状态不允许调用时返回 403。
-            </Callout>
-            <AppLink className="api-doc-text-link" to={API_MANAGEMENT_ROUTE}>
-              前往 API Keys 管理页面
-              <span aria-hidden="true">→</span>
-            </AppLink>
           </DocSection>
 
           <DocSection section={API_DOC_SECTIONS[2]}>
-            <p>Run 用于发起一次请求并获取完整结果。</p>
-            <div className="api-doc-endpoint">
-              <span>POST</span>
-              <code>/api/v1/run</code>
-            </div>
-            <Callout>
-              当前非流式 Run 已实现。请求体仅包含 message 和可选 conversationId。
-            </Callout>
+            <p>
+              <strong>适用场景：</strong>后台任务、批量处理、只需要最终回答的场景。
+              等待整轮生成结束后一次返回，不需要处理事件流。
+            </p>
 
-            <h3>请求头</h3>
-            <div className="api-doc-table-wrap">
-              <table className="api-doc-table">
-                <thead>
-                  <tr>
-                    <th>请求头</th>
-                    <th>说明</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td><code>Authorization</code></td>
-                    <td><code>Bearer {'${API_KEY}'}</code></td>
-                  </tr>
-                  <tr>
-                    <td><code>Content-Type</code></td>
-                    <td><code>application/json</code></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            <h3>TypeScript SDK</h3>
+            <CodeBlock sample={QUICK_START_SAMPLES[0]} onNotice={handleNotice} />
 
             <h3>请求参数</h3>
             <ParameterTable />
-            <h3>请求示例</h3>
-            <CodeBlock sample={RUN_REQUEST_SAMPLE} onNotice={handleNotice} />
-            <div className="api-doc-response api-doc-response--success">
-              <h3>成功响应示例 <span>HTTP 200</span></h3>
-              <CodeBlock sample={RUN_RESPONSE_SAMPLE} onNotice={handleNotice} />
-            </div>
-            <div className="api-doc-response api-doc-response--error">
-              <h3>错误响应示例 <span>HTTP 4xx / 5xx</span></h3>
-              <CodeBlock sample={RUN_ERROR_SAMPLE} onNotice={handleNotice} />
-            </div>
-            <Callout>
-              成功响应使用 <code>{'{ code, message, data }'}</code> 信封，
-              错误响应的数字 code 与 HTTP 状态码一致。
-            </Callout>
+
+            <h3>返回结果</h3>
+            <CodeBlock sample={RUN_RESPONSE_SAMPLE} onNotice={handleNotice} />
             <p>
-              请求体不得包含 <code>agentId</code>。目标 Agent 和所有者身份均由
-              API Key 绑定关系及后端反查结果确定。
+              SDK 返回的 <code>RunResult</code> 就是响应中的 <code>data</code>，
+              读取 <code>result.content</code> 即可拿到回答；要续聊就把
+              <code>result.conversationId</code> 传回下一次调用。
+            </p>
+
+            <h3>异常处理</h3>
+            <CodeBlock sample={SDK_ERROR_SAMPLE} onNotice={handleNotice} />
+            <p>
+              HTTP 错误返回 <code>{'{ code, message, data: null }'}</code>，
+              其中 <code>code</code> 是数字状态码；SDK 会把它包装成
+              <code>MiniCozeHTTPError</code>，保留 <code>httpStatus</code> 与
+              <code>errorCode</code>。
+            </p>
+            <CodeBlock sample={RUN_ERROR_SAMPLE} onNotice={handleNotice} />
+
+            <h3>REST 调用（curl）</h3>
+            <CodeBlock sample={RUN_REQUEST_SAMPLE} onNotice={handleNotice} />
+            <p>
+              请求体只包含 <code>message</code> 和可选的 <code>conversationId</code>；
+              不要传 <code>agentId</code>，目标 Agent 由 API Key 决定。
             </p>
           </DocSection>
 
           <DocSection section={API_DOC_SECTIONS[3]}>
             <p>
-              Stream 通过 SSE 逐事件返回执行过程和最终结果。
+              <strong>适用场景：</strong>聊天界面、需要边生成边展示、或要感知工具调用过程的场景。
+              Stream 返回 <code>POST /api/v1/stream</code> 上的 SSE 事件流。
             </p>
-            <div className="api-doc-endpoint">
-              <span>POST</span>
-              <code>/api/v1/stream</code>
-              <small>Accept: text/event-stream</small>
-            </div>
 
-            <h3>请求头</h3>
-            <div className="api-doc-table-wrap">
-              <table className="api-doc-table">
-                <thead>
-                  <tr>
-                    <th>请求头</th>
-                    <th>说明</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td><code>Authorization</code></td>
-                    <td><code>Bearer {'${API_KEY}'}</code></td>
-                  </tr>
-                  <tr>
-                    <td><code>Content-Type</code></td>
-                    <td><code>application/json</code></td>
-                  </tr>
-                  <tr>
-                    <td><code>Accept</code></td>
-                    <td><code>text/event-stream</code></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <h3>请求参数</h3>
-            <ParameterTable />
-            <h3>curl 调试示例</h3>
-            <CodeBlock sample={STREAM_REQUEST_SAMPLE} onNotice={handleNotice} />
-            <h3>SSE 响应结构</h3>
-            <CodeBlock sample={STREAM_RESPONSE_SAMPLE} onNotice={handleNotice} />
-            <p>
-              SSE 的 <code>id</code> 格式为 <code>{'${runId}:${seq}'}</code>，
-              seq 从 1 连续递增；注释心跳不属于业务事件。当前
-              <code>id</code> 不提供断点续传。
-            </p>
-            <h3>TypeScript SDK 流式调用</h3>
+            <h3>TypeScript SDK</h3>
             <CodeBlock sample={STREAM_SDK_SAMPLE} onNotice={handleNotice} />
+            <ul className="api-doc-list">
+              <li><code>client.stream()</code> 返回 <code>AsyncIterable&lt;RunStreamEvent&gt;</code>，用 <code>for await</code> 消费。</li>
+              <li>把 <code>message.delta</code> 的 <code>content</code> 依次拼接，就是最终回答。</li>
+              <li>SDK 校验 <code>seq</code> 连续、首个事件必须是 <code>run.started</code>，并保证一定以终态结束或抛错。</li>
+            </ul>
 
-            <h3>SSE 事件说明</h3>
+            <h3>事件说明</h3>
             <div className="api-doc-table-wrap">
               <table className="api-doc-table">
                 <thead>
@@ -303,66 +377,61 @@ export function SdkDocsPage() {
                 </tbody>
               </table>
             </div>
+
+            <h3>原始 SSE 响应</h3>
+            <CodeBlock sample={STREAM_RESPONSE_SAMPLE} onNotice={handleNotice} />
             <p>
-              <code>tool.completed.status=failed</code> 只表示单次工具调用失败，
-              不代表整个 Run 失败；只有 <code>run.completed</code> 和
-              <code>run.failed</code> 会结束 Stream。
+              <code>id</code> 格式为 <code>{'{runId}:{seq}'}</code>，<code>seq</code> 从 1 连续递增；
+              以 <code>:</code> 开头的是注释心跳（每 15 秒一次），不属于业务事件，也不提供断点续传。
+            </p>
+
+            <h3>正常结束与异常中断</h3>
+            <ul className="api-doc-list">
+              <li>正常流必须且只能收到一个 <code>run.completed</code> 或 <code>run.failed</code>。</li>
+              <li>服务端在流建立后出错，会补发 <code>run.failed</code>，此时 HTTP 状态可能仍是 200。</li>
+              <li>缺少终态的 EOF 不能当成成功，SDK 会抛 <code>MiniCozeStreamError</code>。</li>
+              <li>主动结束请调用 <code>controller.abort()</code>，SDK 会抛 <code>MiniCozeAbortError</code> 并释放连接。</li>
+              <li>默认整轮超时 190000ms，可用 <code>{'stream(params, { timeoutMs })'}</code> 覆盖。</li>
+            </ul>
+            <CodeBlock sample={STREAM_FAILED_EVENT_SAMPLE} onNotice={handleNotice} />
+
+            <h3>工具事件</h3>
+            <p>
+              <code>tool.completed.status=failed</code> 只代表该次工具调用失败，
+              不结束 Stream，也不会触发终态。
             </p>
             <CodeBlock sample={TOOL_EVENTS_SAMPLE} onNotice={handleNotice} />
-            <h3>run.failed 事件示例</h3>
-            <CodeBlock sample={STREAM_FAILED_EVENT_SAMPLE} onNotice={handleNotice} />
-            <Callout tone="warning">
-              <strong>结束与中断：</strong>
-              每个正常流必须且只能收到一个 run.completed 或 run.failed。
-              客户端取消时应使用 AbortSignal；缺少终态的 EOF 不能视为成功。
-              默认 Stream 超时为 190000ms，可通过 <code>timeoutMs</code> 覆盖。
-            </Callout>
+
+            <h3>REST 调用（curl）</h3>
+            <CodeBlock sample={STREAM_REQUEST_SAMPLE} onNotice={handleNotice} />
           </DocSection>
 
           <DocSection section={API_DOC_SECTIONS[4]}>
             <p>
-              <code>@minicoze/sdk</code> 已实现 Run 与 Stream，并通过
-              <a
-                href="https://github.com/moyanyanyanyan/mini-coze-group-1/releases/tag/v0.1.0"
-                target="_blank"
-                rel="noreferrer"
-              >
-                GitHub Release v0.1.0
-              </a>
-              分发。
+              一个可以直接跑起来的最小项目：只用 Node + SDK，不引入框架。
+              要求 Node 20+（用到 <code>--env-file</code> 和顶层 await）。
             </p>
-            <h3>GitHub Release 安装</h3>
-            <CodeBlock sample={SDK_INSTALL_SAMPLE} onNotice={handleNotice} />
-            <h3>客户端初始化</h3>
-            <CodeBlock sample={SDK_INIT_SAMPLE} onNotice={handleNotice} />
-            <h3>
-              <code>client.run()</code>
-            </h3>
-            <CodeBlock
-              sample={QUICK_START_SAMPLES.find((sample) => sample.id === 'typescript')!}
-              onNotice={handleNotice}
-            />
-            <h3>
-              <code>client.stream()</code>
-            </h3>
-            <CodeBlock sample={STREAM_SDK_SAMPLE} onNotice={handleNotice} />
-            <h3>基本类型说明</h3>
-            <ParameterTable rows={SDK_TYPES} />
-            <h3>基本错误处理</h3>
-            <CodeBlock sample={SDK_ERROR_SAMPLE} onNotice={handleNotice} />
-            <p>
-              SSE 建立前的 HTTP 错误使用 <code>MiniCozeHTTPError</code>；
-              流协议或缺少终态使用 <code>MiniCozeStreamError</code>；
-              网络、超时和主动取消分别使用 SDK 的
-              <code>MiniCozeNetworkError</code>、<code>MiniCozeTimeoutError</code>
-              和 <code>MiniCozeAbortError</code>。
-            </p>
+            <h3>项目结构</h3>
+            <CodeBlock sample={EXAMPLE_TREE_SAMPLE} onNotice={handleNotice} />
+            <h3>package.json</h3>
+            <CodeBlock sample={EXAMPLE_PACKAGE_SAMPLE} onNotice={handleNotice} />
+            <h3>.env</h3>
+            <CodeBlock sample={ENV_SAMPLE} onNotice={handleNotice} />
+            <h3>src/client.ts</h3>
+            <CodeBlock sample={EXAMPLE_CLIENT_SAMPLE} onNotice={handleNotice} />
+            <h3>src/run.ts</h3>
+            <CodeBlock sample={EXAMPLE_RUN_SAMPLE} onNotice={handleNotice} />
+            <h3>src/stream.ts</h3>
+            <CodeBlock sample={EXAMPLE_STREAM_SAMPLE} onNotice={handleNotice} />
+            <h3>运行</h3>
+            <CodeBlock sample={EXAMPLE_COMMANDS_SAMPLE} onNotice={handleNotice} />
+            <Callout>
+              每次代码块右上角都可以直接复制。示例里的 Key 只从环境变量读取，
+              换成你自己的 Key 和 Base URL 就能跑通。
+            </Callout>
           </DocSection>
 
           <DocSection section={API_DOC_SECTIONS[5]}>
-            <p>
-              以下内容对应当前公开 Run 和 Stream 实现。
-            </p>
             <h3>接口概览</h3>
             <div className="api-doc-table-wrap">
               <table className="api-doc-table">
@@ -387,35 +456,28 @@ export function SdkDocsPage() {
               </table>
             </div>
 
+            <h3>鉴权</h3>
+            <div className="api-doc-auth-method">
+              <span>Authorization</span>
+              <code>{'Bearer <API_KEY>'}</code>
+              <small>每个公开 Run / Stream 请求都必须携带</small>
+            </div>
+
             <h3>请求参数</h3>
             <ParameterTable />
-            <div className="api-doc-response api-doc-response--success">
-              <h3>成功响应 <span>HTTP 200</span></h3>
-              <CodeBlock sample={RUN_RESPONSE_SAMPLE} onNotice={handleNotice} />
-            </div>
-            <div className="api-doc-response api-doc-response--error">
-              <h3>错误响应 <span>HTTP 4xx / 5xx</span></h3>
-              <CodeBlock sample={RUN_ERROR_SAMPLE} onNotice={handleNotice} />
-            </div>
-            <h3>Runtime 错误码映射</h3>
-            <div className="api-doc-table-wrap">
-              <table className="api-doc-table">
-                <thead>
-                  <tr>
-                    <th>Runtime code</th>
-                    <th>HTTP 状态码</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {RUNTIME_ERRORS.map((item) => (
-                    <tr key={item.code}>
-                      <td><code className="api-doc-code-chip">{item.code}</code></td>
-                      <td><code className={`api-doc-status-code ${statusTone(item.httpStatus)}`}>{item.httpStatus}</code></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+
+            <h3>成功响应</h3>
+            <CodeBlock sample={RUN_RESPONSE_SAMPLE} onNotice={handleNotice} />
+
+            <h3>错误响应</h3>
+            <CodeBlock sample={RUN_ERROR_SAMPLE} onNotice={handleNotice} />
+
+            <h3>SDK 导出内容</h3>
+            <ParameterTable rows={SDK_EXPORTS} />
+
+            <h3>SDK 类型</h3>
+            <ParameterTable rows={SDK_TYPES} />
+
             <h3>HTTP 状态码</h3>
             <div className="api-doc-table-wrap">
               <table className="api-doc-table">
@@ -437,14 +499,60 @@ export function SdkDocsPage() {
                 </tbody>
               </table>
             </div>
+
+            <h3>Runtime 错误码映射</h3>
+            <div className="api-doc-table-wrap">
+              <table className="api-doc-table">
+                <thead>
+                  <tr>
+                    <th>Runtime code</th>
+                    <th>HTTP 状态码</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {RUNTIME_ERRORS.map((item) => (
+                    <tr key={item.code}>
+                      <td><code className="api-doc-code-chip">{item.code}</code></td>
+                      <td><code className={`api-doc-status-code ${statusTone(item.httpStatus)}`}>{item.httpStatus}</code></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             <Callout>
-              当前 HTTP 响应中的 <code>code</code> 是数字 HTTP 状态码。
-              Runtime 在 SSE 响应开始前失败时返回 JSON HTTP 错误；响应开始后，
-              即使 HTTP 状态已经为 200，也会以 <code>run.failed</code> 事件结束。
+              HTTP 响应里的 <code>code</code> 是数字状态码。Runtime 在 SSE 建立前失败会返回 JSON 错误；
+              建立后失败则以 <code>run.failed</code> 事件结束。
             </Callout>
           </DocSection>
 
           <DocSection section={API_DOC_SECTIONS[6]}>
+            <h3>SDK 错误类型</h3>
+            <div className="api-doc-table-wrap">
+              <table className="api-doc-table">
+                <thead>
+                  <tr>
+                    <th>错误类</th>
+                    <th>触发时机</th>
+                    <th>附加字段</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {SDK_ERROR_ROWS.map((row) => (
+                    <tr key={row.name}>
+                      <td><code>{row.name}</code></td>
+                      <td>{row.when}</td>
+                      <td>{row.detail}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p>
+              所有错误类都继承 <code>MiniCozeSDKError</code>，
+              也可以用基类统一捕获；<code>error.cause</code> 保留底层错误对象。
+            </p>
+
+            <h3>常见问题</h3>
             <div className="api-doc-faq">
               {FAQ_ITEMS.map((item) => (
                 <article key={item.question}>
@@ -488,7 +596,7 @@ function DocSection({ section, children }: { section: DocSection; children: Reac
   );
 }
 
-function ParameterTable({ rows = REQUEST_PARAMETERS }: { rows?: typeof REQUEST_PARAMETERS }) {
+function ParameterTable({ rows = REQUEST_PARAMETERS }: { rows?: readonly { name: string; type: string; description: string }[] }) {
   return (
     <div className="api-doc-table-wrap">
       <table className="api-doc-table">
