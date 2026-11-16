@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import type { ConversationSummary } from '@minicoze/shared';
 import { Icon } from '../../../shared/ui/Icon';
 import styles from '../agent-chat.module.css';
@@ -10,6 +11,8 @@ interface ConversationListProps {
   onSelect: (id: string) => void;
   onCreate: () => void;
   onDelete: (conversation: ConversationSummary) => void;
+  mobileOpen: boolean;
+  onMobileClose: () => void;
 }
 
 /** 今天显示时间，昨天显示「昨天」，更早显示月/日 */
@@ -40,11 +43,24 @@ export function ConversationList({
   onSelect,
   onCreate,
   onDelete,
+  mobileOpen,
+  onMobileClose,
 }: ConversationListProps) {
+  const [keyword, setKeyword] = useState('');
+  const filtered = useMemo(() => {
+    const normalized = keyword.trim().toLowerCase();
+    if (!normalized) return conversations;
+    return conversations.filter((item) => {
+      const agentName = item.agentId ? agentNames[item.agentId] ?? '' : '';
+      return `${item.title || '新对话'} ${agentName}`.toLowerCase().includes(normalized);
+    });
+  }, [agentNames, conversations, keyword]);
+
   return (
-    <aside className={styles.history} aria-label="历史对话">
+    <aside className={`${styles.history}${mobileOpen ? ` ${styles.historyMobileOpen}` : ''}`} aria-label="历史对话">
       <div className={styles.historyHead}>
         <span className={styles.historyTitle}>历史对话</span>
+        <button type="button" className={styles.historyClose} onClick={onMobileClose} aria-label="关闭历史对话">×</button>
         <button
           type="button"
           className={styles.historyNew}
@@ -57,6 +73,11 @@ export function ConversationList({
         </button>
       </div>
 
+      <label className={styles.historySearch}>
+        <span aria-hidden="true">⌕</span>
+        <input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="搜索对话" aria-label="搜索历史对话" />
+      </label>
+
       <div className={styles.historyList}>
         {conversations.length === 0 ? (
           <p className={styles.historyEmpty}>
@@ -64,8 +85,10 @@ export function ConversationList({
             <br />
             发第一条消息后会自动出现在这里。
           </p>
+        ) : filtered.length === 0 ? (
+          <p className={styles.historyEmpty}>没有找到匹配的对话。</p>
         ) : (
-          conversations.map((item) => {
+          filtered.map((item) => {
             const active = item.id === activeId;
             return (
               <div
@@ -75,7 +98,7 @@ export function ConversationList({
                 <button
                   type="button"
                   className={styles.historyOpen}
-                  onClick={() => onSelect(item.id)}
+                  onClick={() => { onSelect(item.id); onMobileClose(); }}
                   disabled={disabled}
                   aria-current={active ? 'page' : undefined}
                 >

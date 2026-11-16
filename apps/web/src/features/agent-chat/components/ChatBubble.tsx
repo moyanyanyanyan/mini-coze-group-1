@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { ReactNode } from 'react';
 import type { ChatMessage } from '@minicoze/shared';
 import { MarkdownMessage } from './MarkdownMessage';
@@ -8,6 +9,7 @@ interface ChatBubbleProps {
 }
 
 export function ChatBubble({ message }: ChatBubbleProps) {
+  const [copied, setCopied] = useState(false);
   const isUser = message.role === 'user';
   // 是否还在生成只看 status，不能靠「内容为空」猜 —— 失败的消息内容也是空的
   const generating = message.status === 'running' || message.status === 'pending';
@@ -42,13 +44,32 @@ export function ChatBubble({ message }: ChatBubbleProps) {
       >
         {isUser ? '我' : 'AI'}
       </div>
-      <div
-        className={`${styles.bubble} ${isUser ? styles.bubbleUser : styles.bubbleAssistant}`}
-        aria-live={generating && !isUser ? 'polite' : undefined}
-      >
-        {body}
-        {!waiting && message.status === 'cancelled' && message.content ? (
-          <span className={styles.bubbleHint}>已停止</span>
+      <div className={styles.bubbleColumn}>
+        <div
+          className={`${styles.bubble} ${isUser ? styles.bubbleUser : styles.bubbleAssistant}`}
+          aria-live={generating && !isUser ? 'polite' : undefined}
+        >
+          {body}
+          {!waiting && message.status === 'cancelled' && message.content ? <span className={styles.bubbleHint}>已停止</span> : null}
+          {!waiting && message.status === 'failed' && message.content ? <span className={styles.bubbleHint}>生成中断，请重新发送</span> : null}
+        </div>
+        {!isUser && message.content && !generating ? (
+          <div className={styles.messageActions}>
+            <button
+              type="button"
+              onClick={() => {
+                if (!navigator.clipboard?.writeText) return;
+                void navigator.clipboard.writeText(message.content)
+                  .then(() => {
+                    setCopied(true);
+                    window.setTimeout(() => setCopied(false), 1400);
+                  })
+                  .catch(() => setCopied(false));
+              }}
+            >
+              {copied ? '已复制' : '复制回答'}
+            </button>
+          </div>
         ) : null}
       </div>
     </div>
