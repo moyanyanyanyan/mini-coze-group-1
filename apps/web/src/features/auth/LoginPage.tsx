@@ -53,7 +53,7 @@ export function LoginPage() {
 
   return (
     <AuthLayout
-      title="登录 MiniCoze"
+      title="登录织跃"
       description="用邮箱继续，进入你的智能体工作台。"
       footer={{ text: '还没有账号？', label: '免费注册', to: '/register' }}
     >

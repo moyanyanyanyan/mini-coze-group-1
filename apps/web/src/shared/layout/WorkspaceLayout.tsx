@@ -6,6 +6,8 @@ import type { AuthUser } from '../../features/auth/types';
 import { AppLink } from '../routing/AppLink';
 import { navigate } from '../routing/navigation';
 import { Icon } from '../ui/Icon';
+import { BrandMark } from '../ui/BrandMark';
+import { BRAND_NAME } from '../brand';
 import './workspace-layout.css';
 
 interface WorkspaceLayoutProps {
@@ -65,9 +67,9 @@ export function WorkspaceLayout({ pathname, children }: WorkspaceLayoutProps) {
   return (
     <div className="workspace-shell">
       <aside className="workspace-sidebar" aria-label="功能导航">
-        <AppLink className="workspace-brand" to="/" aria-label="返回 MiniCoze 首页">
-          <span className="workspace-brand-mark" aria-hidden="true">M</span>
-          <span>MiniCoze</span>
+        <AppLink className="workspace-brand" to="/" aria-label="返回织跃首页">
+          <BrandMark className="workspace-brand-mark" />
+          <span>{BRAND_NAME}</span>
         </AppLink>
 
         <nav className="workspace-nav">

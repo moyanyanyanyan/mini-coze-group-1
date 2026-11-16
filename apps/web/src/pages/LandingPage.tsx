@@ -16,7 +16,7 @@ export function LandingPage(){
     return (
         <div className={styles.landing}>
             <header className={styles.navBar}>
-                <span className={styles.logo}>MiniCoze</span>
+                <span className={styles.logo}>织跃</span>
                 <div className={styles.navActions}>
                     <button className={styles.btnGhost} onClick={()=>navigate("/login")}>登录</button>
                     <button className={styles.btnPrimary} onClick={()=>navigate("/register")}>开始使用</button>

@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import { AppLink } from '../../../shared/routing/AppLink';
 import styles from '../auth.module.css';
+import { BrandMark } from '../../../shared/ui/BrandMark';
+import { BRAND_NAME, BRAND_TAGLINE } from '../../../shared/brand';
 
 interface AuthLayoutProps {
   title: string;
@@ -19,8 +21,8 @@ export function AuthLayout({ title, description, children, footer }: AuthLayoutP
       {/* 左侧品牌面板：纯展示，不承载交互 */}
       <aside className={styles.panel}>
         <div className={styles.panelBrand}>
-          <span className={styles.brandMark} aria-hidden="true">M</span>
-          <span className={styles.brandName}>MiniCoze</span>
+          <BrandMark className={styles.brandMark} />
+          <span className={styles.brandName}>{BRAND_NAME}</span>
         </div>
 
         <div className={styles.panelBody}>
@@ -32,7 +34,7 @@ export function AuthLayout({ title, description, children, footer }: AuthLayoutP
           <p className={styles.panelText}>喂资料、装工具、把步骤拖成一条线——不写代码，让 AI 替你干活。</p>
         </div>
 
-        <p className={styles.panelFoot}>MINICOZE — MAKE AGENTS, WITH CLARITY</p>
+        <p className={styles.panelFoot}>织跃 — {BRAND_TAGLINE}</p>
       </aside>
 
       <main className={styles.main}>
