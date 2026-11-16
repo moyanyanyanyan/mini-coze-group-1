@@ -35,14 +35,12 @@ export function KnowledgeCenterView({ items, editingItem, loading, error, name, 
             <input ref={nameInputRef} id="center-knowledge-name" value={name} onChange={(event) => actions.onNameChange(event.target.value)} maxLength={50} required placeholder="例如：报销制度" />
             <label htmlFor="center-knowledge-description">说明</label>
             <textarea id="center-knowledge-description" value={description} onChange={(event) => actions.onDescriptionChange(event.target.value)} maxLength={200} rows={3} placeholder="这份知识库用于什么？" />
+            <span className="knowledge-field-count">{description.length} / 200</span>
             <div className="knowledge-center-create-actions"><button type="submit" disabled={saving || !canCreate}>{saving ? (editingItem ? '保存中…' : '创建中…') : editingItem ? '保存修改' : '创建知识库'}</button><button type="button" onClick={actions.onToggleCreate} disabled={saving}>取消</button></div>
           </form>
         </div>}
         <section className="knowledge-center-section">
-
-          {loading ? <p className="knowledge-empty">正在加载…</p> : items.length === 0 ? <div className="knowledge-card knowledge-center-empty"><h3>还没有知识库</h3><p>创建一个知识库，集中管理可供 Agent 检索的资料。</p><button type="button" className="knowledge-first-create" onClick={openCreateDialog}>创建第一个知识库</button></div> : <div className="knowledge-center-grid">{items.map((item) => <article className="knowledge-card knowledge-base-card" key={item.id} onClick={() => actions.onOpenDetail(item.id)}><div className="knowledge-base-card-header"><h3>{item.name}</h3><span className={`knowledge-status${item.status === 'DISABLED' ? ' is-disabled' : ''}`}>{item.status === 'ACTIVE' ? '已启用' : '已停用'}</span></div>{item.description? <p>{item.description}</p>:<p>暂无描述</p>}
-          <button type="button" onClick={(event) => { event.stopPropagation(); actions.onOpenDetail(item.id); }}>进入知识库 →</button>
-            </article>)}</div>}
+          {loading ? <p className="knowledge-empty">正在加载…</p> : items.length === 0 ? <div className="knowledge-card knowledge-center-empty"><h3>还没有知识库</h3><p>创建一个知识库，集中管理可供 Agent 检索的资料。</p><button type="button" className="knowledge-first-create" onClick={openCreateDialog}>创建第一个知识库</button></div> : <div className="knowledge-center-grid">{items.map((item) => <article className="knowledge-card knowledge-base-card" key={item.id} role="button" tabIndex={0} aria-label={`进入知识库 ${item.name}`} onClick={() => actions.onOpenDetail(item.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); actions.onOpenDetail(item.id); } }}><div className="knowledge-base-card-header"><div className="knowledge-base-card-title"><h3>{item.name}</h3></div><span className={`knowledge-status${item.status === 'DISABLED' ? ' is-disabled' : ''}`}>{item.status === 'ACTIVE' ? '已启用' : '已停用'}</span></div><p className={`knowledge-base-card-description${item.description ? '' : ' is-empty'}`}>{item.description || '未添加描述'}</p><div className="knowledge-base-card-footer"><span aria-hidden="true" /> <button type="button" onClick={(event) => { event.stopPropagation(); actions.onOpenDetail(item.id); }}>进入知识库 →</button></div></article>)}</div>}
         </section>
       </div>
     </section>

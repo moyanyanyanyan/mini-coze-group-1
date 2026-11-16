@@ -27,6 +27,13 @@ export class KnowledgeDocumentController {
     return { code: 200, message: 'ok', data: await this.documents.content(id, resolveKnowledgeWorkspace(request, workspaceId)) };
   }
 
+  @Get('documents/:id/content-page')
+  async contentPage(@Req() request: Request, @Param('id') id: string, @Query('workspaceId') workspaceId: string, @Query('cursor') cursor?: string, @Query('limit') limit?: string) {
+    const parsedLimit = limit === undefined ? 4000 : Number(limit);
+    if (!Number.isInteger(parsedLimit) || parsedLimit < 100 || parsedLimit > 5000) throw new BadRequestException('文本分页长度无效');
+    return { code: 200, message: 'ok', data: await this.documents.contentPage(id, resolveKnowledgeWorkspace(request, workspaceId), cursor, parsedLimit) };
+  }
+
   @Delete('documents/:id')
   async remove(@Req() request: Request, @Param('id') id: string, @Query('workspaceId') workspaceId: string) {
     return { code: 200, message: 'ok', data: await this.documents.remove(id, resolveKnowledgeWorkspace(request, workspaceId)) };

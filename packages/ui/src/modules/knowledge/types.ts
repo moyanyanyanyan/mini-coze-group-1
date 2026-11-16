@@ -74,6 +74,8 @@ export interface KnowledgeDocumentContentState {
   content: string | null;
   loading: boolean;
   error: string;
+  hasMore?: boolean;
+  totalLength?: number;
 }
 
 export interface KnowledgeActions {
@@ -97,6 +99,7 @@ export interface KnowledgeActions {
   onViewDocumentChunks: (id: string) => void;
   onCloseDocumentDrawer: () => void;
   handleDeleteDocument: (id: string) => void;
+  onReadDocument: (id: string) => void;
   onSelectedDocumentChange: (id: string | null) => void;
   onQueryChange: (value: string) => void;
   handleSearch: (event: FormEvent<HTMLFormElement>) => void;

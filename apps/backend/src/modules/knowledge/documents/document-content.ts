@@ -26,6 +26,44 @@ export function sourceTypeFromFilename(filename: string): 'TXT' | 'JSON' {
   throw new DocumentContentError('UNSUPPORTED_FILE', '只支持 .txt 和 .json 文件');
 }
 
+export interface DocumentTextPage {
+  content: string;
+  nextCursor: string | null;
+  hasMore: boolean;
+  totalLength: number;
+}
+
+function decodeTextCursor(cursor?: string): number {
+  if (!cursor) return 0;
+  try {
+    const value = Number(Buffer.from(cursor, 'base64url').toString('utf8'));
+    if (!Number.isInteger(value) || value < 0) throw new Error('invalid cursor');
+    return value;
+  } catch {
+    throw new DocumentContentError('INVALID_CURSOR', '文本分页位置无效');
+  }
+}
+
+export function readDocumentTextPage(text: string, cursor?: string, requestedLimit = 4000): DocumentTextPage {
+  const characters = Array.from(text);
+  const start = decodeTextCursor(cursor);
+  if (start > characters.length) throw new DocumentContentError('INVALID_CURSOR', '文本分页位置无效');
+  const limit = Math.min(Math.max(Math.trunc(requestedLimit) || 4000, 100), 5000);
+  const targetEnd = Math.min(start + limit, characters.length);
+  let end = targetEnd;
+  if (targetEnd < characters.length) {
+    const newline = characters.lastIndexOf('\n', targetEnd - 1);
+    if (newline >= start + Math.floor(limit / 2)) end = newline + 1;
+  }
+  const hasMore = end < characters.length;
+  return {
+    content: characters.slice(start, end).join(''),
+    nextCursor: hasMore ? Buffer.from(String(end), 'utf8').toString('base64url') : null,
+    hasMore,
+    totalLength: characters.length,
+  };
+}
+
 export function extractDocumentText(sourceType: 'TEXT' | 'TXT' | 'JSON', bytes: Uint8Array): string {
   if (bytes.byteLength === 0) throw new DocumentContentError('EMPTY_CONTENT', '资料内容不能为空');
   if (bytes.byteLength > MAX_DOCUMENT_BYTES) throw new DocumentContentError('FILE_TOO_LARGE', '资料不能超过 1 MB');

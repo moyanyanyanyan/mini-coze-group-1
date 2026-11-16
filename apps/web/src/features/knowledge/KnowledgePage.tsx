@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { KnowledgeView } from '@minicoze/ui/knowledge';
 import { useConfirm } from '@minicoze/ui/hooks';
 import { KnowledgeCenterPage } from './KnowledgeCenterPage';
-import { createKnowledgeBase, createTextDocument, getKnowledgeWorkspaceId, deleteKnowledgeBase, deleteKnowledgeDocument, getKnowledgeDocumentContent, listKnowledgeBases, listKnowledgeDocuments, previewKnowledgeSearch, retryKnowledgeDocument, updateKnowledgeBase, updateKnowledgeBaseStatus, uploadDocumentFile, type KnowledgeBase, type KnowledgeDocument, type KnowledgeSearchResult } from './knowledge.api';
+import { createKnowledgeBase, createTextDocument, getKnowledgeDocument, getKnowledgeDocumentContent, getKnowledgeDocumentContentPage, getKnowledgeWorkspaceId, deleteKnowledgeBase, deleteKnowledgeDocument, listKnowledgeBases, listKnowledgeDocuments, previewKnowledgeSearch, retryKnowledgeDocument, updateKnowledgeBase, updateKnowledgeBaseStatus, uploadDocumentFile, type KnowledgeBase, type KnowledgeDocument, type KnowledgeSearchResult } from './knowledge.api';
 import { navigate, usePathname } from '../../shared/routing/navigation';
 
 
@@ -11,7 +11,9 @@ export function KnowledgePage() {
   const pathname = usePathname();
   const detailPrefix = '/workspace/knowledge/';
   if (!pathname.startsWith(detailPrefix)) return <KnowledgeCenterPage />;
-  const knowledgeBaseId = decodeURIComponent(pathname.slice(detailPrefix.length));
+  const segments = pathname.slice(detailPrefix.length).split('/').filter(Boolean).map((segment) => decodeURIComponent(segment));
+  if (segments.length === 3 && segments[1] === 'read') return <KnowledgeDocumentReaderPage knowledgeBaseId={segments[0]} documentId={segments[2]} />;
+  const knowledgeBaseId = segments[0];
   return <KnowledgeDetailPage knowledgeBaseId={knowledgeBaseId} />;
 }
 
@@ -48,6 +50,8 @@ function KnowledgeDetailPage({ knowledgeBaseId }: { knowledgeBaseId: string }) {
   const [documentContent, setDocumentContent] = useState<string | null>(null);
   const [documentContentLoading, setDocumentContentLoading] = useState(false);
   const [documentContentError, setDocumentContentError] = useState('');
+  const [documentContentHasMore, setDocumentContentHasMore] = useState(false);
+  const [documentContentTotalLength, setDocumentContentTotalLength] = useState<number | undefined>(undefined);
   const [query, setQuery] = useState('');
   const [searchResult, setSearchResult] = useState<KnowledgeSearchResult | null>(null);
   const [contentByDocumentId, setContentByDocumentId] = useState<Record<string, string>>({});
@@ -88,6 +92,8 @@ function KnowledgeDetailPage({ knowledgeBaseId }: { knowledgeBaseId: string }) {
     setDocumentDrawerOpen(false);
     setDocumentContent(null);
     setDocumentContentError('');
+    setDocumentContentHasMore(false);
+    setDocumentContentTotalLength(undefined);
     setSearchResult(null);
     setSearchError('');
     setSearching(false);
@@ -121,13 +127,17 @@ function KnowledgeDetailPage({ knowledgeBaseId }: { knowledgeBaseId: string }) {
       setDocumentContent(null);
       setDocumentContentLoading(false);
       setDocumentContentError('');
+      setDocumentContentHasMore(false);
+      setDocumentContentTotalLength(undefined);
       return;
     }
     let active = true;
     setDocumentContentLoading(true);
     setDocumentContentError('');
-    getKnowledgeDocumentContent(selectedDocumentId, workspaceId)
-      .then((result) => { if (active) setDocumentContent(result.content); })
+    setDocumentContentHasMore(false);
+    setDocumentContentTotalLength(undefined);
+    getKnowledgeDocumentContentPage(selectedDocumentId, workspaceId, undefined, 1200)
+      .then((result) => { if (active) { setDocumentContent(result.content); setDocumentContentHasMore(result.hasMore); setDocumentContentTotalLength(result.totalLength); } })
       .catch((cause: unknown) => { if (active) { setDocumentContent(null); setDocumentContentError(getMessage(cause)); } })
       .finally(() => { if (active) setDocumentContentLoading(false); });
     return () => { active = false; };
@@ -206,7 +216,7 @@ function KnowledgeDetailPage({ knowledgeBaseId }: { knowledgeBaseId: string }) {
     if (!selectedId || deletingBase || updatingBaseStatus) return;
     const baseId = selectedId;
     const base = items.find((item) => item.id === baseId);
-    if (!await confirm(`确定删除知识库「${base?.name ?? '当前知识库'}」吗？其中的 ${documents.length} 份文档、切片和向量也会永久删除，无法恢复。`)) return;
+    if (!await confirm(`确定删除知识库「${base?.name ?? '当前知识库'}」吗？删除后无法恢复。`)) return;
     setDeletingBase(true);
     setError('');
     try {
@@ -224,7 +234,7 @@ function KnowledgeDetailPage({ knowledgeBaseId }: { knowledgeBaseId: string }) {
 
   async function handleDeleteDocument(document: KnowledgeDocument) {
     if (deletingDocumentId || document.status === 'PROCESSING') return;
-    if (!await confirm(`确定删除文档「${document.title}」吗？其 ${document.chunkCount} 个切片和向量也会永久删除，无法恢复。`)) return;
+    if (!await confirm(`确定删除文档「${document.title}」吗？删除后无法恢复。`)) return;
     setDeletingDocumentId(document.id);
     setDocumentError('');
     try {
@@ -312,7 +322,7 @@ function KnowledgeDetailPage({ knowledgeBaseId }: { knowledgeBaseId: string }) {
         addingDocument, sourceMode, documentTitle, documentText, selectedDocumentId, selectedDocument,
         documentDrawerOpen, readyDocuments, hasProcessing,
       }}
-      documentContentState={{ content: documentContent, loading: documentContentLoading, error: documentContentError }}
+      documentContentState={{ content: documentContent, loading: documentContentLoading, error: documentContentError, hasMore: documentContentHasMore, totalLength: documentContentTotalLength }}
       searchState={{ query, searchResult, contentByDocumentId, searching, searchError, canSearch: Boolean(query.trim()) }}
       confirmation={confirmation}
       fileInputRef={fileInputRef}
@@ -344,6 +354,7 @@ function KnowledgeDetailPage({ knowledgeBaseId }: { knowledgeBaseId: string }) {
         handleDocumentSubmit,
         handleRetry,
         onViewDocumentChunks: (id) => { setSelectedDocumentId(id); setDocumentDrawerOpen(true); },
+        onReadDocument: (id) => navigate(`/workspace/knowledge/${encodeURIComponent(knowledgeBaseId)}/read/${encodeURIComponent(id)}`),
         onCloseDocumentDrawer: () => setDocumentDrawerOpen(false),
         handleDeleteDocument: (id) => {
           const document = documents.find((item) => item.id === id);
@@ -359,4 +370,65 @@ function KnowledgeDetailPage({ knowledgeBaseId }: { knowledgeBaseId: string }) {
 
 function getMessage(cause: unknown): string {
   return cause instanceof Error ? cause.message : '请求失败，请稍后重试';
+}
+
+function KnowledgeDocumentReaderPage({ knowledgeBaseId, documentId }: { knowledgeBaseId: string; documentId: string }) {
+  const [workspaceId, setWorkspaceId] = useState('');
+  const [document, setDocument] = useState<KnowledgeDocument | null>(null);
+  const [content, setContent] = useState('');
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [totalLength, setTotalLength] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    getKnowledgeWorkspaceId()
+      .then((id) => { if (active) setWorkspaceId(id); })
+      .catch((cause: unknown) => { if (active) { setError(getMessage(cause)); setLoading(false); } });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!workspaceId) return;
+    let active = true;
+    setLoading(true);
+    Promise.all([
+      getKnowledgeDocument(documentId, workspaceId),
+      getKnowledgeDocumentContentPage(documentId, workspaceId, undefined, 4000),
+    ])
+      .then(([nextDocument, page]) => { if (active) { setDocument(nextDocument); setContent(page.content); setNextCursor(page.nextCursor); setTotalLength(page.totalLength); setError(''); } })
+      .catch((cause: unknown) => { if (active) setError(getMessage(cause)); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [workspaceId, documentId]);
+
+  async function loadMore() {
+    if (!workspaceId || !nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    setError('');
+    try {
+      const page = await getKnowledgeDocumentContentPage(documentId, workspaceId, nextCursor, 4000);
+      setContent((current) => current + page.content);
+      setNextCursor(page.nextCursor);
+      setTotalLength(page.totalLength);
+    } catch (cause) {
+      setError(getMessage(cause));
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  return <section className="feature-page knowledge-reading-page" aria-label="识别内容阅读页">
+    <div className="knowledge-reading-content">
+      <button type="button" className="knowledge-reading-back" onClick={() => navigate(`/workspace/knowledge/${encodeURIComponent(knowledgeBaseId)}`)}>← 返回知识库详情</button>
+      {loading ? <p className="knowledge-empty">正在加载识别内容…</p> : error && !document ? <div className="knowledge-error" role="alert">{error}</div> : document && <>
+        <header className="knowledge-reading-header"><h1>{document.title}</h1><p>{document.sourceType} · {totalLength?.toLocaleString('zh-CN') ?? '—'} 字 · {document.status === 'READY' ? '可检索' : document.status === 'PROCESSING' ? '处理中' : '处理失败'}</p></header>
+        {error && <p className="knowledge-error" role="alert">{error}</p>}
+        {content ? <div className="knowledge-reading-body">{content}</div> : <p className="knowledge-empty">这份资料没有可展示的识别内容。</p>}
+        {nextCursor && <button type="button" className="knowledge-reading-load-more" onClick={() => void loadMore()} disabled={loadingMore}>{loadingMore ? '加载中…' : '加载更多内容'}</button>}
+      </>}
+    </div>
+  </section>;
 }

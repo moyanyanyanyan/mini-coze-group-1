@@ -27,6 +27,14 @@ export interface KnowledgeDocumentContent {
   content: string;
 }
 
+export interface KnowledgeDocumentContentPage {
+  documentId: string;
+  content: string;
+  nextCursor: string | null;
+  hasMore: boolean;
+  totalLength: number;
+}
+
 export interface KnowledgeChunkPreview {
   id: string;
   position: number;
@@ -128,6 +136,19 @@ export async function getKnowledgeDocumentContent(documentId: string, workspaceI
   const params = new URLSearchParams({ workspaceId });
   const response = await fetch(`${apiBase}/documents/${encodeURIComponent(documentId)}/content?${params}`, { credentials: 'include' });
   return readResponse<KnowledgeDocumentContent>(response);
+}
+
+export async function getKnowledgeDocumentContentPage(documentId: string, workspaceId: string, cursor?: string, limit = 4000): Promise<KnowledgeDocumentContentPage> {
+  const params = new URLSearchParams({ workspaceId, limit: String(limit) });
+  if (cursor) params.set('cursor', cursor);
+  const response = await fetch(`${apiBase}/documents/${encodeURIComponent(documentId)}/content-page?${params}`, { credentials: 'include' });
+  return readResponse<KnowledgeDocumentContentPage>(response);
+}
+
+export async function getKnowledgeDocument(documentId: string, workspaceId: string): Promise<KnowledgeDocument> {
+  const params = new URLSearchParams({ workspaceId });
+  const response = await fetch(`${apiBase}/documents/${encodeURIComponent(documentId)}?${params}`, { credentials: 'include' });
+  return readResponse<KnowledgeDocument>(response);
 }
 
 export async function listDocumentChunks(knowledgeBaseId: string, documentId: string, workspaceId: string, page: number): Promise<KnowledgeChunkPage> {

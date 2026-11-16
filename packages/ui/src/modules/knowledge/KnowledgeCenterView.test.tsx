@@ -38,6 +38,7 @@ describe('knowledge center view', () => {
     expect(html).toContain('aria-modal="true"');
     expect(html).toContain('关闭弹窗');
     expect(html).toContain('knowledge-modal-backdrop');
+    expect(html).toContain('0 / 200');
   });
 
   it('keeps card actions focused on entering the knowledge base', () => {
@@ -46,5 +47,17 @@ describe('knowledge center view', () => {
     const html = renderToStaticMarkup(<KnowledgeCenterView {...input} />);
     expect(html).toContain('进入知识库');
     expect(html).not.toContain('编辑知识库');
+  });
+
+  it('keeps empty and long descriptions within the same card structure', () => {
+    const input = props();
+    input.items = [
+      { id: 'empty', name: '空描述', description: '', status: 'ACTIVE' },
+      { id: 'long', name: '很长的知识库名称很长的知识库名称很长的知识库名称', description: '连续英文和 URL https://example.com/a-very-long-resource-name-without-spaces 以及换行内容'.repeat(4), status: 'DISABLED' },
+    ];
+    const html = renderToStaticMarkup(<KnowledgeCenterView {...input} />);
+    expect(html).toContain('未添加描述');
+    expect(html).toContain('knowledge-base-card-description');
+    expect(html).toContain('知识库名称很长');
   });
 });

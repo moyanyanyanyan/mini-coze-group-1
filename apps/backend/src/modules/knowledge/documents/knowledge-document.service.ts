@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { basename, extname } from 'node:path';
 import { PrismaService } from '../../../database/prisma.service';
 import { EmbeddingClient, EMBEDDING_DIMENSION, EmbeddingUnavailableError } from '../../../integrations/embedding.client';
-import { decodeUploadFilename, DocumentContentError, extractDocumentText, MAX_DOCUMENT_BYTES, sourceTypeFromFilename } from './document-content';
+import { decodeUploadFilename, DocumentContentError, extractDocumentText, MAX_DOCUMENT_BYTES, readDocumentTextPage, sourceTypeFromFilename } from './document-content';
 import { chunkDocument } from './chunk-document';
 import { CreateTextDocumentDto } from '../dto/create-text-document.dto';
 
@@ -80,6 +80,14 @@ export class KnowledgeDocumentService implements OnModuleInit {
     });
     if (!document || document.knowledgeBase.workspaceId !== workspaceId?.trim()) throw new NotFoundException('文档不存在');
     return { documentId: document.id, content: document.rawText ?? '' };
+  }
+
+  async contentPage(id: string, workspaceId: string, cursor?: string, limit = 4000) {
+    const document = await this.prisma.knowledgeDocument.findUnique({
+      where: { id }, select: { id: true, knowledgeBase: { select: { workspaceId: true } }, rawText: true },
+    });
+    if (!document || document.knowledgeBase.workspaceId !== workspaceId?.trim()) throw new NotFoundException('文档不存在');
+    return { documentId: document.id, ...readDocumentTextPage(document.rawText ?? '', cursor, limit) };
   }
 
   async retry(id: string, workspaceId: string) {

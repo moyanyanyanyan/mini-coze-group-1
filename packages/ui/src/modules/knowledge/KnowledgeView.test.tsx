@@ -32,7 +32,7 @@ function props(): KnowledgeViewProps {
       onDocumentTitleChange: noop, onDocumentTextChange: noop, onDocumentFileChange: noop,
       handleDocumentSubmit: noop, handleRetry: noop, onViewDocumentChunks: noop,
       onCloseDocumentDrawer: noop,
-      handleDeleteDocument: noop, onSelectedDocumentChange: noop,
+      handleDeleteDocument: noop, onReadDocument: noop, onSelectedDocumentChange: noop,
       onQueryChange: noop, handleSearch: noop,
     },
   };
@@ -78,6 +78,16 @@ describe('knowledge view', () => {
     expect(html).toContain('识别内容');
     expect(html).toContain('&lt;script&gt;识别内容&lt;/script&gt;');
     expect(html).not.toContain('内容片段 1');
+  });
+
+  it('shows the full reading entry only when preview has more content', () => {
+    const input = props();
+    input.documentState.documentDrawerOpen = true;
+    input.documentContentState.hasMore = true;
+    input.documentContentState.totalLength = 12000;
+    const html = renderToStaticMarkup(<KnowledgeView {...input} />);
+    expect(html).toContain('阅读全文');
+    expect(html).toContain('12,000 字');
   });
 
   it('distinguishes pending, failed and empty retrieval states', () => {

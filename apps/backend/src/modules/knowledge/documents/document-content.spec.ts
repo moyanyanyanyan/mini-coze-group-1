@@ -1,4 +1,4 @@
-import { decodeUploadFilename, DocumentContentError, extractDocumentText, sourceTypeFromFilename } from './document-content';
+import { decodeUploadFilename, DocumentContentError, extractDocumentText, readDocumentTextPage, sourceTypeFromFilename } from './document-content';
 
 describe('document content extraction', () => {
   it('keeps nested JSON field paths and array order', () => {
@@ -33,5 +33,19 @@ describe('document content extraction', () => {
     expect(decodeUploadFilename(filename)).toBe(filename);
     expect(decodeUploadFilename('resume.txt')).toBe('resume.txt');
     expect(decodeUploadFilename('café.txt')).toBe('café.txt');
+  });
+
+  it('pages continuous text without splitting Unicode characters or duplicating content', () => {
+    const source = `${'😀员工手册\n'.repeat(40)}最后一段`;
+    const pages: string[] = [];
+    let cursor: string | undefined;
+    let page;
+    do {
+      page = readDocumentTextPage(source, cursor, 100);
+      pages.push(page.content);
+      cursor = page.nextCursor ?? undefined;
+    } while (page.hasMore);
+    expect(pages.join('')).toBe(source);
+    expect(readDocumentTextPage(source, undefined, 100).content).not.toContain('\uFFFD');
   });
 });

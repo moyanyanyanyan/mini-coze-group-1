@@ -12,7 +12,7 @@ export function KnowledgeView({
   const { activeTab, documents, documentError, documentLoading, documentSaving, deletingDocumentId,
     addingDocument, sourceMode, documentTitle, documentText, selectedDocument, documentDrawerOpen,
     hasProcessing } = documentState;
-  const { content: documentContent, loading: documentContentLoading, error: documentContentError } = documentContentState;
+  const { content: documentContent, loading: documentContentLoading, error: documentContentError, hasMore: documentContentHasMore, totalLength: documentContentTotalLength } = documentContentState;
   const { query, searchResult, contentByDocumentId, searching, searchError, canSearch } = searchState;
   const [documentQuery, setDocumentQuery] = useState('');
   const [documentStatusFilter, setDocumentStatusFilter] = useState<'ALL' | 'READY' | 'PROCESSING' | 'FAILED'>('ALL');
@@ -24,7 +24,7 @@ export function KnowledgeView({
   const groupedSearchResults = searchResult?.status === 'HIT' ? groupSearchResults(searchResult.hits, contentByDocumentId) : [];
   const { handleToggleBaseStatus, onEditKnowledgeBase, handleDeleteBase, onActiveTabChange, onToggleDocumentForm,
     onSourceModeChange, onDocumentTitleChange, onDocumentTextChange, onDocumentFileChange,
-    handleDocumentSubmit, handleRetry, onViewDocumentChunks, handleDeleteDocument,
+    handleDocumentSubmit, handleRetry, onViewDocumentChunks, onReadDocument, handleDeleteDocument,
     onCloseDocumentDrawer, onQueryChange, handleSearch } = actions;
   useEffect(() => {
     if (!documentDrawerOpen) return undefined;
@@ -49,6 +49,7 @@ export function KnowledgeView({
           <input id="edit-knowledge-name" value={editName} onChange={(event) => onEditNameChange(event.target.value)} maxLength={50} required />
           <label htmlFor="edit-knowledge-description">说明</label>
           <textarea id="edit-knowledge-description" value={editDescription} onChange={(event) => onEditDescriptionChange(event.target.value)} maxLength={200} rows={3} />
+          <span className="knowledge-field-count">{editDescription.length} / 200</span>
           <div className="knowledge-center-create-actions"><button type="submit" disabled={editSaving || !editName.trim()}>{editSaving ? '保存中…' : '保存修改'}</button><button type="button" onClick={onCloseEditDialog} disabled={editSaving}>取消</button></div>
         </form>
       </div>}
@@ -142,10 +143,10 @@ export function KnowledgeView({
                   <header className="knowledge-drawer-header"><div><span>资料详情</span><h2>{selectedDocument.title}</h2></div><button type="button" aria-label="关闭" onClick={onCloseDocumentDrawer}>×</button></header>
                   <div className="knowledge-drawer-body">
                     <div className="knowledge-drawer-status-row"><span className={`knowledge-document-status status-${selectedDocument.status.toLowerCase()}`}>{selectedDocument.status === 'READY' ? '可检索' : selectedDocument.status === 'PROCESSING' ? '处理中' : '处理失败'}</span>{selectedDocument.status === 'PROCESSING' && <span className="knowledge-stage">当前步骤：{selectedDocument.stage}</span>}</div>
-                    <section className="knowledge-detail-section"><h3>资料信息</h3><dl className="knowledge-detail-grid"><div><dt>资料格式</dt><dd>{selectedDocument.sourceType}</dd></div><div><dt>添加时间</dt><dd>{new Date(selectedDocument.createdAt).toLocaleString('zh-CN')}</dd></div><div><dt>原始文件名</dt><dd>{selectedDocument.originalFileName || selectedDocument.title}</dd></div><div><dt>处理状态</dt><dd>{selectedDocument.status === 'READY' ? '处理完成' : selectedDocument.status === 'PROCESSING' ? '正在处理' : '处理失败'}</dd></div></dl></section>
+                    <section className="knowledge-detail-section"><h3>资料信息</h3><dl className="knowledge-detail-grid"><div><dt>资料格式</dt><dd>{selectedDocument.sourceType}</dd></div><div><dt>添加时间</dt><dd>{new Date(selectedDocument.createdAt).toLocaleString('zh-CN')}</dd></div><div><dt>原始文件名</dt><dd>{selectedDocument.originalFileName || selectedDocument.title}</dd></div><div><dt>处理状态</dt><dd>{selectedDocument.status === 'READY' ? '处理完成' : selectedDocument.status === 'PROCESSING' ? '正在处理' : '处理失败'}</dd></div>{documentContentTotalLength !== undefined && <div><dt>内容长度</dt><dd>{documentContentTotalLength.toLocaleString('zh-CN')} 字</dd></div>}</dl></section>
                     {selectedDocument.status === 'PROCESSING' && <section className="knowledge-processing-panel"><strong>正在处理这份资料</strong><p>处理完成后，资料会自动变为可检索状态。请稍候。</p></section>}
                     {selectedDocument.status === 'FAILED' && <section className="knowledge-failed-panel"><strong>这份资料暂时无法处理</strong><p>{friendlyDocumentError(selectedDocument.error?.message)}</p><button type="button" className="knowledge-primary-button" disabled={deletingDocumentId !== null} onClick={() => void handleRetry(selectedDocument.id)}>重新处理</button></section>}
-                    {selectedDocument.status === 'READY' && <section className="knowledge-detail-section"><div className="knowledge-panel-heading"><div><h3>识别内容</h3><p>以下内容为资料处理后识别出的连续文本。</p></div></div>{documentContentError && <p className="knowledge-error" role="alert">{documentContentError}</p>}{documentContentLoading ? <p className="knowledge-empty">正在加载识别内容…</p> : documentContent === null ? null : documentContent ? <div className="knowledge-document-content">{documentContent}</div> : <p className="knowledge-empty">这份资料没有可展示的识别内容。</p>}</section>}
+                    {selectedDocument.status === 'READY' && <section className="knowledge-detail-section"><div className="knowledge-panel-heading"><div><h3>识别内容</h3><p>以下内容为资料处理后识别出的连续文本。</p></div></div>{documentContentError && <p className="knowledge-error" role="alert">{documentContentError}</p>}{documentContentLoading ? <p className="knowledge-empty">正在加载识别内容…</p> : documentContent === null ? null : documentContent ? <><div className="knowledge-document-content">{documentContent}</div>{documentContentHasMore && <button type="button" className="knowledge-primary-button knowledge-read-more" onClick={() => onReadDocument(selectedDocument.id)}>阅读全文</button>}</> : <p className="knowledge-empty">这份资料没有可展示的识别内容。</p>}</section>}
                   </div>
                   <footer className="knowledge-drawer-footer"><button type="button" className="knowledge-delete" disabled={selectedDocument.status === 'PROCESSING' || deletingDocumentId !== null} onClick={() => void handleDeleteDocument(selectedDocument.id)}>{deletingDocumentId === selectedDocument.id ? '删除中…' : '删除资料'}</button></footer>
                 </aside>
