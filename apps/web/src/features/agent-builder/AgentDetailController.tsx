@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AgentDetailView, type AgentModelOption, type AgentSaveState } from '@minicoze/ui/agent-builder';
+import { AgentDetailView, type AgentSaveState } from '@minicoze/ui/agent-builder';
 import {
+  listChatModelOptions,
   contextLimitOptions,
   getAgentVersion,
   listAgentVersions,
@@ -23,7 +24,6 @@ interface Props {
   agent: Agent;
   knowledgeBases: KnowledgeBaseSummary[];
   plugins: PluginSummary[];
-  modelOptions: AgentModelOption[];
   modelNotice: string | null;
   saveState: SaveState;
   saveMessage: string;
@@ -42,7 +42,6 @@ export function AgentDetailController({
   agent,
   knowledgeBases,
   plugins,
-  modelOptions,
   modelNotice,
   saveState,
   saveMessage,
@@ -55,6 +54,7 @@ export function AgentDetailController({
   const [pluginSaving, setPluginSaving] = useState(false);
   const [pluginSaveError, setPluginSaveError] = useState<string | null>(null);
   const pluginSavePending = useRef(false);
+  const [modelOptions, setModelOptions] = useState<{ value: string; label: string }[]>([]);
   const [pickerOpen, setPickerOpen] = useState<PickerKind | null>(null);
   const [versions, setVersions] = useState<AgentVersionSummary[]>([]);
   const [versionsLoading, setVersionsLoading] = useState(false);
@@ -113,11 +113,29 @@ export function AgentDetailController({
     description: agent.description ?? '',
     systemPrompt: agent.systemPrompt,
     model: agent.model,
+    modelConfigId: agent.modelConfigId ?? '',
     temperature: agent.temperature,
     maxTokens: agent.maxTokens,
     contextLimit: agent.contextLimit,
     openingMessage: agent.openingMessage ?? '',
   });
+
+  useEffect(() => {
+    let active = true;
+    listChatModelOptions()
+      .then((items) => {
+        if (!active) return;
+        setModelOptions(items.map((item) => ({
+          value: item.id,
+          label: `${item.name} · ${item.modelIdentifier}`,
+        })));
+      })
+      .catch(() => {
+        if (!active) return;
+        setModelOptions([]);
+      });
+    return () => { active = false; };
+  }, []);
 
   const update = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => {
     setForm((f) => ({ ...f, [key]: value }));
@@ -127,7 +145,7 @@ export function AgentDetailController({
     form.name !== agent.name ||
     form.description !== (agent.description ?? '') ||
     form.systemPrompt !== agent.systemPrompt ||
-    form.model !== agent.model ||
+    form.modelConfigId !== (agent.modelConfigId ?? '') ||
     form.temperature !== agent.temperature ||
     form.maxTokens !== agent.maxTokens ||
     form.contextLimit !== agent.contextLimit ||
@@ -193,7 +211,7 @@ export function AgentDetailController({
       name: form.name,
       description: form.description,
       systemPrompt: form.systemPrompt,
-      model: form.model,
+      modelConfigId: form.modelConfigId,
       temperature: form.temperature,
       maxTokens: form.maxTokens,
       contextLimit: form.contextLimit,

@@ -40,6 +40,8 @@ export const ErrorCode = {
   // ---- 模型管理 ----
   /** Agent 保存时引用了不存在或已停用的模型 */
   MODEL_NOT_AVAILABLE: 'MODEL_NOT_AVAILABLE',
+  /** Agent 未绑定模型配置，无法运行 */
+  MODEL_NOT_BOUND: 'MODEL_NOT_BOUND',
   // ---- 聊天 ----
   /** 同一会话正在生成中，又来了一条新消息 */
   CONVERSATION_BUSY: 'CONVERSATION_BUSY',

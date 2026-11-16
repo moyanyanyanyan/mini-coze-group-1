@@ -8,19 +8,13 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { Prisma } from '@prisma/client';
+import { ErrorCode } from '../../common/errors/error-codes';
 import { AgentStatus } from './types';
 import {
   toAgentDetail,
   buildAgentConfig,
   parseRuntimeAgentConfigSnapshot,
 } from './agent-config.mapper';
-import {
-  DEFAULT_MODEL_KEY,
-  assertModelAvailable,
-  findModelConfig,
-  toModelRuntimeDescriptor,
-  type ModelRuntimeDescriptor,
-} from './model-catalog';
 import { CreateAgentDto } from './dto/create-agent.dto';
 import { UpdateAgentDto } from './dto/update-agent.dto';
 import { ListAgentsQueryDto } from './dto/list-agents.query.dto';
@@ -32,7 +26,8 @@ import {
   KnowledgeCatalogPort,
 } from './ports/knowledge-catalog.port';
 import { PLUGIN_CATALOG_PORT, PluginCatalogPort } from './ports/plugin-catalog.port';
-import type { CurrentUserPayload, PublicAgentConfig } from './types';
+import type { CurrentUserPayload, PublicAgentConfig, RuntimeAgentConfig } from './types';
+import { ModelConfigsService } from '../model-configs/model-configs.service';
 
 @Injectable()
 export class AgentsService {
@@ -40,12 +35,12 @@ export class AgentsService {
     private readonly prisma: PrismaService,
     @Inject(KNOWLEDGE_CATALOG_PORT) private readonly knowledgeCatalog: KnowledgeCatalogPort,
     @Inject(PLUGIN_CATALOG_PORT) private readonly pluginCatalog: PluginCatalogPort,
+    private readonly modelConfigs: ModelConfigsService,
   ) {}
 
   async create(dto: CreateAgentDto, user: CurrentUserPayload) {
-    const model = dto.model ?? DEFAULT_MODEL_KEY;
-    assertModelAvailable(model);
-
+    // 模型管理统一维护调用地址与 Key，新建必须绑定模型配置。
+    const boundConfig = await this.modelConfigs.resolveForBinding(user.id, dto.modelConfigId);
     const agent = await this.prisma.agent.create({
       data: {
         ownerId: user.id,
@@ -54,7 +49,8 @@ export class AgentsService {
         description: dto.description,
         avatarUrl: dto.avatarUrl,
         systemPrompt: dto.systemPrompt ?? '',
-        model,
+        model: boundConfig.modelIdentifier,
+        modelConfigId: boundConfig.id,
         temperature: dto.temperature ?? 0.7,
         maxTokens: dto.maxTokens ?? 4096,
         contextLimit: dto.contextLimit ?? 20,
@@ -134,11 +130,17 @@ export class AgentsService {
         workflowBindings: true,
       },
     });
-    if (!agent) {throw new NotFoundException('Agent 不存在');}
-    if (agent.status === 'ARCHIVED') {throw new NotFoundException('Agent 已归档');}
-    if (agent.ownerId !== userId) {throw new ForbiddenException('无权访问此 Agent');}
-    const detail = toAgentDetail(agent);
-    return buildAgentConfig(detail, 0, toModelRuntimeDescriptor(detail.model));
+    if (!agent) throw new NotFoundException('Agent 不存在');
+    if (agent.status === 'ARCHIVED') throw new NotFoundException('Agent 已归档');
+    if (agent.ownerId !== userId) throw new ForbiddenException('无权访问此 Agent');
+    if (!agent.modelConfigId) {
+      throw new BadRequestException({
+        code: ErrorCode.MODEL_NOT_BOUND,
+        message: 'Agent 未绑定模型配置，请先在「模型管理」中绑定后再运行',
+      });
+    }
+    const config = buildAgentConfig(toAgentDetail(agent));
+    return this.attachModelConnection(config, agent.ownerId, agent.modelConfigId);
   }
 
   async getPublicAgent(agentId: string): Promise<PublicAgentConfig> {
@@ -150,6 +152,7 @@ export class AgentsService {
         status: true,
         currentVersionId: true,
         contextLimit: true,
+        modelConfigId: true,
       },
     });
 
@@ -175,13 +178,11 @@ export class AgentsService {
       throw new NotFoundException('Agent 发布版本不存在');
     }
 
-    const legacyModel = this.resolveSnapshotModel(version.snapshot);
     const config = parseRuntimeAgentConfigSnapshot(
       version.snapshot,
       agent.id,
       version.version,
       agent.contextLimit,
-      legacyModel,
     );
 
     if (!config) {
@@ -199,13 +200,18 @@ export class AgentsService {
       agentId: agent.id,
       ownerId: agent.ownerId,
       status: agent.status,
-      config,
+      config: await this.attachModelConnection(
+        config,
+        agent.ownerId,
+        config.modelConfigId,
+      ),
     };
   }
 
   async update(agentId: string, dto: UpdateAgentDto, user: CurrentUserPayload) {
-    if (dto.model !== undefined) {assertModelAvailable(dto.model);}
-
+    const boundConfig = dto.modelConfigId
+      ? await this.modelConfigs.resolveForBinding(user.id, dto.modelConfigId)
+      : null;
     return this.withAgentTransaction(agentId, async (tx) => {
       const existing = await this.assertAgentWritable(agentId, user.id, tx);
 
@@ -216,7 +222,7 @@ export class AgentsService {
         dto.status !== undefined ||
         dto.name !== undefined ||
         dto.systemPrompt !== undefined ||
-        dto.model !== undefined ||
+        dto.modelConfigId !== undefined ||
         dto.temperature !== undefined ||
         dto.maxTokens !== undefined ||
         dto.contextLimit !== undefined ||
@@ -233,7 +239,7 @@ export class AgentsService {
           description: dto.description,
           avatarUrl: dto.avatarUrl,
           systemPrompt: dto.systemPrompt,
-          model: dto.model,
+          ...(boundConfig ? { model: boundConfig.modelIdentifier, modelConfigId: boundConfig.id } : {}),
           temperature: dto.temperature,
           maxTokens: dto.maxTokens,
           contextLimit: dto.contextLimit,
@@ -258,6 +264,25 @@ export class AgentsService {
         published: agent.status === 'ACTIVE',
       };
     });
+  }
+
+  /** 运行时把模型配置解析为连接信息；Key 只进入内存请求体。 */
+  private async attachModelConnection(
+    config: RuntimeAgentConfig,
+    ownerId: string,
+    modelConfigId: string,
+  ): Promise<RuntimeAgentConfig> {
+    const connection = await this.modelConfigs.resolveConnection(ownerId, modelConfigId);
+    return {
+      ...config,
+      model: connection.model,
+      connection: {
+        protocol: connection.protocol,
+        model: connection.model,
+        baseUrl: connection.baseUrl,
+        apiKey: connection.apiKey,
+      },
+    };
   }
 
   async remove(agentId: string, user: CurrentUserPayload) {
@@ -431,16 +456,6 @@ export class AgentsService {
     return agent;
   }
 
-  // 只有旧快照缺 provider 时才反查静态清单；新快照自带 provider/upstreamModel。
-  private resolveSnapshotModel(snapshot: Prisma.JsonValue): ModelRuntimeDescriptor | null {
-    if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {return null;}
-    const value = snapshot as Record<string, unknown>;
-    if (value.provider !== undefined) {return null;}
-    if (typeof value.model !== 'string' || !value.model) {return null;}
-
-    return toModelRuntimeDescriptor(value.model);
-  }
-
   private async takeSnapshot(agentId: string, tx: Prisma.TransactionClient): Promise<{ version: number; versionId: string }> {
     const agent = await tx.agent.findUnique({
       where: { id: agentId },
@@ -460,8 +475,7 @@ export class AgentsService {
     const nextVersion = (maxVersionRow._max.version ?? 0) + 1;
 
     const detail = toAgentDetail(agent);
-    const modelRuntime = toModelRuntimeDescriptor(agent.model);
-    const snapshot = buildAgentConfig(detail, nextVersion, modelRuntime);
+    const snapshot = buildAgentConfig(detail, nextVersion);
 
     const version = await tx.agentVersion.create({
       data: {

@@ -33,6 +33,15 @@ class EnvironmentVariables {
   @IsString()
   INTERNAL_SERVICE_TOKEN = '';
 
+  // 传给 Runtime 的模型名，随模型供应商不同而不同
+  @IsString()
+  AGENT_MODEL = 'deepseek-chat';
+
+  // 模型管理凭据加密密钥；未配置时保存模型配置会明确报错，不会明文落库
+  @IsOptional()
+  @IsString()
+  MODEL_CREDENTIAL_SECRET = '';
+
   @IsString()
   DATABASE_URL!: string;
 

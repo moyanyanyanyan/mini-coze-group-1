@@ -18,11 +18,8 @@ const detailProps: AgentDetailViewProps = {
     pluginBindings: [], knowledgeBaseBindings: [], workflowBindings: [] },
   knowledgeBases: [], availableKnowledgeBases: [], plugins: [],
   form: { name: '草稿名称', description: '', systemPrompt: '系统提示词', model: 'model-1',
-    temperature: 0.5, maxTokens: 1024, contextLimit: 5, openingMessage: '欢迎使用' },
-  update: noop,
-  modelOptions: [{ value: 'model-1', label: '测试模型', maxOutputTokens: 4096, enabled: true, isDefault: true }],
-  modelNotice: null,
-  contextLimitOptions: [5],
+    modelConfigId: 'model-config-1', temperature: 0.5, maxTokens: 1024, contextLimit: 5, openingMessage: '欢迎使用' },
+  update: noop, modelOptions: [{ value: 'model-config-1', label: '测试模型 · model-1' }], modelNotice: null, contextLimitOptions: [5],
   saveState: 'idle', saveMessage: '', pluginSaving: false, pluginSaveError: null, pickerOpen: null,
   versions: [], versionsLoading: false, versionsError: null, versionDetailOpen: false,
   selectedVersion: null, selectedVersionLoading: false, selectedVersionError: null,
@@ -95,22 +92,11 @@ describe('agent builder views', () => {
     expect(html).toMatch(/disabled="">创建智能体/);
   });
 
-  it('blocks saving when max tokens exceed the selected model limit', () => {
+  it('blocks saving when max tokens is not a positive integer', () => {
     const html = renderToStaticMarkup(
-      <AgentDetailView {...detailProps} form={{ ...detailProps.form, maxTokens: 9000 }} />,
+      <AgentDetailView {...detailProps} form={{ ...detailProps.form, maxTokens: 0 }} />,
     );
-    expect(html).toContain('最大输出长度不能超过 4096');
-    expect(html).toContain('该模型单次回复上限 4096 Token。');
-    expect(html).toMatch(/disabled="">保存/);
-  });
-
-  it('marks a disabled bound model and blocks saving', () => {
-    const html = renderToStaticMarkup(
-      <AgentDetailView {...detailProps}
-        modelOptions={[{ value: 'model-1', label: '停用模型', maxOutputTokens: 4096, enabled: false, isDefault: false }]} />,
-    );
-    expect(html).toContain('该模型已停用，请更换模型后再保存。');
-    expect(html).toContain('aria-invalid="true"');
+    expect(html).toContain('最大输出长度需大于 0');
     expect(html).toMatch(/disabled="">保存/);
   });
 

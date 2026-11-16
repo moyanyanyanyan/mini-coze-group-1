@@ -1,5 +1,6 @@
 import asyncio
 import json
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -8,10 +9,38 @@ from pydantic import ValidationError
 
 from app.config import Settings, get_settings
 from app.runtime.errors import ModelError
-from app.runtime.schemas import ChatMessage, ModelInput, ModelResult, Usage, ModelToolCall, ToolCallBatch, ToolDefinition
+from app.runtime.schemas import (
+    ChatMessage,
+    ModelConnection,
+    ModelInput,
+    ModelResult,
+    ModelTestResult,
+    Usage,
+    ModelToolCall,
+    ToolCallBatch,
+    ToolDefinition,
+)
 
 
-def validate_model(value: ModelInput, settings: Settings) -> None:
+def resolve_endpoint(settings: Settings, connection: ModelConnection | None = None) -> tuple[str, str, str]:
+    """返回 (base_url, api_key, provider)。显式连接优先于服务端环境配置。"""
+    if connection is not None:
+        return connection.baseUrl.rstrip("/"), connection.apiKey, connection.protocol
+    return (
+        settings.deepseek_base_url.rstrip("/"),
+        settings.deepseek_api_key.get_secret_value(),
+        settings.effective_model_provider,
+    )
+
+
+def validate_model(value: ModelInput, settings: Settings, connection: ModelConnection | None = None) -> None:
+    if connection is not None:
+        # 连接来自模型管理，模型标识由服务端配置决定，不再套用环境变量允许列表。
+        if value.model != connection.model:
+            raise ModelError("INVALID_REQUEST", "模型与连接配置不一致", 400)
+        if not connection.apiKey.strip():
+            raise ModelError("MODEL_NOT_CONFIGURED", "模型服务未配置", 503)
+        return
     allowed = {settings.deepseek_model} | {
         name.strip() for name in settings.deepseek_allowed_models.split(",") if name.strip()
     }
@@ -64,30 +93,33 @@ def check_finish(reason: str) -> None:
         raise ModelError("MODEL_UNAVAILABLE", "模型未正常完成；本周不支持自动工具调用", 502)
 
 
-def payload(value: ModelInput, stream: bool, settings: Settings) -> dict:
+def payload(value: ModelInput, stream: bool, settings: Settings, provider: str | None = None) -> dict:
+    active_provider = provider or settings.effective_model_provider
     body = value.model_dump()
     body["messages"] = [m.model_dump() for m in value.messages]
     # 本周固定为非思考文本模式，temperature 生效且不暴露 reasoning_content。
     body["stream"] = stream
-    if settings.effective_model_provider == "siliconflow":
+    if active_provider == "siliconflow":
         body["enable_thinking"] = False
-    elif settings.effective_model_provider == "deepseek":
+    elif active_provider == "deepseek":
         body["thinking"] = {"type": "disabled"}
-    if stream and settings.effective_model_provider == "deepseek":
+    if stream and active_provider == "deepseek":
         body["stream_options"] = {"include_usage": True}
     return body
 
 
 async def stream_model(value: ModelInput, *, settings: Settings, client: httpx.AsyncClient | None = None,
-                       tools: list[ToolDefinition] | None = None, messages: list[dict] | None = None) -> AsyncIterator[str | ModelResult | ToolCallBatch]:
-    validate_model(value, settings)
+                       tools: list[ToolDefinition] | None = None, messages: list[dict] | None = None,
+                       connection: ModelConnection | None = None) -> AsyncIterator[str | ModelResult | ToolCallBatch]:
+    validate_model(value, settings, connection)
     check_budget(value.messages, value.max_tokens, settings)
+    base_url, api_key, provider = resolve_endpoint(settings, connection)
     content: list[str] = []
     reason = None
     usage = None
     done = False
     calls: dict[int, dict] = {}
-    body = payload(value, True, settings)
+    body = payload(value, True, settings, provider)
     if tools:
         body["tools"] = [{"type": "function", "function": {
             "name": tool.name, "description": tool.description, "parameters": tool.parameters,
@@ -97,10 +129,10 @@ async def stream_model(value: ModelInput, *, settings: Settings, client: httpx.A
         body["messages"] = messages
     try:
         async with asyncio.timeout(settings.model_timeout):
-            async with model_client(client, trust_env=settings.model_trust_env) as connection:
-                async with connection.stream(
-                    "POST", settings.deepseek_base_url.rstrip("/") + "/chat/completions",
-                    headers={"Authorization": "Bearer " + settings.deepseek_api_key.get_secret_value()},
+            async with model_client(client, trust_env=settings.model_trust_env) as http_client:
+                async with http_client.stream(
+                    "POST", base_url + "/chat/completions",
+                    headers={"Authorization": "Bearer " + api_key},
                     json=body, timeout=settings.model_timeout,
                 ) as response:
                     check_status(response)
@@ -229,3 +261,63 @@ async def call_model(*, model: str, messages: list[dict[str, str]], temperature:
         raise ModelError("MODEL_UNAVAILABLE", "模型连接失败", 502, True) from exc
     except (ValueError, KeyError, IndexError, TypeError, AttributeError, ValidationError) as exc:
         raise ModelError("MODEL_PROTOCOL_ERROR", "模型返回格式不合法", 502) from exc
+
+
+async def test_model_connection(
+    connection: ModelConnection,
+    kind: str,
+    *,
+    settings: Settings | None = None,
+    client: httpx.AsyncClient | None = None,
+) -> ModelTestResult:
+    """内部排查用最小请求，复用同一套地址、鉴权与错误映射；不记录 Key。"""
+    active = settings or get_settings()
+    timeout_seconds = min(active.model_timeout, 30)
+    base_url, api_key, _ = resolve_endpoint(active, connection)
+    headers = {"Authorization": "Bearer " + api_key}
+    started = time.monotonic()
+
+    def elapsed() -> int:
+        return int((time.monotonic() - started) * 1000)
+
+    try:
+        async with asyncio.timeout(timeout_seconds):
+            async with model_client(client, trust_env=active.model_trust_env) as http_client:
+                if kind == "embedding":
+                    response = await http_client.post(
+                        base_url + "/embeddings",
+                        headers=headers,
+                        json={"model": connection.model, "input": ["ping"]},
+                        timeout=timeout_seconds,
+                    )
+                    check_status(response)
+                    data = response.json()
+                    vector = data["data"][0]["embedding"]
+                    if not isinstance(vector, list) or not vector:
+                        raise ValueError("invalid embedding")
+                    return ModelTestResult(ok=True, latencyMs=elapsed(), dimension=len(vector))
+
+                response = await http_client.post(
+                    base_url + "/chat/completions",
+                    headers=headers,
+                    json={
+                        "model": connection.model,
+                        "messages": [{"role": "user", "content": "ping"}],
+                        "max_tokens": 1,
+                        "stream": False,
+                    },
+                    timeout=timeout_seconds,
+                )
+                check_status(response)
+                data = response.json()
+                if not isinstance(data, dict) or not data.get("choices"):
+                    raise ValueError("invalid completion")
+                return ModelTestResult(ok=True, latencyMs=elapsed(), dimension=None)
+    except ModelError as exc:
+        return ModelTestResult(ok=False, latencyMs=elapsed(), errorType=exc.code)
+    except (TimeoutError, httpx.TimeoutException):
+        return ModelTestResult(ok=False, latencyMs=elapsed(), errorType="MODEL_TIMEOUT")
+    except httpx.HTTPError:
+        return ModelTestResult(ok=False, latencyMs=elapsed(), errorType="MODEL_UNAVAILABLE")
+    except (ValueError, KeyError, IndexError, TypeError, AttributeError, ValidationError):
+        return ModelTestResult(ok=False, latencyMs=elapsed(), errorType="MODEL_PROTOCOL_ERROR")

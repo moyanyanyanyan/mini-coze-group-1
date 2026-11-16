@@ -94,7 +94,7 @@ export function AgentBuilderPage() {
   const handleCreate = async (data: {
     name: string;
     description: string;
-    model: string;
+    modelConfigId: string;
     openingMessage: string;
   }) => {
     try {
@@ -218,7 +218,6 @@ export function AgentBuilderPage() {
           agent={selectedAgent}
           knowledgeBases={knowledgeBases}
           plugins={plugins}
-          modelOptions={modelOptions}
           modelNotice={modelNotice}
           saveState={saveState}
           saveMessage={saveMessage}

@@ -6,13 +6,13 @@ interface Props {
   modelOptions: AgentModelOption[];
   modelNotice: string | null;
   onClose: () => void;
-  onSubmit: (data: { name: string; description: string; model: string; openingMessage: string }) => void;
+  onSubmit: (data: { name: string; description: string; modelConfigId: string; openingMessage: string }) => void;
 }
 
 export function CreateAgentController({ modelOptions, modelNotice, onClose, onSubmit }: Props) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [model, setModel] = useState(() => defaultModelKey(modelOptions));
+  const [modelConfigId, setModelConfigId] = useState(() => defaultModelKey(modelOptions));
   const [openingMessage, setOpeningMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -30,10 +30,14 @@ export function CreateAgentController({ modelOptions, modelNotice, onClose, onSu
       setError('描述不能超过 200 字');
       return;
     }
+    if (!modelConfigId) {
+      setError('请选择模型配置');
+      return;
+    }
     onSubmit({
       name: name.trim(),
       description: description.trim(),
-      model,
+      modelConfigId,
       openingMessage: openingMessage.trim(),
     });
   };
@@ -42,7 +46,7 @@ export function CreateAgentController({ modelOptions, modelNotice, onClose, onSu
     <CreateAgentView
       name={name}
       description={description}
-      model={model}
+      model={modelConfigId}
       modelOptions={modelOptions}
       modelNotice={modelNotice}
       openingMessage={openingMessage}
@@ -50,7 +54,7 @@ export function CreateAgentController({ modelOptions, modelNotice, onClose, onSu
       canSubmit={Boolean(name.trim())}
       onNameChange={(value) => { setName(value); setError(null); }}
       onDescriptionChange={(value) => { setDescription(value); setError(null); }}
-      onModelChange={setModel}
+      onModelChange={setModelConfigId}
       onOpeningMessageChange={setOpeningMessage}
       onClose={onClose}
       handleSubmit={handleSubmit}

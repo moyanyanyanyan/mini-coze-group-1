@@ -10,7 +10,8 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.config import get_settings
 from app.runtime.errors import ModelError
-from app.runtime.schemas import RuntimeRequest
+from app.runtime.deepseek import test_model_connection
+from app.runtime.schemas import ModelTestRequest, RuntimeRequest
 from app.runtime.service import RuntimeService
 from app.runtime.providers import HttpKnowledgeProvider
 from app.runtime.http_providers import HttpPluginProvider
@@ -37,6 +38,12 @@ router = APIRouter(prefix="/internal/runtime", dependencies=[Depends(internal_au
 async def run(body: RuntimeRequest, runtime: RuntimeService = Depends(get_runtime)):
     runtime.preflight(body)
     return await runtime.run(body)
+
+
+@router.post("/models/test")
+async def test_model(body: ModelTestRequest):
+    """内部排查接口：真实发起最小请求，返回结果、耗时与错误类型，不回显 Key。"""
+    return await test_model_connection(body.connection, body.type, settings=get_settings())
 
 
 async def sse_events(runtime: RuntimeService, body: RuntimeRequest):

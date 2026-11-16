@@ -1,9 +1,14 @@
-import type { ModelProvider } from './model-catalog';
-
 export type AgentStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
 
 export interface CurrentUserPayload {
   id: string;
+}
+
+export interface RuntimeModelConnection {
+  protocol: string;
+  model: string;
+  baseUrl: string;
+  apiKey: string;
 }
 
 export interface RuntimeAgentConfig {
@@ -13,8 +18,10 @@ export interface RuntimeAgentConfig {
   name: string;
   systemPrompt: string;
   model: string;
-  provider: ModelProvider;
-  upstreamModel: string;
+  /** 绑定的模型配置 ID；发布快照只保存 ID，不保存凭据。 */
+  modelConfigId: string;
+  /** 运行时临时组装的连接信息，含 Key，禁止落库或打日志。 */
+  connection?: RuntimeModelConnection;
   temperature: number;
   maxTokens: number;
   knowledgeBaseIds: string[];
@@ -59,6 +66,7 @@ export interface AgentDetail {
   avatarUrl?: string;
   systemPrompt: string;
   model: string;
+  modelConfigId: string | null;
   temperature: number;
   maxTokens: number;
   contextLimit: number;

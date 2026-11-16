@@ -5,7 +5,7 @@ import { useOverlayFocus } from '../../hooks/useOverlayFocus';
 import { BindingPickerModal, type PickerItem } from './BindingPickerModal';
 import type {
   AgentDetailData, AgentFormValues, AgentSaveState, AgentStatus, BindingPickerKind,
-  KnowledgeBaseOption, PluginOption, AgentVersionItem, AgentVersionPreview, AgentModelOption,
+  KnowledgeBaseOption, PluginOption, AgentVersionItem, AgentVersionPreview,
 } from './types';
 
 export interface AgentDetailViewProps {
@@ -15,7 +15,7 @@ export interface AgentDetailViewProps {
   plugins: PluginOption[];
   form: AgentFormValues;
   update: <K extends keyof AgentFormValues>(key: K, value: AgentFormValues[K]) => void;
-  modelOptions: AgentModelOption[];
+  modelOptions: { value: string; label: string }[];
   modelNotice: string | null;
   contextLimitOptions: number[];
   saveState: AgentSaveState;
@@ -171,16 +171,8 @@ export function AgentDetailView({
 
   const busy = saveState === 'saving' || pluginSaving;
 
-  const selectedModel = modelOptions.find((option) => option.value === form.model);
-  const modelsUsable = !modelNotice && modelOptions.length > 0;
-  const modelUnavailable = modelsUsable && (!selectedModel || !selectedModel.enabled);
-  const maxTokenLimit = modelsUsable && selectedModel ? selectedModel.maxOutputTokens : null;
-  const tokenError = form.maxTokens < 1
-    ? '最大输出长度需大于 0'
-    : maxTokenLimit !== null && form.maxTokens > maxTokenLimit
-      ? `最大输出长度不能超过 ${maxTokenLimit}`
-      : null;
-  const saveBlocked = modelUnavailable || tokenError !== null;
+  const tokenError = form.maxTokens < 1 ? '最大输出长度需大于 0' : null;
+  const saveBlocked = tokenError !== null;
 
   const feedbackMessage = saveState === 'dirty' ? '有未保存修改' : saveMessage;
 
@@ -291,26 +283,14 @@ export function AgentDetailView({
 
           <CollapsibleSection title="模型设置" defaultOpen>
             <div className="ab-field">
-              <label className="ab-label" htmlFor="agent-model">模型</label>
-              <select
-                id="agent-model"
-                className={`ab-input${modelUnavailable ? ' ab-input-error' : ''}`}
-                aria-invalid={modelUnavailable}
-                value={form.model}
-                onChange={(e) => update('model', e.target.value)}
-              >
+              <label className="ab-label" htmlFor="agent-model">模型配置</label>
+              <select id="agent-model" className="ab-input" value={form.modelConfigId} onChange={(e) => update('modelConfigId', e.target.value)}>
+                {!form.modelConfigId && <option value="">未绑定模型配置</option>}
                 {modelOptions.map((o) => (
-                  <option key={o.value} value={o.value} disabled={!o.enabled}>{o.label}</option>
+                  <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
-                {!selectedModel && (
-                  <option value={form.model}>{form.model}（不可用）</option>
-                )}
               </select>
-              {modelUnavailable && (
-                <small className="ab-field-error" role="alert">
-                  {selectedModel ? '该模型已停用，请更换模型后再保存。' : '当前模型不在可用列表中，请重新选择。'}
-                </small>
-              )}
+              <small className="ab-field-hint">调用地址与 Key 由「模型管理」统一维护，修改后对已发布版本同样生效。</small>
               {modelNotice && <small className="ab-field-notice">{modelNotice}</small>}
             </div>
 
@@ -324,13 +304,10 @@ export function AgentDetailView({
                   className={`ab-input${tokenError ? ' ab-input-error' : ''}`}
                   type="number"
                   min={1}
-                  max={maxTokenLimit ?? undefined}
                   value={form.maxTokens}
                   onChange={(e) => update('maxTokens', Number(e.target.value))}
                 />
-                <small id="agent-tokens-hint" className="ab-field-hint">
-                  {maxTokenLimit !== null ? `该模型单次回复上限 ${maxTokenLimit} Token。` : '每次回复的 Token 上限。'}
-                </small>
+                <small id="agent-tokens-hint" className="ab-field-hint">每次回复的 Token 上限。</small>
                 {tokenError && <small className="ab-field-error" role="alert">{tokenError}</small>}
               </div>
 

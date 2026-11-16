@@ -1,12 +1,21 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 // 智能体配置
+export interface RuntimeModelConnection {
+  protocol: string;
+  model: string;
+  baseUrl: string;
+  apiKey: string;
+}
+
 export interface RuntimeAgentConfig {
   id: string;
   revision: number;
   name: string;
   systemPrompt: string;
   model: string;
+  modelConfigId?: string;
+  connection?: RuntimeModelConnection;
   temperature: number;
   maxTokens: number;
   knowledgeBaseIds: string[];

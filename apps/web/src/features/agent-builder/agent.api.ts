@@ -35,6 +35,7 @@ export interface Agent {
   avatarUrl?: string;
   systemPrompt: string;
   model: string;
+  modelConfigId?: string | null;
   temperature: number;
   maxTokens: number;
   contextLimit: number;
@@ -77,7 +78,7 @@ export interface CreateAgentInput {
   description?: string;
   avatarUrl?: string;
   systemPrompt?: string;
-  model?: string;
+  modelConfigId: string;
   temperature?: number;
   maxTokens?: number;
   contextLimit?: number;
@@ -90,7 +91,7 @@ export interface UpdateAgentInput {
   description?: string;
   avatarUrl?: string;
   systemPrompt?: string;
-  model?: string;
+  modelConfigId?: string | null;
   temperature?: number;
   maxTokens?: number;
   contextLimit?: number;
@@ -145,6 +146,20 @@ export async function listAgents(params = new URLSearchParams()): Promise<AgentL
   const query = params.toString();
   const response = await fetch(`${API_BASE}/api/agents${query ? '?' + query : ''}`, { credentials: 'include' });
   return readResponse<AgentListResponse>(response);
+}
+
+export interface ChatModelOption {
+  id: string;
+  name: string;
+  modelIdentifier: string;
+}
+
+/** Agent 只能绑定「已启用」的对话模型配置；地址与 Key 由模型管理统一维护。 */
+export async function listChatModelOptions(): Promise<ChatModelOption[]> {
+  const params = new URLSearchParams({ type: 'CHAT', status: 'enabled', pageSize: '100' });
+  const response = await fetch(`${API_BASE}/api/model-configs?${params.toString()}`, { credentials: 'include' });
+  const page = await readResponse<{ items: ChatModelOption[] }>(response);
+  return page.items;
 }
 
 export async function getAgent(agentId: string): Promise<Agent> {

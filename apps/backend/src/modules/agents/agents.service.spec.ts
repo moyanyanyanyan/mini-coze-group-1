@@ -9,11 +9,15 @@ import {
 import { AgentsService } from './agents.service';
 
 function createService(prisma: Record<string, unknown>, knowledgeIds: string[] = []) {
-  return new AgentsService(
-    prisma as never,
-    { findByIds: async () => knowledgeIds.map((id) => ({ id })) } as never,
-    {} as never,
-  );
+  const modelConfigs = {
+    resolveConnection: jest.fn().mockResolvedValue({
+      protocol: 'openai',
+      model: 'deepseek-chat',
+      baseUrl: 'https://api.deepseek.com',
+      apiKey: 'sk-test',
+    }),
+  };
+  return new AgentsService(prisma as never, { findByIds: async () => knowledgeIds.map((id) => ({ id })) } as never, {} as never, modelConfigs as never);
 }
 
 const publishedConfig = {
@@ -22,6 +26,7 @@ const publishedConfig = {
   name: 'Published Agent',
   systemPrompt: 'Published prompt',
   model: 'deepseek-chat',
+  modelConfigId: 'model-config-1',
   temperature: 0.3,
   maxTokens: 1024,
   knowledgeBaseIds: ['kb-1'],
@@ -60,8 +65,14 @@ describe('AgentsService.getPublicAgent', () => {
       status: 'ACTIVE',
       config: {
         ...publishedConfig,
-        provider: 'deepseek',
-        upstreamModel: 'deepseek-chat',
+        model: 'deepseek-chat',
+        modelConfigId: 'model-config-1',
+        connection: {
+          protocol: 'openai',
+          model: 'deepseek-chat',
+          baseUrl: 'https://api.deepseek.com',
+          apiKey: 'sk-test',
+        },
         contextLimit: expected,
       },
     });
