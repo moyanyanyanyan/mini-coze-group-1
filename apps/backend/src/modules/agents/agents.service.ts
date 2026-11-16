@@ -14,8 +14,13 @@ import {
   buildAgentConfig,
   parseRuntimeAgentConfigSnapshot,
 } from './agent-config.mapper';
-import { ModelsService } from '../models/models.service';
-import { toModelProvider, type ModelRuntimeDescriptor } from '../models/model-config.mapper';
+import {
+  DEFAULT_MODEL_KEY,
+  assertModelAvailable,
+  findModelConfig,
+  toModelRuntimeDescriptor,
+  type ModelRuntimeDescriptor,
+} from './model-catalog';
 import { CreateAgentDto } from './dto/create-agent.dto';
 import { UpdateAgentDto } from './dto/update-agent.dto';
 import { ListAgentsQueryDto } from './dto/list-agents.query.dto';
@@ -35,12 +40,11 @@ export class AgentsService {
     private readonly prisma: PrismaService,
     @Inject(KNOWLEDGE_CATALOG_PORT) private readonly knowledgeCatalog: KnowledgeCatalogPort,
     @Inject(PLUGIN_CATALOG_PORT) private readonly pluginCatalog: PluginCatalogPort,
-    private readonly models: ModelsService,
   ) {}
 
   async create(dto: CreateAgentDto, user: CurrentUserPayload) {
-    const model = dto.model ?? await this.models.getDefaultKey();
-    await this.models.assertAvailable(model);
+    const model = dto.model ?? DEFAULT_MODEL_KEY;
+    assertModelAvailable(model);
 
     const agent = await this.prisma.agent.create({
       data: {
@@ -134,17 +138,7 @@ export class AgentsService {
     if (agent.status === 'ARCHIVED') {throw new NotFoundException('Agent 已归档');}
     if (agent.ownerId !== userId) {throw new ForbiddenException('无权访问此 Agent');}
     const detail = toAgentDetail(agent);
-    const modelConfig = await this.models.getByKey(detail.model);
-    return buildAgentConfig(
-      detail,
-      0,
-      modelConfig
-        ? {
-          provider: toModelProvider(modelConfig.provider),
-          upstreamModel: modelConfig.upstreamModel,
-        }
-        : null,
-    );
+    return buildAgentConfig(detail, 0, toModelRuntimeDescriptor(detail.model));
   }
 
   async getPublicAgent(agentId: string): Promise<PublicAgentConfig> {
@@ -181,7 +175,7 @@ export class AgentsService {
       throw new NotFoundException('Agent 发布版本不存在');
     }
 
-    const legacyModel = await this.resolveSnapshotModel(version.snapshot);
+    const legacyModel = this.resolveSnapshotModel(version.snapshot);
     const config = parseRuntimeAgentConfigSnapshot(
       version.snapshot,
       agent.id,
@@ -210,7 +204,7 @@ export class AgentsService {
   }
 
   async update(agentId: string, dto: UpdateAgentDto, user: CurrentUserPayload) {
-    if (dto.model !== undefined) {await this.models.assertAvailable(dto.model);}
+    if (dto.model !== undefined) {assertModelAvailable(dto.model);}
 
     return this.withAgentTransaction(agentId, async (tx) => {
       const existing = await this.assertAgentWritable(agentId, user.id, tx);
@@ -437,22 +431,14 @@ export class AgentsService {
     return agent;
   }
 
-  // 只有旧快照缺 provider 时才查表；新快照自带 provider/upstreamModel。
-  private async resolveSnapshotModel(
-    snapshot: Prisma.JsonValue,
-  ): Promise<ModelRuntimeDescriptor | null> {
+  // 只有旧快照缺 provider 时才反查静态清单；新快照自带 provider/upstreamModel。
+  private resolveSnapshotModel(snapshot: Prisma.JsonValue): ModelRuntimeDescriptor | null {
     if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {return null;}
     const value = snapshot as Record<string, unknown>;
     if (value.provider !== undefined) {return null;}
     if (typeof value.model !== 'string' || !value.model) {return null;}
 
-    const model = await this.models.getByKey(value.model);
-    return model
-      ? {
-        provider: toModelProvider(model.provider),
-        upstreamModel: model.upstreamModel,
-      }
-      : null;
+    return toModelRuntimeDescriptor(value.model);
   }
 
   private async takeSnapshot(agentId: string, tx: Prisma.TransactionClient): Promise<{ version: number; versionId: string }> {
@@ -474,13 +460,7 @@ export class AgentsService {
     const nextVersion = (maxVersionRow._max.version ?? 0) + 1;
 
     const detail = toAgentDetail(agent);
-    const modelConfig = await tx.modelConfig.findUnique({ where: { key: agent.model } });
-    const modelRuntime = modelConfig
-      ? {
-        provider: toModelProvider(modelConfig.provider),
-        upstreamModel: modelConfig.upstreamModel,
-      }
-      : null;
+    const modelRuntime = toModelRuntimeDescriptor(agent.model);
     const snapshot = buildAgentConfig(detail, nextVersion, modelRuntime);
 
     const version = await tx.agentVersion.create({

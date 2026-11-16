@@ -1,4 +1,4 @@
-import type { ModelProvider } from '../models/model-config.mapper';
+import type { ModelProvider } from './model-catalog';
 
 export type AgentStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
 

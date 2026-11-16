@@ -9,7 +9,7 @@ import {
   MODEL_PROVIDERS,
   type ModelProvider,
   type ModelRuntimeDescriptor,
-} from '../models/model-config.mapper';
+} from './model-catalog';
 
 export function buildAgentConfig(
   agent: AgentDetail,

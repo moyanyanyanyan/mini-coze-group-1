@@ -1,7 +1,6 @@
 import { AgentBuilderPage, agentBuilderManifest } from '../features/agent-builder';
 import { AgentChatPage, agentChatManifest } from '../features/agent-chat';
 import { KnowledgePage, knowledgeManifest } from '../features/knowledge';
-import { ModelManagementPage, modelManagementManifest } from '../features/model-management';
 import { PluginsPage, pluginsManifest } from '../features/plugins';
 import { PublishSdkPage, publishSdkManifest } from '../features/publish-sdk';
 import { WorkflowPage, workflowManifest } from '../features/workflow-editor';
@@ -19,12 +18,6 @@ export const workspaceFeatures: readonly FeatureDefinition[] = [
     ...agentBuilderManifest,
     Component: AgentBuilderPage,
     showInLanding: true,
-    showInNavigation: true,
-  },
-  {
-    ...modelManagementManifest,
-    Component: ModelManagementPage,
-    showInLanding: false,
     showInNavigation: true,
   },
   {

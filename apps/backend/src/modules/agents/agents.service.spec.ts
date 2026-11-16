@@ -9,18 +9,10 @@ import {
 import { AgentsService } from './agents.service';
 
 function createService(prisma: Record<string, unknown>, knowledgeIds: string[] = []) {
-  const models = {
-    getByKey: jest.fn(async (key: string) => (
-      key === 'deepseek-chat' ? { provider: 'deepseek', upstreamModel: 'deepseek-chat' } : null
-    )),
-    assertAvailable: jest.fn(async (key: string) => ({ key, enabled: true })),
-    getDefaultKey: jest.fn(async () => 'deepseek-chat'),
-  };
   return new AgentsService(
     prisma as never,
     { findByIds: async () => knowledgeIds.map((id) => ({ id })) } as never,
     {} as never,
-    models as never,
   );
 }
 

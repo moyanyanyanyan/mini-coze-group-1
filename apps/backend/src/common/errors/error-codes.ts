@@ -40,8 +40,6 @@ export const ErrorCode = {
   // ---- 模型管理 ----
   /** Agent 保存时引用了不存在或已停用的模型 */
   MODEL_NOT_AVAILABLE: 'MODEL_NOT_AVAILABLE',
-  /** 模型仍被 Agent 引用，不能删除 */
-  MODEL_IN_USE: 'MODEL_IN_USE',
   // ---- 聊天 ----
   /** 同一会话正在生成中，又来了一条新消息 */
   CONVERSATION_BUSY: 'CONVERSATION_BUSY',

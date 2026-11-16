@@ -1,5 +1,4 @@
 import type { AgentModelOption } from '@minicoze/ui/agent-builder';
-import { listModels } from '../model-management/model.api';
 
 export const FALLBACK_MODEL: AgentModelOption = {
   value: 'deepseek-ai/DeepSeek-V4.1-Flash',
@@ -9,31 +8,31 @@ export const FALLBACK_MODEL: AgentModelOption = {
   isDefault: true,
 };
 
+const STATIC_MODELS: AgentModelOption[] = [
+  FALLBACK_MODEL,
+  {
+    value: 'deepseek-ai/DeepSeek-V3.2',
+    label: 'DeepSeek V3.2',
+    maxOutputTokens: 8192,
+    enabled: true,
+    isDefault: false,
+  },
+  {
+    value: 'deepseek-chat',
+    label: 'DeepSeek Chat',
+    maxOutputTokens: 8192,
+    enabled: true,
+    isDefault: false,
+  },
+];
+
 export interface AgentModelLoadResult {
   options: AgentModelOption[];
   error: string | null;
 }
 
 export async function loadAgentModels(): Promise<AgentModelLoadResult> {
-  try {
-    const { items } = await listModels(true);
-    const enabled = items.filter((model) => model.enabled);
-    if (enabled.length === 0) {
-      return { options: [FALLBACK_MODEL], error: '暂无启用中的模型，已回退到默认模型' };
-    }
-    return {
-      options: enabled.map((model) => ({
-        value: model.key,
-        label: model.displayName,
-        maxOutputTokens: model.maxOutputTokens,
-        enabled: true,
-        isDefault: model.isDefault,
-      })),
-      error: null,
-    };
-  } catch {
-    return { options: [FALLBACK_MODEL], error: '模型列表加载失败，已回退到默认模型' };
-  }
+  return { options: STATIC_MODELS, error: null };
 }
 
 export function defaultModelKey(options: AgentModelOption[]): string {

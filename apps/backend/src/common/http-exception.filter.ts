@@ -76,7 +76,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       return;
     }
 
-    // 业务显式给出的字符串 code 优先（如 MODEL_IN_USE），其余接口保持数字 code。
+    // 业务显式给出的字符串 code 优先（如 MODEL_NOT_AVAILABLE），其余接口保持数字 code。
     const explicitCode = isErrorCode(rawCode) ? rawCode : undefined;
     response.status(status).json({
       code: explicitCode ?? status,

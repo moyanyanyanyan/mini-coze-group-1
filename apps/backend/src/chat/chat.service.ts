@@ -551,7 +551,6 @@ export class ChatService {
         pendingUser = { id: row.id, role: 'user', content: row.content };
         continue;
       }
-    //   配对成功并且清空pendingUser
       if (pendingUser) {
         pairs.push(pendingUser, { id: row.id, role: 'assistant', content: row.content });
         pendingUser = null;

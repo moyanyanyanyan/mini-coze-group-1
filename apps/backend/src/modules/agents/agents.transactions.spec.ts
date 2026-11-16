@@ -39,21 +39,13 @@ function setup(status = 'ACTIVE') {
       aggregate: jest.fn().mockResolvedValue({ _max: { version: 1 } }),
       create: jest.fn().mockResolvedValue({ id: 'version-2', version: 2 }),
     },
-    modelConfig: {
-      findUnique: jest.fn().mockResolvedValue({ provider: 'deepseek', upstreamModel: 'deepseek-chat' }),
-    },
   };
   // 根客户端只暴露事务入口，任何越过事务的读写都会使测试失败。
   const prisma = { $transaction: jest.fn(async (operation: (client: typeof tx) => Promise<unknown>) => operation(tx)) };
-  const models = {
-    assertAvailable: jest.fn(async () => ({ key: 'deepseek-chat', enabled: true })),
-    getByKey: jest.fn(async () => ({ provider: 'deepseek', upstreamModel: 'deepseek-chat' })),
-    getDefaultKey: jest.fn(async () => 'deepseek-chat'),
-  };
   const service = new AgentsService(prisma as never, {} as never, {
     findByIds: jest.fn(async (ids: string[]) => ids.map((pluginId) => ({ pluginId }))),
-  } as never, models as never);
-  return { service, prisma, tx, agent, models };
+  } as never);
+  return { service, prisma, tx, agent };
 }
 
 const user = { id: 'user-1' };
