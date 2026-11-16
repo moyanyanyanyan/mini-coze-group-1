@@ -1,5 +1,6 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, UnauthorizedException } from "@nestjs/common";
 import * as bcrypt from "bcryptjs";
+import { ErrorCode } from "../../common/errors/error-codes";
 import type { User } from "@prisma/client";
 import type { CurrentUser } from "@minicoze/shared";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -87,6 +88,42 @@ export class UsersService{
         return this.prisma.user.update({
             where:{id:userId},
             data:{googleId},
+        })
+    }
+    // ========== 个人中心 ==========
+
+    async updateDisplayName(userId:string,displayName:string):Promise<User>{
+        return this.prisma.user.update({
+            where:{id:userId},
+            data:{displayName},
+        })
+    }
+
+    // 有密码的账号必须先比对旧密码；纯 Google 账号（passwordHash 为 null）直接把新密码写上去
+    async changePassword(userId:string,currentPassword:string|undefined,newPassword:string):Promise<void>{
+        const user=await this.prisma.user.findUnique({where:{id:userId}})
+        // 正常情况下 JWT 策略已经查过一次；这里仍兜一手，避免并发删号后写出孤儿数据
+        if(!user){
+            throw new UnauthorizedException({
+                code:ErrorCode.TOKEN_INVALID,
+                message:'登录状态无效',
+            })
+        }
+        if(user.passwordHash){
+            const currentOk=currentPassword
+                ?await bcrypt.compare(currentPassword,user.passwordHash)
+                :false
+            if(!currentOk){
+                throw new UnauthorizedException({
+                    code:ErrorCode.INVALID_CREDENTIALS,
+                    message:'当前密码不正确',
+                })
+            }
+        }
+        const passwordHash=await bcrypt.hash(newPassword,SALT_ROUNDS)
+        await this.prisma.user.update({
+            where:{id:userId},
+            data:{passwordHash},
         })
     }
 }

@@ -2,6 +2,7 @@ import { AgentBuilderPage, agentBuilderManifest } from '../features/agent-builde
 import { AgentChatPage, agentChatManifest } from '../features/agent-chat';
 import { KnowledgePage, knowledgeManifest } from '../features/knowledge';
 import { PluginsPage, pluginsManifest } from '../features/plugins';
+import { ProfilePage, profileManifest } from '../features/profile';
 import { PublishSdkPage, publishSdkManifest } from '../features/publish-sdk';
 import { WorkflowPage, workflowManifest } from '../features/workflow-editor';
 import { WorkspacePage, workspaceManifest } from '../features/workspace';
@@ -49,6 +50,12 @@ export const workspaceFeatures: readonly FeatureDefinition[] = [
     Component: PublishSdkPage,
     showInLanding: true,
     showInNavigation: true,
+  },
+  {
+    ...profileManifest,
+    Component: ProfilePage,
+    showInLanding: false,
+    showInNavigation: false,
   },
 ];
 

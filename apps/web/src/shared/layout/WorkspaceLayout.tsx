@@ -131,6 +131,17 @@ export function WorkspaceLayout({ pathname, children }: WorkspaceLayoutProps) {
                   className="workspace-user-menu-item"
                   onClick={() => {
                     setMenuOpen(false);
+                    navigate('/workspace/profile');
+                  }}
+                >
+                  个人中心
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="workspace-user-menu-item"
+                  onClick={() => {
+                    setMenuOpen(false);
                     navigate('/workspace');
                   }}
                 >
