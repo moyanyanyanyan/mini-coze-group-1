@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../shared/api/http';
-import { changePassword, getProfile, saveDisplayName } from './profile-api';
+import { changePassword, getProfile, saveDisplayName, uploadAvatar } from './profile-api';
 
 function envelope(status: number, data: unknown) {
   return new Response(JSON.stringify({ code: status, message: 'ok', data }), {
@@ -73,6 +73,35 @@ describe('profile API', () => {
     await changePassword({ currentPassword: '12345678', newPassword: 'newpass888' });
     const init = fetchMock.mock.calls[0][1] as RequestInit;
     expect(init.body).toBe(JSON.stringify({ currentPassword: '12345678', newPassword: 'newpass888' }));
+  });
+
+  it('uploads the avatar as multipart FormData', async () => {
+    const fetchMock = stubFetch(() => envelope(201, {
+      id: 'user-1',
+      email: 'u@test.com',
+      displayName: '昵称',
+      avatarUrl: '/api/users/avatar/u1.png',
+    }));
+    const file = new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], 'avatar.png', { type: 'image/png' });
+
+    const updated = await uploadAvatar(file);
+    expect(updated.avatarUrl).toBe('/api/users/avatar/u1.png');
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(init.method).toBe('POST');
+    expect(init.body).toBeInstanceOf(FormData);
+    expect((init.body as FormData).get('file')).toBe(file);
+    expect(init.headers).toBeUndefined();
+  });
+
+  it('surfaces avatar validation errors', async () => {
+    stubFetch(() => errorResponse(400, '头像大小不能超过 5MB'));
+    const file = new File([new Uint8Array([1])], 'big.png', { type: 'image/png' });
+
+    const error = await uploadAvatar(file).catch((cause: unknown) => cause);
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(400);
+    expect((error as ApiError).message).toBe('头像大小不能超过 5MB');
   });
 
   it('surfaces a 401 as ApiError with the server message', async () => {

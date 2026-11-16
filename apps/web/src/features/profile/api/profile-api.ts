@@ -1,4 +1,4 @@
-import { get, patch } from '../../../shared/api/http';
+import { get, patch, postForm } from '../../../shared/api/http';
 import type { AuthUser } from '../../auth/types';
 
 /** /api/users/* 被后端 ResponseInterceptor 包成 { code, message, data }，这里统一拆包 */
@@ -12,6 +12,9 @@ export interface ProfileUser extends AuthUser {
   googleLinked: boolean;
   hasPassword: boolean;
 }
+
+export const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
+export const AVATAR_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 
 export interface ChangePasswordInput {
   currentPassword?: string;
@@ -28,4 +31,10 @@ export async function saveDisplayName(displayName: string): Promise<AuthUser> {
 
 export async function changePassword(input: ChangePasswordInput): Promise<void> {
   await patch<Envelope<null>>('/api/users/me/password', input);
+}
+
+export async function uploadAvatar(file: File): Promise<AuthUser> {
+  const form = new FormData();
+  form.append('file', file);
+  return (await postForm<Envelope<AuthUser>>('/api/users/me/avatar', form)).data;
 }

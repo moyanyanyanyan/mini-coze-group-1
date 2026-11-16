@@ -99,6 +99,13 @@ export class UsersService{
         })
     }
 
+    async updateAvatar(userId:string,avatarUrl:string):Promise<User>{
+        return this.prisma.user.update({
+            where:{id:userId},
+            data:{avatarUrl},
+        })
+    }
+
     // 有密码的账号必须先比对旧密码；纯 Google 账号（passwordHash 为 null）直接把新密码写上去
     async changePassword(userId:string,currentPassword:string|undefined,newPassword:string):Promise<void>{
         const user=await this.prisma.user.findUnique({where:{id:userId}})

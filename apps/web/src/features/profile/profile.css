@@ -588,3 +588,23 @@
     margin-left: 0;
   }
 }
+
+/* 头像上传 */
+.profile-avatar {
+  position: relative;
+  cursor: pointer;
+}
+
+.profile-avatar:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.profile-avatar.is-uploading {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.profile-avatar-input {
+  display: none;
+}

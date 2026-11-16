@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { logout } from '../auth/api/auth-api';
 import { ApiError } from '../../shared/api/http';
-import { getProfile, saveDisplayName } from './api/profile-api';
+import { getProfile, saveDisplayName, uploadAvatar, AVATAR_MIME_TYPES, MAX_AVATAR_BYTES } from './api/profile-api';
 import { AccountSecurity } from './AccountSecurity';
 import type { ProfileUser } from './api/profile-api';
 import { navigate } from '../../shared/routing/navigation';
+import { setCurrentUser } from '../../shared/user/current-user';
 import './profile.css';
 
 type ProfileSection = 'profile' | 'security' | 'account';
@@ -34,10 +35,13 @@ export function ProfilePage() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [savingName, setSavingName] = useState(false);
   const [nameFeedback, setNameFeedback] = useState<Feedback | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarFeedback, setAvatarFeedback] = useState<Feedback | null>(null);
 
   const applyUser = (profile: ProfileUser) => {
     setUser(profile);
     setDisplayName(profile.displayName);
+    setCurrentUser(profile);
   };
 
   useEffect(() => {
@@ -78,14 +82,42 @@ export function ProfilePage() {
     setNameFeedback(null);
     try {
       const updated = await saveDisplayName(next);
-      // 页面数据以接口响应为准
-      setUser((current) => (current ? { ...current, ...updated } : current));
+      // 页面数据以接口响应为准，同时写回全局用户快照（左下角、下拉菜单一起更新）
+      const merged = { ...user, ...updated };
+      setUser(merged);
+      setCurrentUser(merged);
       setDisplayName(updated.displayName);
       setNameFeedback({ type: 'ok', text: '昵称已保存' });
     } catch (cause) {
       setNameFeedback({ type: 'error', text: errorText(cause, '保存失败，请稍后再试') });
     } finally {
       setSavingName(false);
+    }
+  };
+
+  const handleAvatarFile = async (file: File) => {
+    if (!user || avatarUploading) return;
+    if (!AVATAR_MIME_TYPES.includes(file.type as (typeof AVATAR_MIME_TYPES)[number])) {
+      setAvatarFeedback({ type: 'error', text: '仅支持 JPG、PNG、WebP 格式的图片' });
+      return;
+    }
+    if (file.size > MAX_AVATAR_BYTES) {
+      setAvatarFeedback({ type: 'error', text: '头像大小不能超过 5MB' });
+      return;
+    }
+    setAvatarUploading(true);
+    setAvatarFeedback(null);
+    try {
+      const updated = await uploadAvatar(file);
+      // 上传失败时不会走到这里，原头像保持不变
+      const merged = { ...user, ...updated };
+      setUser(merged);
+      setCurrentUser(merged);
+      setAvatarFeedback({ type: 'ok', text: '头像已更新' });
+    } catch (cause) {
+      setAvatarFeedback({ type: 'error', text: errorText(cause, '头像上传失败，请稍后再试') });
+    } finally {
+      setAvatarUploading(false);
     }
   };
 
@@ -154,6 +186,9 @@ export function ProfilePage() {
                   saving={savingName}
                   dirty={displayName.trim() !== user.displayName}
                   feedback={nameFeedback}
+                  avatarUploading={avatarUploading}
+                  avatarFeedback={avatarFeedback}
+                  onAvatarFile={(file) => void handleAvatarFile(file)}
                   copyLabel={copyLabel}
                   onCopyUserId={() => void copyUserId()}
                 />
@@ -189,6 +224,9 @@ function ProfileDetails({
   saving,
   dirty,
   feedback,
+  avatarUploading,
+  avatarFeedback,
+  onAvatarFile,
   copyLabel,
   onCopyUserId,
 }: {
@@ -199,10 +237,17 @@ function ProfileDetails({
   saving: boolean;
   dirty: boolean;
   feedback: Feedback | null;
+  avatarUploading: boolean;
+  avatarFeedback: Feedback | null;
+  onAvatarFile: (file: File) => void;
   copyLabel: string;
   onCopyUserId: () => void;
 }) {
   const initial = (displayName || user.email).trim().charAt(0).toUpperCase() || '?';
+  const avatarInput = useRef<HTMLInputElement>(null);
+  const openAvatarPicker = () => {
+    if (!avatarUploading) avatarInput.current?.click();
+  };
   return (
     <section className="profile-section" aria-labelledby="profile-details-title">
       <div className="profile-section-heading">
@@ -213,15 +258,48 @@ function ProfileDetails({
       </div>
 
       <div className="profile-identity">
-        <div className="profile-avatar">
+        <input
+          ref={avatarInput}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          className="profile-avatar-input"
+          disabled={avatarUploading}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            // 清空 value，保证连续选择同一张图也会触发 onChange
+            event.target.value = '';
+            if (file) onAvatarFile(file);
+          }}
+        />
+        <div
+          className={`profile-avatar${avatarUploading ? ' is-uploading' : ''}`}
+          role="button"
+          tabIndex={0}
+          aria-label="更换头像"
+          title="点击更换头像"
+          onClick={openAvatarPicker}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              openAvatarPicker();
+            }
+          }}
+        >
           {user.avatarUrl ? <img src={user.avatarUrl} alt="用户头像" /> : initial}
         </div>
         <div className="profile-identity-copy">
           <strong>{displayName || user.email}</strong>
           <span>{user.email}</span>
         </div>
-        <button type="button" disabled title="头像上传暂未开放">更换头像</button>
+        <button type="button" onClick={openAvatarPicker} disabled={avatarUploading}>
+          {avatarUploading ? '上传中…' : '更换头像'}
+        </button>
       </div>
+      {avatarFeedback ? (
+        <p className={`profile-form-message profile-form-message--${avatarFeedback.type}`} role="status">
+          {avatarFeedback.text}
+        </p>
+      ) : null}
 
       <div className="profile-form">
         <label>

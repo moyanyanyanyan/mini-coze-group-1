@@ -5,11 +5,14 @@ import {
   Get,
   HttpCode,
   Patch,
+  Post,
   UnauthorizedException,
-  UseGuards,
+  UploadedFile,
   UseInterceptors,
+  UseGuards,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
+import { FileInterceptor } from "@nestjs/platform-express";
 import type { CurrentUser as CurrentUserPayload } from "@minicoze/shared";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { ResponseInterceptor } from "../../common/response.interceptor";
@@ -17,13 +20,21 @@ import { ErrorCode } from "../../common/errors/error-codes";
 import { UsersService } from "./users.service";
 import { UpdateProfileDto } from "./dto/update-profile.dto";
 import { ChangePasswordDto } from "./dto/change-password.dto";
+import {
+  AvatarStorageService,
+  MAX_AVATAR_BYTES,
+  type UploadedAvatarFile,
+} from "./avatar-storage.service";
 
 // 个人中心。用户身份只认 JWT 里的 userId，请求体一律不接 id
 @Controller("users")
 @UseInterceptors(ResponseInterceptor)
 @UseGuards(AuthGuard("jwt"))
 export class UsersController {
-  constructor(private readonly users: UsersService) {}
+  constructor(
+    private readonly users: UsersService,
+    private readonly avatars: AvatarStorageService,
+  ) {}
 
   @Get("me")
   async me(@CurrentUser() current: CurrentUserPayload) {
@@ -52,6 +63,20 @@ export class UsersController {
       throw new BadRequestException("昵称不能为空");
     }
     const user = await this.users.updateDisplayName(current.id, displayName);
+    return this.users.toCurrentUser(user);
+  }
+
+  @Post("me/avatar")
+  // 硬上限放到 2 倍，5MB 的友好提示由 service 给出
+  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: MAX_AVATAR_BYTES * 2 } }))
+  async uploadAvatar(
+    @CurrentUser() current: CurrentUserPayload,
+    @UploadedFile() file?: UploadedAvatarFile,
+  ) {
+    const previous = await this.users.findById(current.id);
+    const avatarUrl = await this.avatars.save(current.id, file);
+    const user = await this.users.updateAvatar(current.id, avatarUrl);
+    await this.avatars.removeByUrl(previous?.avatarUrl);
     return this.users.toCurrentUser(user);
   }
 

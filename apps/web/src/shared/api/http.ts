@@ -25,18 +25,7 @@ interface ErrorBody {
   message?: string | string[];
 }
 
-async function request<T>(
-  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
-  path: string,
-  body?: unknown,
-): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-
+async function readResponse<T>(response: Response): Promise<T> {
   // 204 No Content 没有响应体，直接结束
   if (response.status === 204) {
     return undefined as T;
@@ -57,6 +46,21 @@ async function request<T>(
   return payload as T;
 }
 
+async function request<T>(
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+  path: string,
+  body?: unknown,
+): Promise<T> {
+  const response = await fetch(`${API_BASE}${path}`, {
+    method,
+    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+
+  return readResponse<T>(response);
+}
+
 export function get<T>(path: string): Promise<T> {
   return request<T>('GET', path);
 }
@@ -71,4 +75,15 @@ export function patch<T>(path: string, body?: unknown): Promise<T> {
 
 export function del<T>(path: string): Promise<T> {
   return request<T>('DELETE', path);
+}
+
+/** multipart 上传：不手动设置 Content-Type，交给浏览器带 boundary */
+export async function postForm<T>(path: string, form: FormData): Promise<T> {
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    credentials: 'include',
+    body: form,
+  });
+
+  return readResponse<T>(response);
 }

@@ -3,8 +3,13 @@ import { ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import request from 'supertest';
+import { rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { HttpExceptionFilter } from '../src/common/http-exception.filter';
 import { PrismaService } from '../src/prisma/prisma.service';
+
+const avatarDir = join(tmpdir(), 'minicoze-avatar-e2e-' + Date.now());
 
 const newEmail = () => `e2e_users_${Date.now()}_${Math.floor(Math.random() * 1000)}@test.com`;
 
@@ -15,6 +20,8 @@ describe('Users (e2e)', () => {
   const created: string[] = [];
 
   beforeAll(async () => {
+    // 头像写到临时目录，测试结束整体删除
+    process.env.AVATAR_STORAGE_DIR = avatarDir;
     const { AppModule } = await import('../src/app.module');
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -34,6 +41,7 @@ describe('Users (e2e)', () => {
       await prisma.user.deleteMany({ where: { email: { in: created } } });
     }
     await app?.close();
+    await rm(avatarDir, { recursive: true, force: true });
   });
 
   async function registerUser(displayName = 'E2E') {
@@ -169,6 +177,68 @@ describe('Users (e2e)', () => {
     });
   });
 
+  describe('POST /api/users/me/avatar', () => {
+    // 1x1 透明 PNG
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      'base64',
+    );
+
+    it('上传成功后保存地址，刷新资料仍是该地址', async () => {
+      const { token } = await registerUser('头像用户');
+
+      const res = await request(app.getHttpServer())
+        .post('/api/users/me/avatar')
+        .set('Authorization', `Bearer ${token}`)
+        .attach('file', png, { filename: 'avatar.png', contentType: 'image/png' })
+        .expect(201);
+
+      const avatarUrl = res.body.data.avatarUrl as string;
+      expect(avatarUrl).toMatch(/^\/api\/users\/avatar\/.+\.png$/);
+
+      const me = await request(app.getHttpServer())
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(me.body.avatarUrl).toBe(avatarUrl);
+
+      const file = await request(app.getHttpServer()).get(avatarUrl).expect(200);
+      expect(file.headers['content-type']).toContain('image/png');
+    });
+
+    it('文件头不是图片时拒绝，即使扩展名是 png', async () => {
+      const { token } = await registerUser('假图片用户');
+
+      const res = await request(app.getHttpServer())
+        .post('/api/users/me/avatar')
+        .set('Authorization', `Bearer ${token}`)
+        .attach('file', Buffer.from('not an image'), { filename: 'fake.png', contentType: 'image/png' })
+        .expect(400);
+
+      expect(res.body.message).toContain('仅支持 JPG、PNG、WebP');
+    });
+
+    it('超过 5MB 时拒绝', async () => {
+      const { token } = await registerUser('大图用户');
+      const big = Buffer.alloc(5 * 1024 * 1024 + 1);
+      big.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0);
+
+      const res = await request(app.getHttpServer())
+        .post('/api/users/me/avatar')
+        .set('Authorization', `Bearer ${token}`)
+        .attach('file', big, { filename: 'big.png', contentType: 'image/png' })
+        .expect(400);
+
+      expect(res.body.message).toContain('不能超过 5MB');
+    });
+
+    it('未登录不能上传', async () => {
+      await request(app.getHttpServer())
+        .post('/api/users/me/avatar')
+        .attach('file', png, { filename: 'avatar.png', contentType: 'image/png' })
+        .expect(401);
+    });
+  });
   describe('未登录', () => {
     it('三个个人中心接口都返回 401', async () => {
       await request(app.getHttpServer()).get('/api/users/me').expect(401);
