@@ -68,3 +68,23 @@
 @media(min-width:1041px){.landing-hero{grid-template-columns:minmax(0,1.03fr) minmax(520px,.97fr);gap:48px}.landing-hero h1{font-size:clamp(46px,4.4vw,64px)}}
 @media(max-width:760px){.landing-block-cluster{display:none}.landing-trust div i{display:none}.landing-trust div{gap:14px 22px}}
 @media(prefers-reduced-motion:reduce){.landing-block-cluster{animation:none}}
+
+/* Improve first-screen text hierarchy and legibility. */
+.landing-hero h1 {
+  font-weight: 2000;
+}
+
+.landing-hero h1 span {
+  font-weight: 700;
+  font-synthesis: weight;
+  -webkit-text-stroke: 0.8px currentColor;
+}
+
+.landing-kicker {
+  color: var(--ink-700);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}

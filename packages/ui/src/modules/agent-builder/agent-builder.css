@@ -5,6 +5,21 @@
   color: var(--ink-900);
 }
 
+.agent-builder {
+  background:
+    radial-gradient(circle at 82% 4%, rgba(114,88,214,.07), transparent 24rem),
+    radial-gradient(circle at 7% 36%, rgba(95,201,195,.055), transparent 20rem);
+}
+.ab-list-eyebrow {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--violet-700);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .14em;
+}
+
 .ab-list {
   width: min(100%, var(--page-max));
   margin-inline: auto;
@@ -135,6 +150,8 @@
 }
 
 .ab-card {
+  position: relative;
+  overflow: hidden;
   display: grid;
   gap: 10px;
   min-height: 208px;
@@ -146,6 +163,19 @@
   cursor: pointer;
   transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
 }
+
+.ab-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 22px;
+  width: 56px;
+  height: 5px;
+  border-radius: 0 0 6px 6px;
+  background: var(--block-violet);
+}
+.ab-card:nth-child(3n + 2)::before { background: var(--block-cyan); }
+.ab-card:nth-child(3n)::before { background: var(--block-coral); }
 
 .ab-card:hover {
   border-color: var(--violet-300);
@@ -160,6 +190,7 @@
 }
 
 .ab-avatar {
+  position: relative;
   display: grid;
   width: 40px;
   height: 40px;
@@ -169,6 +200,16 @@
   background: var(--violet-600);
   font-size: 17px;
   font-weight: 650;
+}
+
+.ab-avatar::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  width: 17px;
+  height: 7px;
+  border-radius: 5px 5px 2px 2px;
+  background: inherit;
 }
 
 .ab-status-badge {

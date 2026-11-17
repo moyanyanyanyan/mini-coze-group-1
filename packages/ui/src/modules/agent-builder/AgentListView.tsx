@@ -47,9 +47,12 @@ export function AgentListView({
     <div className="ab-list">
       <header className="ab-list-header">
         <div className="ab-list-title-row">
-          <h2 className="ab-list-title">智能体</h2>
+          <div>
+            <span className="ab-list-eyebrow">ROLE BLOCKS</span>
+            <h2 className="ab-list-title">我的智能体</h2>
+          </div>
           <button className="ab-btn ab-btn-primary" onClick={onCreate}>
-            新建智能体
+            添加角色积木
           </button>
         </div>
 
@@ -128,7 +131,7 @@ export function AgentListView({
 
         <button className="ab-card ab-card-create" onClick={onCreate} aria-label="新建智能体">
           <div className="ab-card-create-plus" aria-hidden="true">+</div>
-          <div className="ab-card-create-label">新建智能体</div>
+          <div className="ab-card-create-label">添加角色积木</div>
         </button>
 
         {result?.items.length === 0 && (

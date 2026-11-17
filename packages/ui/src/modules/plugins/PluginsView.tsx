@@ -21,8 +21,9 @@ export function PluginsView({
       <header className="pm-header">
         <div className="pm-header-inner">
           <div>
-            <h1>插件</h1>
-            <p>浏览内置能力，在智能体编辑页选择并绑定使用。</p>
+            <span className="pm-eyebrow">TOOL BLOCKS</span>
+            <h1>工具积木</h1>
+            <p>挑选现成能力，像拼积木一样装到你的智能体上。</p>
           </div>
         </div>
       </header>
