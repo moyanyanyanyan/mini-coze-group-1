@@ -2,6 +2,7 @@
 .api-keys-page {
   padding: clamp(36px, 5vw, 66px) clamp(22px, 5vw, 68px) 76px;
   color: var(--ink-900);
+  background: radial-gradient(circle at 84% 4%,rgba(103,169,130,.07),transparent 25rem);
 }
 
 .api-keys-shell {
@@ -160,12 +161,14 @@
 }
 
 .api-key-table-shell {
+  position: relative;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 18px;
   background: #fff;
   box-shadow: 0 18px 48px rgba(72, 52, 126, 0.055);
 }
+.api-key-table-shell::before { content: ''; position: absolute; z-index: 2; top: 0; left: 26px; width: 64px; height: 5px; border-radius: 0 0 6px 6px; background: linear-gradient(90deg,var(--block-green) 0 45%,transparent 45% 53%,var(--block-cyan) 53%); }
 
 .api-key-table-scroll {
   overflow-x: auto;

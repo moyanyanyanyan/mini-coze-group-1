@@ -7,7 +7,17 @@
   min-height: 100%;
   color: var(--ink-900);
   padding-bottom: 64px;
-  background: #f8f8fb;
+  background: radial-gradient(circle at 82% 3%,rgba(246,138,114,.07),transparent 25rem),#faf9fc;
+}
+
+.pm-eyebrow {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--violet-700);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .14em;
 }
 
 /* ---------- Header（顶部条，样式对齐 landing/workspace 头） ---------- */
@@ -138,6 +148,8 @@
 /* ---------- 插件卡片 ---------- */
 
 .pm-card {
+  position: relative;
+  overflow: hidden;
   box-shadow: none;
   display: flex;
   flex-direction: column;
@@ -147,6 +159,9 @@
   min-height: 0;
   padding: 18px;
 }
+.pm-card::before { content: ''; position: absolute; top: 0; left: 20px; width: 54px; height: 5px; border-radius: 0 0 6px 6px; background: var(--block-coral); }
+.pm-card:nth-child(3n + 2)::before { background: var(--block-cyan); }
+.pm-card:nth-child(3n)::before { background: var(--block-yellow); }
 .pm-technical { min-width: 0; overflow-wrap: anywhere; font-size: 12px; color: var(--ink-500); }
 .pm-technical summary { cursor: pointer; padding-block: 6px; }
 .pm-technical ul { margin: 6px 0; padding-inline-start: 18px; }
@@ -160,6 +175,7 @@
 }
 
 .pm-card-icon {
+  position: relative;
   flex: none;
   width: 44px;
   height: 44px;
@@ -169,6 +185,7 @@
   color: var(--violet-600);
   background: var(--violet-50);
 }
+.pm-card-icon::before { content: ''; position: absolute; top: -5px; width: 17px; height: 7px; border-radius: 5px 5px 2px 2px; background: inherit; }
 
 .pm-card-icon svg {
   width: 20px;

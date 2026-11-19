@@ -50,7 +50,7 @@ export function MessageComposer({ disabled, onSend, streaming, unavailable, onSt
         aria-label="消息内容"
         className={styles.textarea}
         value={draft}
-        placeholder={streaming ? '正在回复，可点击右侧停止' : disabled ? unavailable ? '请先选择可用的智能体' : '正在加载会话…' : '发送消息…'}
+        placeholder={streaming ? '正在拼接回答，可点击右侧停止' : disabled ? unavailable ? '请先选择一位可用的智能体' : '正在整理对话积木…' : '放入你的下一块想法…'}
         rows={1}
         disabled={disabled}
         onChange={(event) => setDraft(event.target.value)}

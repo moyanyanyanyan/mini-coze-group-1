@@ -51,7 +51,7 @@ export function AgentChatView({
       <aside ref={conversationPanelRef} role={conversationDrawer ? 'dialog' : undefined} aria-modal={conversationDrawer || undefined} className={styles.conversationPanel} aria-label="会话列表">
         <div className={styles.conversationHeader}>
           <div>
-            <strong>历史对话</strong>
+            <strong>对话工作区</strong>
           </div>
           <button className={styles.panelClose} aria-label="关闭会话列表" onClick={() => setConversationsOpen(false)}><Icon name="close" /></button>
         </div>
@@ -99,7 +99,15 @@ export function AgentChatView({
         </header>
 
         <div className={styles.stream} ref={streamRef} onScroll={onScroll}>
-        {needsAgent && (
+        {bootError && agents.length === 0 ? (
+          <div className={styles.empty}>
+            <span className={styles.emptyIcon} aria-hidden="true"><Icon name="plug" /></span>
+            <strong>对话积木暂时没有接上</strong>
+            <p>连接服务后，角色、知识与工具会重新回到这里。</p>
+            <button className={styles.createAgent} type="button" onClick={onRetry}>重新连接</button>
+          </div>
+        ) : null}
+        {needsAgent && !bootError && (
           <div className={styles.empty}>
             <strong>创建智能体，开始对话</strong>
             <LinkComponent className={styles.createAgent} to={createAgentRoute}>创建智能体</LinkComponent>
@@ -110,8 +118,8 @@ export function AgentChatView({
             <span className={styles.emptyIcon} aria-hidden="true">
               <Icon name="chat" />
             </span>
-            <strong>开始你的第一段对话</strong>
-            <p>从一个问题开始，或试试下面的建议。</p>
+            <strong>放下第一块想法</strong>
+            <p>从一个问题开始，妙搭会把知识、工具和流程拼到回答里。</p>
             <div className={styles.suggestions}>
               {suggestedPrompts.map((prompt) => (
                 <button
@@ -141,7 +149,7 @@ export function AgentChatView({
         </div>
 
         <div className={styles.footer}>
-        {bootError ? <div className={styles.alert} role="alert">{bootError} <button onClick={() => { onRetry(); }}>重试</button></div> : null}
+        {bootError && agents.length > 0 ? <div className={styles.alert} role="alert">{bootError} <button onClick={() => { onRetry(); }}>重试</button></div> : null}
         {sendError ? <p className={styles.alert} role="alert">{sendError}</p> : null}
 
           {awayFromBottom && <button className={styles.latestButton} onClick={jumpToLatest}><Icon name="arrowDown" />回到最新消息</button>}
@@ -154,7 +162,7 @@ export function AgentChatView({
               onStop={handleStop}
               onSend={(content) => void handleSend(content)}
             />
-            <span className={styles.composerHint}>Enter 发送 · Shift + Enter 换行</span>
+            <span className={styles.composerHint}>输入想法，妙搭负责把能力拼起来 · Enter 发送</span>
           </>
         )}
         </div>
