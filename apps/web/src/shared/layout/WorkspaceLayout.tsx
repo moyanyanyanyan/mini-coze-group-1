@@ -32,7 +32,7 @@ export function WorkspaceLayout({ pathname, children }: { pathname: string; chil
     try {
       await logout();
     } catch {
-      // 后端就算没清掉也不拦着走，cookie 大不了 7 天后自然过期
+      // 即使退出接口不可用，也允许用户回到登录页。
     }
     navigate('/login');
   };
