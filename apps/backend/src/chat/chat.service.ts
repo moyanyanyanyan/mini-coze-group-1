@@ -84,6 +84,10 @@ export class ChatService {
     this.busy.add(conversationId);
   }
 
+  async assertReady(): Promise<void> {
+    await this.runtime.assertReady();
+  }
+
   release(conversationId: string): void {
     this.busy.delete(conversationId);
   }
@@ -100,6 +104,7 @@ export class ChatService {
       throw new ForbiddenException('会话不属于指定 Agent');
     }
 
+    await this.assertReady();
     const run = await this.prepareRun({
       conversationId: input.conversationId,
       userId: input.userId,
@@ -178,6 +183,7 @@ export class ChatService {
     const agentConfig = input.agentConfig
       ?? await this.agents.getAgentConfig(agentId, input.userId);
 
+    await this.assertReady();
     const run = await this.prepareRun({
       conversationId: input.conversationId,
       userId: input.userId,

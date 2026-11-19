@@ -17,6 +17,8 @@ export interface AgentChatViewProps {
   citationsByMessage: Record<string, { title: string }[]>;
   streamingId: string | null;
   sendError: string;
+  readiness?: 'starting' | 'ready' | 'failed' | 'unavailable';
+  onReadinessRetry?: () => void;
   needsAgent: boolean;
   bootError: string;
   switching: boolean;
@@ -29,7 +31,7 @@ export interface AgentChatViewProps {
   handleConversationChange: (id: string) => void;
   handleDeleteConversation: (id: string) => void;
   handleAgentChange: (id: string) => void;
-  handleSend: (content: string) => void;
+  handleSend: (content: string) => void | Promise<boolean | void>;
   handleStop: () => void;
   onRetry: () => void;
 }
@@ -38,7 +40,7 @@ export function AgentChatView({
   conversationId, conversations, agents, selectedAgentId, messages, citationsByMessage,
   streamingId, sendError, needsAgent, bootError, switching, suggestedPrompts, viewport,
   confirmation, LinkComponent, createAgentRoute, handleNewConversation, handleConversationChange,
-  handleDeleteConversation, handleAgentChange, handleSend, handleStop, onRetry,
+  handleDeleteConversation, handleAgentChange, handleSend, handleStop, onRetry, readiness = 'ready', onReadinessRetry,
 }: AgentChatViewProps) {
   const selectedAgent = agents.find(agent => agent.id === selectedAgentId);
   const { conversationsOpen, setConversationsOpen, conversationPanelRef, conversationDrawer,
@@ -125,7 +127,7 @@ export function AgentChatView({
                 <button
                   type="button"
                   key={prompt}
-                  disabled={!conversationId || streamingId !== null}
+                  disabled={!conversationId || streamingId !== null || switching || readiness !== 'ready'}
                   onClick={() => void handleSend(prompt)}
                 >
                   {prompt}
@@ -149,6 +151,10 @@ export function AgentChatView({
         </div>
 
         <div className={styles.footer}>
+        {readiness !== 'ready' && <div className={styles.alert} role="status">
+          {readiness === 'starting' ? '对话服务正在准备，准备完成后即可发送' : readiness === 'failed' ? '对话服务准备失败，请联系维护者检查并重启服务' : '暂时无法连接对话服务，正在尝试重新连接'}
+          {readiness !== 'starting' && <button type="button" onClick={onReadinessRetry}>重新检查</button>}
+        </div>}
         {bootError && agents.length > 0 ? <div className={styles.alert} role="alert">{bootError} <button onClick={() => { onRetry(); }}>重试</button></div> : null}
         {sendError ? <p className={styles.alert} role="alert">{sendError}</p> : null}
 
@@ -158,9 +164,10 @@ export function AgentChatView({
           <>
             <MessageComposer
               disabled={streamingId !== null || switching}
+              sendBlocked={readiness !== 'ready'}
               streaming={streamingId !== null}
               onStop={handleStop}
-              onSend={(content) => void handleSend(content)}
+              onSend={handleSend}
             />
             <span className={styles.composerHint}>输入想法，妙搭负责把能力拼起来 · Enter 发送</span>
           </>

@@ -35,7 +35,7 @@ it.each([[0, 0], [5, 5], [100, 10]])('配置 %i 轮时只向 Runtime 发送最�
     getAgentConfig: jest.fn().mockResolvedValue({ ...config, contextLimit }),
   } as unknown as AgentsService;
   let runtimeRequest: RuntimeRequestBody | undefined;
-  const runtime = {
+  const runtime = { assertReady: jest.fn().mockResolvedValue(undefined),
     stream: async function* (request: RuntimeRequestBody): AsyncGenerator<RuntimeSseEvent> {
       runtimeRequest = request;
       const envelope = { runId: request.runId, conversationId: request.conversationId, timestamp: new Date().toISOString() };

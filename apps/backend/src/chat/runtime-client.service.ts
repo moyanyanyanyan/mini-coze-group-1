@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 
 // 智能体配置
 export interface RuntimeAgentConfig {
@@ -296,6 +296,24 @@ export class RuntimeClientService {
   // 切 mock / 切真身只改这个环境变量
   private readonly baseUrl = process.env.AGENT_SERVICE_URL ?? 'http://localhost:8000';
   private readonly token = process.env.INTERNAL_SERVICE_TOKEN ?? '';
+
+  async readiness(): Promise<{ status: 'starting' | 'ready' | 'failed' | 'unavailable' }> {
+    try {
+      const response = await fetch(new URL('/ready', this.baseUrl), { signal: AbortSignal.timeout(2000) });
+      const body = await response.json() as { status?: unknown };
+      if (response.status === 200 && body.status === 'ready') return { status: 'ready' };
+      if (response.status === 503 && (body.status === 'starting' || body.status === 'failed')) return { status: body.status };
+    } catch (error) {
+      this.logger.debug(`Runtime readiness probe failed: ${error instanceof Error ? error.name : 'unknown'}`);
+    }
+    return { status: 'unavailable' };
+  }
+
+  async assertReady(): Promise<void> {
+    if ((await this.readiness()).status !== 'ready') {
+      throw new ServiceUnavailableException({ code: 'SERVICE_NOT_READY', message: '对话服务尚未就绪，请稍后重试' });
+    }
+  }
 
   async run(
     request: RuntimeRequestBody,

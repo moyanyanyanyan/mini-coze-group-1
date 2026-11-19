@@ -1,6 +1,8 @@
+import logging
 from hmac import compare_digest
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
@@ -9,6 +11,8 @@ from app.knowledge.embedding import embed_texts
 from app.api.runtime import router as runtime_router
 from app.workflow.router import router as workflow_router
 
+logger = logging.getLogger(__name__)
+
 api_router = APIRouter()
 api_router.include_router(runtime_router)
 
@@ -16,6 +20,12 @@ api_router.include_router(runtime_router)
 @api_router.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "service": "agent"}
+
+
+@api_router.get("/ready")
+def ready(request: Request):
+    status = getattr(request.app.state, "readiness", "starting")
+    return JSONResponse({"status": status, "code": None if status == "ready" else "SERVICE_NOT_READY"}, status_code=200 if status == "ready" else 503)
 
 
 class EmbeddingRequest(BaseModel):
@@ -37,6 +47,7 @@ async def create_embeddings(
     try:
         return await run_in_threadpool(embed_texts, request.texts)
     except Exception as exc:
+        logger.exception("Embedding model failed")
         raise HTTPException(status_code=503, detail="Embedding model is unavailable") from exc
 
 api_router.include_router(workflow_router)

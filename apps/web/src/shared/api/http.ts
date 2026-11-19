@@ -37,9 +37,11 @@ async function request<T>(
   method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
   path: string,
   body?: unknown,
+  signal?: AbortSignal,
 ): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     method,
+    signal,
     headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
     credentials: 'include',
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -65,8 +67,8 @@ async function request<T>(
   return payload as T;
 }
 
-export function get<T>(path: string): Promise<T> {
-  return request<T>('GET', path);
+export function get<T>(path: string, signal?: AbortSignal): Promise<T> {
+  return request<T>('GET', path, undefined, signal);
 }
 
 export function post<T>(path: string, body?: unknown): Promise<T> {

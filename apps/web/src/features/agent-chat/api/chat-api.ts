@@ -139,14 +139,14 @@ export async function streamMessage(
 
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as
-      | { code?: string; message?: string | string[] }
+      | { code?: string; errorCode?: string; message?: string | string[] }
       | null;
     const rawMessage = Array.isArray(payload?.message)
       ? payload.message[0]
       : payload?.message;
     throw new ApiError(
       response.status,
-      payload?.code ?? 'UNKNOWN',
+      payload?.errorCode ?? payload?.code ?? 'UNKNOWN',
       rawMessage ?? '发送失败，请稍后再试',
     );
   }

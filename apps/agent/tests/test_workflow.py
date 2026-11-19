@@ -126,6 +126,7 @@ def test_http(definition, monkeypatch):
     async def unavailable(**kwargs):
         raise RuntimeError("provider down")
 
+    monkeypatch.setattr("app.readiness.embed_texts", lambda texts: {"vectors": [[0.1] * 512]})
     # Never reach the real model from tests.
     monkeypatch.setattr(app.state, "workflow_complete", unavailable)
     with TestClient(app) as client:

@@ -52,3 +52,9 @@ describe('chat stream transport', () => {
     await expect(streamMessage('conversation-1', '问题', { onDelta: vi.fn() })).rejects.toMatchObject({ status: 401, message: '请登录' });
   });
 });
+
+
+it('preserves readiness error codes in the backend numeric envelope', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ code: 503, errorCode: 'SERVICE_NOT_READY', message: '准备中', data: null }), { status: 503 })));
+  await expect(streamMessage('conversation', '问题', { onDelta: vi.fn() })).rejects.toMatchObject({ status: 503, code: 'SERVICE_NOT_READY' });
+});

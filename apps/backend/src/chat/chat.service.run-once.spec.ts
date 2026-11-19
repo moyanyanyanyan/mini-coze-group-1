@@ -87,7 +87,7 @@ function createHarness() {
       agentId: 'agent-public',
     }),
   } as unknown as ConversationsService;
-  const runtime = { run: jest.fn() };
+  const runtime = { assertReady: jest.fn().mockResolvedValue(undefined), run: jest.fn() };
   const service = new ChatService(
     prisma,
     conversations,
@@ -107,6 +107,13 @@ function createHarness() {
 }
 
 describe('ChatService.runOnce', () => {
+  it('does not persist a turn when runtime is not ready', async () => {
+    const harness = createHarness();
+    harness.runtime.assertReady.mockRejectedValue(new Error('not ready'));
+    await expect(harness.service.runOnce({ conversationId: 'conversation-1', userId: 'owner', agentId: 'agent-public', message: 'hello', agentConfig })).rejects.toThrow('not ready');
+    expect(harness.create).not.toHaveBeenCalled();
+    expect(harness.runtime.run).not.toHaveBeenCalled();
+  });
   it('reuses turn persistence, excludes current messages from history, and saves completion', async () => {
     const harness = createHarness();
     let requestBody: RuntimeRequestBody | undefined;

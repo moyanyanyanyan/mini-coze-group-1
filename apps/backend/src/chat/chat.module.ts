@@ -1,3 +1,4 @@
+import { ReadinessController } from './readiness.controller';
 import { Module } from '@nestjs/common';
 import { ConversationsModule } from '../modules/conversations/conversations.module';
 import { ChatController } from './chat.controller';
@@ -9,7 +10,7 @@ import { RuntimeCollectorService } from '../modules/operations/collection/runtim
 
 @Module({
   imports: [ConversationsModule, AgentsModule, OperationsModule],
-  controllers: [ChatController],
+  controllers: [ChatController, ReadinessController],
   providers: [ChatService, { provide: RuntimeClientService, useExisting: RuntimeCollectorService }],
   exports: [ChatService, RuntimeClientService],
 })

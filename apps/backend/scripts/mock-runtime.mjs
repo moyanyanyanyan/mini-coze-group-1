@@ -72,6 +72,11 @@ async function writeFrame(res, env) {
 
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
+  if (req.method === 'GET' && url.pathname === '/ready') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'ready', code: null }));
+    return;
+  }
 
   if (url.pathname !== '/internal/runtime/stream') {
     res.writeHead(404, { 'content-type': 'application/json' });

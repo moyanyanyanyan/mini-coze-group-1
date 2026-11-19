@@ -9,6 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.config import get_settings
+from app.readiness import require_ready
 from app.runtime.errors import ModelError
 from app.runtime.schemas import RuntimeRequest
 from app.runtime.service import RuntimeService
@@ -30,7 +31,7 @@ def internal_auth(request: Request) -> None:
         raise ModelError("INTERNAL_UNAUTHORIZED", "内部服务凭证无效", 401)
 
 
-router = APIRouter(prefix="/internal/runtime", dependencies=[Depends(internal_auth)])
+router = APIRouter(prefix="/internal/runtime", dependencies=[Depends(internal_auth), Depends(require_ready)])
 
 
 @router.post("/run")

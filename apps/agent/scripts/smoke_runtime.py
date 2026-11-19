@@ -28,9 +28,9 @@ async def verify(port: int, token: str):
                             "model": settings.deepseek_model, "temperature": 0.7, "maxTokens": 128,
                             "knowledgeBaseIds": [], "pluginIds": []}, "history": [], "message": "用三句话介绍流式输出。"}
     async with httpx.AsyncClient(base_url=f"http://127.0.0.1:{port}", trust_env=False, timeout=90) as client:
-        for _ in range(100):
+        for _ in range(1300):
             try:
-                if (await client.get("/health")).status_code == 200:
+                if (await client.get("/ready")).status_code == 200:
                     break
             except httpx.ConnectError:
                 pass

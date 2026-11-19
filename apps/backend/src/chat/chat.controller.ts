@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Logger,
+  HttpException,
   Param,
   Post,
   Res,
@@ -25,6 +26,7 @@ import type { RuntimeSseEvent } from './runtime-client.service';
  *    前端只认右边这几个值，后端换 Runtime 实现也不影响它。
  */
 const INTERNAL_TO_OUTBOUND: Record<string, string> = {
+  SERVICE_NOT_READY: 'SERVICE_NOT_READY',
   INTERNAL_UNAUTHORIZED: 'MODEL_ERROR',
   INTERNAL_NOT_CONFIGURED: 'MODEL_ERROR',
   RUNTIME_UNAVAILABLE: 'MODEL_ERROR',
@@ -98,6 +100,7 @@ export class ChatController {
       throw new BadRequestException('请先选择智能体');
     }
     await this.agents.getAgentConfig(conversation.agentId, user.id);
+    await this.chat.assertReady();
     this.chat.acquire(id);
     res.writeHead(200, {
       'Content-Type': 'text/event-stream; charset=utf-8',
@@ -126,6 +129,8 @@ export class ChatController {
       }
     } catch (error) {
       this.logger.error(`聊天流异常 conversationId=${id}`, error as Error);
+      const detail = error instanceof HttpException ? error.getResponse() : null;
+      const notReady = detail !== null && typeof detail === 'object' && 'code' in detail && detail.code === 'SERVICE_NOT_READY';
       if (!res.writableEnded) {
         res.write(frame({
           runId: lastEvent?.runId ?? randomUUID(),
@@ -133,7 +138,7 @@ export class ChatController {
           seq: (lastEvent?.seq ?? 0) + 1,
           timestamp: new Date().toISOString(),
           type: 'run.failed',
-          data: { code: 'MODEL_ERROR', message: '生成失败，请稍后重试', retryable: true },
+          data: { code: notReady ? 'SERVICE_NOT_READY' : 'MODEL_ERROR', message: notReady ? '对话服务尚未就绪，请稍后重试' : '生成失败，请稍后重试', retryable: true },
         }));
       }
     } finally {

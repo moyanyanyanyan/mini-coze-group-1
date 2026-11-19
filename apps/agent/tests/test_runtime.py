@@ -258,6 +258,7 @@ def test_timeouts_release_connection(settings, body, which, expected):
 
 
 def test_http_auth_validation_run_and_sse(settings, body, monkeypatch):
+    monkeypatch.setattr(app.state, "readiness", "ready", raising=False)
     monkeypatch.setattr(routes, "get_settings", lambda: settings)
     async def verify():
         async with httpx.AsyncClient(transport=transport()) as upstream:

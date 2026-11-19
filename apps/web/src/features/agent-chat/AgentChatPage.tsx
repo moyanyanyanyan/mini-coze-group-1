@@ -14,6 +14,8 @@ import { AppLink } from '../../shared/routing/AppLink';
 import { useConfirm } from '@minicoze/ui/hooks';
 import { AgentChatView, useChatViewport } from '@minicoze/ui/agent-chat';
 
+import { useChatReadiness } from './use-chat-readiness';
+
 const SUGGESTED_PROMPTS = [
   '介绍一下你能帮我做什么',
   '帮我梳理一个问题的思路',
@@ -21,6 +23,7 @@ const SUGGESTED_PROMPTS = [
 ];
 
 export function AgentChatPage() {
+  const readiness = useChatReadiness();
   const { confirm, confirmation } = useConfirm();
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -185,8 +188,8 @@ export function AgentChatPage() {
   }, [boot]);
 
   const handleSend = async (content: string) => {
-    if (!conversationId || streamingId || switching) {
-      return;
+    if (!conversationId || streamingId || switching || readiness.status !== 'ready') {
+      return false;
     }
 
     setSendError('');
@@ -196,10 +199,11 @@ export function AgentChatPage() {
     const now = new Date().toISOString();
     // 乐观插入：不等后端回包就把两条气泡画出来，打字效果才不卡
     const assistantKey = `tmp-assistant-${Date.now()}`;
+    const userKey = `tmp-user-${Date.now()}`;
     setMessages((prev) => [
       ...prev,
       {
-        id: `tmp-user-${Date.now()}`,
+        id: userKey,
         conversationId,
         role: 'user',
         status: 'completed',
@@ -217,6 +221,7 @@ export function AgentChatPage() {
     // run.started 一到就有真 id，之后所有更新按它定位。
     // 用 let 而不是 ref，是因为它只活在这一轮里
     let targetId = assistantKey;
+    let rejectedBeforeStart = false;
 
     try {
       await streamMessage(
@@ -249,7 +254,13 @@ export function AgentChatPage() {
             );
             void listConversations().then(setConversations).catch(() => undefined);
           },
-          onFailed: (_code, message) => {
+          onFailed: (code, message) => {
+            if (code === 'SERVICE_NOT_READY' && targetId === assistantKey) {
+              rejectedBeforeStart = true;
+              setMessages(prev => prev.filter(m => m.id !== assistantKey && m.id !== userKey));
+              readiness.refresh();
+              return;
+            }
             setSendError(message);
             setMessages((prev) =>
               prev.map((m) => (m.id === targetId ? { ...m, status: 'failed' } : m)),
@@ -259,6 +270,11 @@ export function AgentChatPage() {
         controller.signal,
       );
     } catch (caught) {
+      if (caught instanceof ApiError && caught.code === 'SERVICE_NOT_READY') {
+        setMessages(prev => prev.filter(m => m.id !== assistantKey && m.id !== userKey));
+        readiness.refresh();
+        return false;
+      }
       // 主动停止是正常路径，不弹错误；半截内容原样留在气泡里
       if (!(caught instanceof DOMException && caught.name === 'AbortError')) {
         setSendError(caught instanceof ApiError ? caught.message : '发送失败，请稍后再试');
@@ -275,6 +291,7 @@ export function AgentChatPage() {
       abortRef.current = null;
       setStreamingId(null);
     }
+    return !rejectedBeforeStart;
   };
 
   const handleStop = () => {
@@ -291,6 +308,8 @@ export function AgentChatPage() {
       citationsByMessage={citationsByMessage}
       streamingId={streamingId}
       sendError={sendError}
+      readiness={readiness.status}
+      onReadinessRetry={readiness.refresh}
       needsAgent={needsAgent}
       bootError={bootError}
       switching={switching}

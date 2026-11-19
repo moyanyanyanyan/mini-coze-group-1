@@ -41,7 +41,7 @@ function createHarness() {
       agentId: 'agent-1',
     }),
   } as unknown as ConversationsService;
-  const runtime = {
+  const runtime = { assertReady: jest.fn().mockResolvedValue(undefined),
     stream: jest.fn(),
   };
   const agents = {

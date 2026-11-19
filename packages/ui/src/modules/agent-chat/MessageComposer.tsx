@@ -5,13 +5,14 @@ import styles from './agent-chat.module.css';
 
 interface MessageComposerProps {
   disabled: boolean;
-  onSend: (content: string) => void;
+  onSend: (content: string) => void | Promise<boolean | void>;
+  sendBlocked?: boolean;
   streaming?: boolean;
   unavailable?: boolean;
   onStop?: () => void;
 }
 
-export function MessageComposer({ disabled, onSend, streaming, unavailable, onStop }: MessageComposerProps) {
+export function MessageComposer({ disabled, onSend, streaming, unavailable, onStop, sendBlocked }: MessageComposerProps) {
   const [draft, setDraft] = useState('');
   const inputRef = useRef<HTMLTextAreaElement>(null);
   useLayoutEffect(() => {
@@ -20,14 +21,19 @@ export function MessageComposer({ disabled, onSend, streaming, unavailable, onSt
     inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 160)}px`;
   }, [draft]);
 
-  const send = () => {
+  const sendingRef = useRef(false);
+  const send = async () => {
     const content = draft.trim();
     // 纯空格不算一条消息，直接吃掉
-    if (!content || disabled) {
+    if (!content || disabled || sendBlocked || sendingRef.current) {
       return;
     }
-    onSend(content);
-    setDraft('');
+    sendingRef.current = true;
+    try {
+      if (await onSend(content) !== false) setDraft(current => current.trim() === content ? '' : current);
+    } finally {
+      sendingRef.current = false;
+    }
   };
 
   const handleSubmit = (event: FormEvent) => {
@@ -59,7 +65,7 @@ export function MessageComposer({ disabled, onSend, streaming, unavailable, onSt
       {streaming ? <button className={styles.send} type="button" aria-label="停止生成" onClick={onStop}><Icon name="stop" /></button> : <button
         className={styles.send}
         type="submit"
-        disabled={disabled || draft.trim().length === 0}
+        disabled={disabled || sendBlocked || draft.trim().length === 0}
         aria-label="发送"
       >
         <Icon name="send" />

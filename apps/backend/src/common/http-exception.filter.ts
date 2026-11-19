@@ -78,6 +78,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     response.status(status).json({
       code: status,
+      ...(rawCode === 'SERVICE_NOT_READY' ? { errorCode: rawCode } : {}),
       message: Array.isArray(message) ? message.join('; ') : message,
       data: null,
       ...(details !== undefined ? { details } : {}),
