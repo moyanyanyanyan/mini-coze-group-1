@@ -4,6 +4,7 @@ from contextlib import aclosing
 
 from app.runtime.deepseek import stream_model
 from app.runtime.errors import ModelError
+from app.runtime.observations import StageRecorder
 from app.runtime.schemas import ModelResult, ToolCallBatch, ToolRequest, ToolSuccess, ToolFailure, Usage
 
 MAX_TOOL_ROUNDS = 4
@@ -22,7 +23,8 @@ def check_tool_budget(value, tools, messages, settings):
         raise ModelError("INVALID_REQUEST", "工具上下文超过本服务预算", 400)
 
 
-async def stream_tool_loop(value, tools, request, settings, plugins, client):
+async def stream_tool_loop(value, tools, request, settings, plugins, client, *, trace=None):
+    trace = trace if trace is not None else StageRecorder()
     messages = [message.model_dump() for message in value.messages]
     allowed = {tool.name: tool for tool in tools}
     seen = set()
@@ -33,8 +35,8 @@ async def stream_tool_loop(value, tools, request, settings, plugins, client):
     for round_index in range(MAX_TOOL_ROUNDS + 1):
         check_tool_budget(value, tools, messages, settings)
         turn = None
-        async with aclosing(stream_model(value, settings=settings, client=client,
-                                        tools=tools, messages=messages)) as events:
+        async with aclosing(trace.model(stream_model(value, settings=settings, client=client,
+                                        tools=tools, messages=messages), value.model, round_index + 1)) as events:
             async for item in events:
                 if isinstance(item, str):
                     content.append(item)
@@ -79,14 +81,18 @@ async def stream_tool_loop(value, tools, request, settings, plugins, client):
         check_tool_budget(value, tools, messages, settings)
         for call, args in prepared:
             yield ("tool.started", {"toolCallId": call.id, "toolName": call.name})
-            result = await plugins.execute(ToolRequest(runId=request.runId, actorId=request.actor.id,
-                agentId=request.agentConfig.id, toolCallId=call.id, toolName=call.name, arguments=args))
-            if result.toolCallId != call.id or result.toolName != call.name:
-                raise ModelError("TOOL_PROTOCOL_ERROR", "工具返回调用标识不匹配", 502)
-            raw = result.model_dump()
-            encoded = json.dumps(raw, ensure_ascii=False, allow_nan=False)
-            if len(encoded.encode("utf-8")) > 16000:
-                raise ModelError("TOOL_RESULT_TOO_LARGE", "工具返回结果超过限制", 502)
+            with trace.measure("tool", round=round_index + 1, toolCallId=call.id, toolName=call.name) as stage:
+                result = await plugins.execute(ToolRequest(runId=request.runId, actorId=request.actor.id,
+                    agentId=request.agentConfig.id, toolCallId=call.id, toolName=call.name, arguments=args))
+                if result.toolCallId != call.id or result.toolName != call.name:
+                    raise ModelError("TOOL_PROTOCOL_ERROR", "工具返回调用标识不匹配", 502)
+                raw = result.model_dump()
+                encoded = json.dumps(raw, ensure_ascii=False, allow_nan=False)
+                if len(encoded.encode("utf-8")) > 16000:
+                    raise ModelError("TOOL_RESULT_TOO_LARGE", "工具返回结果超过限制", 502)
+                if result.status == "failed":
+                    stage.status = "failed"
+                    stage.errorCode = result.error.get("code", "TOOL_FAILED")
             results.append(raw)
             yield ("tool.completed", raw)
             if result.status == "failed" and result.error.get("code") in ("INVALID_ARGUMENTS", "TOOL_NOT_FOUND"):

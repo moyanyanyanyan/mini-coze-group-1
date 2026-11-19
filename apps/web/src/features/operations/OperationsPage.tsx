@@ -1,57 +1,84 @@
+import { useEffect, useLayoutEffect, useRef, useState, type ComponentProps } from 'react';
+import { OperationsView, animateOperationsChange, type OperationsData } from '@minicoze/ui/operations';
 import { getMe } from '../auth/api/auth-api';
 import type { AuthUser } from '../auth/types';
-import { OperationsView, animateOperationsChange } from '@minicoze/ui/operations';
-import { useEffect, useState, useLayoutEffect, type ComponentProps } from 'react';
 import { AppLink } from '../../shared/routing/AppLink';
 import { navigate, useRouteLocation } from '../../shared/routing/navigation';
-import { createOperationsMock } from './operations.mock';
+import { ApiError } from '../../shared/api/http';
+import { loadOperations } from './operations.api';
 
-const mockData = createOperationsMock();
 const scrollPositions = new Map<string, number>();
-
 function OperationsLink({ to, onClick, ...props }: ComponentProps<typeof AppLink>) {
   return <AppLink {...props} to={to} onClick={event => {
     onClick?.(event);
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     const target = new URL(to, window.location.href);
-    // 会话链路展开/收起已有连续布局动画，不叠加快照过渡。
-    const sameConversation = target.pathname === window.location.pathname && target.pathname.includes('/conversations/');
-    if (sameConversation && target.searchParams.get('node') === new URLSearchParams(window.location.search).get('node')) return;
-    event.preventDefault();
-    animateOperationsChange(() => navigate(to));
+    if (target.pathname === window.location.pathname && target.pathname.includes('/conversations/') && target.searchParams.get('node') === new URLSearchParams(window.location.search).get('node')) return;
+    event.preventDefault(); animateOperationsChange(() => navigate(to));
   }} />;
 }
 
 export function OperationsPage() {
-  const [profile, setProfile] = useState<AuthUser>();
-  const [profileError, setProfileError] = useState('');
-  useEffect(() => {
-    let active = true;
-    getMe().then(user => { if (active) setProfile(user); }).catch(() => {
-      if (active) setProfileError('用户信息加载失败');
-    });
-    return () => { active = false; };
-  }, []);
   const location = useRouteLocation();
   const [pathname, search = ''] = location.split('?');
+  return <OperationsController key={pathname} pathname={pathname} search={search} />;
+}
+
+function OperationsController({ pathname, search }: { pathname: string; search: string }) {
+  const [profile, setProfile] = useState<AuthUser>();
+  const [data, setData] = useState<OperationsData>();
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [attempt, setAttempt] = useState(0);
+  const [runPages, setRunPages] = useState(1);
+  const restored = useRef(false);
+  useEffect(() => {
+    let active = true;
+    let pending = false;
+    let polling = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    async function refresh() {
+      if (pending || !active) return;
+      pending = true; setLoading(true);
+      try {
+        const user = await getMe();
+        const next = await loadOperations(pathname, search, user.id, runPages);
+        if (!active) return;
+        setProfile(user); setData(next); setError('');
+        polling = next.runs.some(run => run.observed && (run.observed.status === 'running' || (run.status === 'running' && run.observed.finishedAt !== null && Date.now() - Date.parse(run.observed.finishedAt) < 30_000))) || next.tasks.some(task => task.observed && task.status === 'processing');
+      } catch (failure) {
+        if (!active) return;
+        if (failure instanceof ApiError && failure.status === 401) { setData(undefined); navigate('/login'); }
+        else {
+          if (failure instanceof ApiError && [403, 404].includes(failure.status)) { setData(undefined); polling = false; }
+          setError(failure instanceof Error ? failure.message : '读取失败，请重试');
+        }
+      } finally {
+        pending = false;
+        if (active) {
+          setLoading(false);
+          if (polling && !document.hidden) timer = setTimeout(() => void refresh(), 5000);
+        }
+      }
+    }
+    void refresh();
+    const visibility = () => { clearTimeout(timer); if (!document.hidden && polling) void refresh(); };
+    document.addEventListener('visibilitychange', visibility);
+    return () => { active = false; clearTimeout(timer); document.removeEventListener('visibilitychange', visibility); };
+  }, [pathname, search, attempt, runPages]);
   useLayoutEffect(() => {
-    // 工作区使用独立滚动容器，进入详情回到顶部，返回列表恢复阅读位置。
+    if (!data || restored.current) return;
     const scroller = document.querySelector<HTMLElement>('.workspace-content');
-    if (!scroller) return;
-    scroller.scrollTop = scrollPositions.get(pathname) ?? 0;
-    const remember = () => scrollPositions.set(pathname, scroller.scrollTop);
-    scroller.addEventListener('scroll', remember, { passive: true });
-    return () => scroller.removeEventListener('scroll', remember);
+    if (scroller) scroller.scrollTop = scrollPositions.get(pathname) ?? 0;
+    restored.current = true;
+  }, [data, pathname]);
+  useEffect(() => {
+    const scroller = document.querySelector<HTMLElement>('.workspace-content');
+    const remember = () => { if (restored.current && scroller) scrollPositions.set(pathname, scroller.scrollTop); };
+    scroller?.addEventListener('scroll', remember, { passive: true });
+    return () => scroller?.removeEventListener('scroll', remember);
   }, [pathname]);
-  return (
-    <OperationsView
-      key={pathname}
-      data={mockData}
-      profile={profile}
-      profileError={profileError}
-      pathname={pathname}
-      search={search}
-      LinkComponent={OperationsLink}
-    />
-  );
+  if (!data) return <div className="om"><div className="om-empty" role={error ? 'alert' : 'status'}>{error || '正在加载运行数据…'}{error && <button onClick={() => setAttempt(n => n + 1)}>重试</button>}</div></div>;
+  return <OperationsView data={data} profile={profile} pathname={pathname} search={search} LinkComponent={OperationsLink}
+    loading={loading} error={error} onRefresh={() => setAttempt(n => n + 1)} onMoreRuns={() => setRunPages(n => n + 1)} />;
 }

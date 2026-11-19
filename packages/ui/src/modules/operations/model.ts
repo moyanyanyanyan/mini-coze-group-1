@@ -1,16 +1,21 @@
-export type RunStatus = 'success' | 'warning' | 'failed';
+import type { OperationsRuntimeRun, OperationsRuntimeDetail, OperationsRuntimeStats, OperationsBase, OperationsDocument } from '../../../../shared/src/operations';
+export type RunStatus = 'success' | 'warning' | 'failed' | 'running' | 'cancelled' | 'interrupted';
 export type TaskStatus = 'ready' | 'processing' | 'failed';
 export interface OperationAgent {
+  actual?: boolean;
+  conversationCount?: number;
   id: string;
   name: string;
   description: string;
 }
 export interface OperationBase {
+  observed?: OperationsBase;
   id: string;
   name: string;
   description: string;
 }
 export interface OperationChunk {
+  enabled?: boolean;
   id: string;
   position: number;
   content: string;
@@ -18,6 +23,7 @@ export interface OperationChunk {
   end: number;
 }
 export interface OperationDocument {
+  observed?: OperationsDocument;
   id: string;
   baseId: string;
   name: string;
@@ -25,12 +31,14 @@ export interface OperationDocument {
   chunks: OperationChunk[];
 }
 export interface OperationStage {
+  id?: string;
   name: string;
-  status: 'success' | 'failed' | 'pending' | 'running';
+  status: 'success' | 'failed' | 'pending' | 'running' | 'interrupted';
   durationMs: number;
   description: string;
 }
 export interface OperationTask {
+  observed?: OperationsDocument;
   id: string;
   documentId: string;
   startedAt: number;
@@ -63,6 +71,7 @@ export interface OperationPlugin {
   output: Record<string, string>;
 }
 export interface OperationRun {
+  observed?: OperationsRuntimeRun & { events?: OperationsRuntimeDetail['events'] };
   id: string;
   conversationId: string;
   startedAt: number;
@@ -81,10 +90,16 @@ export interface OperationConversation {
   id: string;
   agentId: string;
   title: string;
-  source: '平台聊天' | 'SDK/API';
+  source: '平台聊天' | 'SDK/API' | '未采集';
   actor: string;
 }
 export interface OperationsData {
+  examples?: OperationsData;
+  connected?: boolean;
+  runtimeStats?: OperationsRuntimeStats;
+  loadedRuns?: number;
+  totalRuns?: number;
+  messages?: { id: string; role: string; content: string; status: string }[];
   agents: OperationAgent[];
   bases: OperationBase[];
   documents: OperationDocument[];
@@ -143,13 +158,15 @@ export const withinDays = (at: number, days: number, now: number) =>
   at <= now && at >= now - days * 86400_000;
 export function runSummary(runs: OperationRun[]) {
   const failed = runs.filter((r) => r.status === 'failed').length;
+  const finished = runs.filter(r => ['success', 'warning', 'failed'].includes(r.status));
+  const timed = runs.filter(r => !r.observed || r.observed.durationMs !== null);
   return {
     count: runs.length,
     failed,
     warnings: runs.filter((r) => r.status === 'warning').length,
-    rate: runs.length ? `${(((runs.length - failed) / runs.length) * 100).toFixed(1)}%` : '—',
-    average: runs.length
-      ? duration(Math.round(runs.reduce((n, r) => n + r.durationMs, 0) / runs.length))
+    rate: finished.length ? `${(((finished.length - failed) / finished.length) * 100).toFixed(1)}%` : '—',
+    average: timed.length
+      ? duration(Math.round(timed.reduce((n, r) => n + r.durationMs, 0) / timed.length))
       : '—',
   };
 }
@@ -159,6 +176,8 @@ export function latestTask(data: OperationsData, documentId: string) {
     .sort((a, b) => b.startedAt - a.startedAt)[0];
 }
 export function baseSummary(data: OperationsData, baseId: string) {
+  const actual = data.bases.find(base => base.id === baseId)?.observed;
+  if (actual) return { files: actual.documentCount, sourceBytes: 0, chunkCount: actual.availableChunkCount, chunkBytes: 0, processing: actual.processingDocuments, failed: actual.failedDocuments };
   const docs = data.documents.filter((d) => d.baseId === baseId);
   const ready = docs.filter((d) => latestTask(data, d.id)?.status === 'ready');
   return {

@@ -96,6 +96,13 @@ afterEach(() => {
 });
 
 describe('RuntimeClientService.run', () => {
+  it('preserves optional stage summaries on HTTP failure', async () => {
+    const stages = [{ stageId: 's1', kind: 'model', status: 'failed', durationMs: 20, startedAt: '2026-11-14T00:00:00Z' }];
+    jest.spyOn(global, 'fetch').mockResolvedValue(new Response(JSON.stringify({ message: '模型限流', stages }), {
+      status: 503, headers: { 'X-Runtime-Error-Code': 'MODEL_RATE_LIMITED' },
+    }));
+    await expect(createClient().run(request)).rejects.toMatchObject({ code: 'MODEL_RATE_LIMITED', options: { stages } });
+  });
   it('calls the non-stream Runtime endpoint and parses RuntimeResult', async () => {
     const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(
       new Response(JSON.stringify(result), { status: 200 }),

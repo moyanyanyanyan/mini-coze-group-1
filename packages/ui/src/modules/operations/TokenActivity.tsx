@@ -10,9 +10,10 @@ export function tokenActivity(runs: OperationRun[], snapshotAt: number) {
   start.setDate(start.getDate() - (start.getDay() + 6) % 7 - 77);
   const totals = new Map<string, number>();
   for (const run of runs) {
+    if (run.observed && run.observed.totalTokens === null) continue;
     if (run.startedAt < start.getTime() || run.startedAt > snapshotAt) continue;
     const key = dayKey(new Date(run.startedAt));
-    totals.set(key, (totals.get(key) ?? 0) + run.inputTokens + run.outputTokens);
+    totals.set(key, (totals.get(key) ?? 0) + (run.observed ? run.observed.totalTokens! : run.inputTokens + run.outputTokens));
   }
   return Array.from({ length: 84 }, (_, index) => {
     const date = new Date(start);

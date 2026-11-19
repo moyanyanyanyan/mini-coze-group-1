@@ -141,6 +141,7 @@ model Conversation {
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages Message[]
+  operationRuns OperationRuntimeRun[]
 
   @@index([userId, updatedAt])
 }

@@ -15,6 +15,7 @@ import { WorkflowsModule } from './modules/workflows/workflows.module';
 import { ChatModule } from './chat/chat.module';
 import { ApiKeysModule } from './modules/api-keys/api-keys.module';
 import { PublicApiModule } from './modules/public-api/public-api.module';
+import { OperationsModule } from './modules/operations/operations.module';
 
 
 @Module({
@@ -31,6 +32,7 @@ import { PublicApiModule } from './modules/public-api/public-api.module';
     AgentsModule,
     ApiKeysModule,
     PublicApiModule,
+    OperationsModule,
     ConversationsModule,
     KnowledgeModule,
     ChatModule,

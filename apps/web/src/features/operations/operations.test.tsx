@@ -107,7 +107,7 @@ describe('运行管理页面与边界', () => {
   it('智能体列表每条记录链接自己的会话列表', () => {
     const html = render(`${operationsRoot}/agents`);
     for (const agent of data.agents) expect(html).toContain(`href="${agentPath(agent.id)}"`);
-    expect(html).toContain('模拟数据 · 未连接后端');
+    expect(html).toContain('模拟数据，不代表实际运行');
   });
 
   it('失败与完成但有异常分别显示，未命中不是失败', () => {
@@ -171,5 +171,32 @@ describe('会话执行详情渐进展开', () => {
     expect(html).toContain('aria-expanded="true"');
     expect(html).toContain('aria-label="返回对话记录"');
     expect(html).toContain('回答已完成，存在节点异常');
+  });
+});
+
+describe('知识库运行三层界面', () => {
+  it('首页展示容量分布、知识库卡片及指向具体处理的错误入口', () => {
+    const html = render(`${operationsRoot}/knowledge`);
+    expect(html).toContain('文件存储分布');
+    expect(html).toContain('最近错误记录');
+    expect(html).toContain('知识库名称搜索');
+    expect(html).toContain('模拟容量');
+    expect(html).toContain(`${taskPath('kb-2', 'task-demo-upload')}?focus=error`);
+  });
+  it('上传失败无原文件与切片，切片失败仍能预览原文件', () => {
+    const upload = render(taskPath('kb-2', 'task-demo-upload'));
+    expect(upload).toContain('原文件不可用');
+    expect(upload).not.toContain('om-k-pdf');
+    expect(render(taskPath('kb-2', 'task-demo-upload'), 'tab=chunks')).toContain('文件上传失败，未生成切片内容');
+    const chunk = render(taskPath('kb-2', 'task-demo-chunk'));
+    expect(chunk).toContain('om-k-text-preview');
+    expect(chunk).toContain('CHUNKING_FAILED');
+  });
+  it('PDF、图片使用不同预览，历史失败保留跳转最新处理的入口', () => {
+    expect(render(taskPath('kb-1', 'task-1-5'))).toContain('模拟 PDF 文件预览');
+    expect(render(taskPath('kb-1', 'task-1-6'))).toContain('/operations-samples/document.svg');
+    const history = render(taskPath('kb-1', 'task-1-2-attempt-1'));
+    expect(history).toContain('正在查看历史处理记录');
+    expect(history).toContain(taskPath('kb-1', 'task-1-2'));
   });
 });

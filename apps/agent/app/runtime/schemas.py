@@ -159,7 +159,24 @@ class ToolFailure(DTO):
     error: dict[str, str]
 
 
+class RuntimeStage(DTO):
+    stageId: str
+    kind: Literal["retrieval", "context", "model", "tool"]
+    startedAt: str
+    durationMs: int = 0
+    status: Literal["running", "completed", "failed", "interrupted"] = "running"
+    errorCode: str | None = None
+    round: int | None = None
+    model: str | None = None
+    outcome: Literal["answer", "tool_calls"] | None = None
+    usage: Usage | None = None
+    chunkCount: int | None = None
+    toolCallId: str | None = None
+    toolName: str | None = None
+
+
 class RuntimeResult(ModelResult):
+    stages: list[RuntimeStage] = Field(default_factory=list, max_length=32)
     runId: str
     conversationId: str
     assistantMessageId: str

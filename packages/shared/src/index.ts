@@ -86,3 +86,6 @@ export interface SendMessageResult {
   assistantMessage: ChatMessage;
 }
 export * from './workflow';
+export * from './operations';
+
+export * from './runtime-stages';

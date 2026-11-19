@@ -78,6 +78,7 @@ export type RuntimeToolResult =
     };
 
 export interface RuntimeResult {
+  stages?: unknown;
   runId: string;
   conversationId: string;
   assistantMessageId: string;
@@ -106,6 +107,7 @@ export class RuntimeCallError extends Error {
       kind?: RuntimeCallErrorKind;
       httpStatus?: number;
       cause?: unknown;
+      stages?: unknown;
     } = {},
   ) {
     super(message, options.cause === undefined ? undefined : { cause: options.cause });
@@ -519,9 +521,11 @@ export class RuntimeClientService {
     const headerCode = response.headers.get('x-runtime-error-code') ?? '';
 
     let bodyMessage = '';
+    let stages: unknown;
     try {
-      const payload = (await response.json()) as { message?: string };
+      const payload = (await response.json()) as { message?: string; stages?: unknown };
       bodyMessage = payload.message ?? '';
+      stages = payload.stages;
     } catch {
       // body 不是 JSON 就算了
     }
@@ -537,6 +541,7 @@ export class RuntimeClientService {
       .replaceAll(this.token, '[REDACTED]');
 
     return new RuntimeCallError(code, message, {
+      stages,
       kind: headerCode ? 'runtime' : 'http',
       httpStatus: response.status,
     });

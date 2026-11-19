@@ -1,3 +1,4 @@
+import { parseRuntimeStages } from '../../../../shared/src/runtime-stages';
 import { animateOperationsChange } from './motion';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -50,7 +51,7 @@ export function Agents(p: ContentProps) {
             status: s.failed ? 'failed' : 'success',
             cells: [
               <Cell title={<L to={agentPath(a.id)}>{a.name}</L>} subtitle={a.description} />,
-              new Set(selected.map((r) => r.conversationId)).size,
+              a.conversationCount ?? new Set(selected.map((r) => r.conversationId)).size,
               s.count,
               <Cell title={s.rate} subtitle={`${s.failed} 次失败`} />,
               s.average,
@@ -88,9 +89,9 @@ export function Conversations(p: ContentProps & { agentId: string }) {
           .filter((c) => c.agentId === agentId)
           .flatMap((c) => {
             const items = selected.filter((r) => r.conversationId === c.id);
-            if (!items.length) return [];
+            if (!items.length && !agent.actual) return [];
             const summary = runSummary(items);
-            const status = summary.failed ? 'failed' : summary.warnings ? 'warning' : 'success';
+            const status = summary.failed ? 'failed' : summary.warnings ? 'warning' : items.find(item => ['running', 'cancelled', 'interrupted'].includes(item.status))?.status ?? 'success';
             return [
               {
                 id: c.id,
@@ -110,9 +111,9 @@ export function Conversations(p: ContentProps & { agentId: string }) {
                       ? '有失败'
                       : status === 'warning'
                         ? '有节点异常'
-                        : '全部成功'}
+                        : !items.length ? '尚无采集记录' : status === 'success' ? '全部成功' : runLabels[status]}
                   </Badge>,
-                  time(items[0].startedAt),
+                  items[0] ? time(items[0].startedAt) : '尚无采集记录',
                   <L to={conversationPath(agentId, c.id)}>查看 →</L>,
                 ],
               },
@@ -124,6 +125,7 @@ export function Conversations(p: ContentProps & { agentId: string }) {
 }
 
 export function RetrievalDetail({ data, run }: { data: OperationsData; run: OperationRun }) {
+  if (!run.observed && data.examples) data = data.examples;
   const hits = run.retrievals.flatMap((r) => r.hits);
   return (
     <>
@@ -248,6 +250,50 @@ export function PluginDetail({ run }: { run: OperationRun }) {
   );
 }
 
+function CollectedTrace({ run }: { run: OperationRun }) {
+  const actual = run.observed!;
+  const stages = parseRuntimeStages(actual.events?.filter(event => event.type === 'runtime.stage').map(event => event.data));
+  const captured = new Set(stages.map(stage => stage.kind));
+  const examples = run.stages.filter(stage => !(
+    (stage.name.includes('知识库检索') && captured.has('retrieval')) ||
+    (stage.name.includes('模型调用') && captured.has('model')) ||
+    (stage.name.includes('插件') && captured.has('tool'))
+  )).map(stage => ({ ...stage, name: `${stage.name}（示例）`, description: `示例说明：${stage.description}` }));
+  const measured = stages.map(stage => ({
+    id: stage.stageId,
+    name: `${({ retrieval: '知识库检索', context: '上下文组装', model: '模型调用', tool: '工具执行' })[stage.kind]}${stage.round ? ` · 第 ${stage.round} 轮` : ''}${stage.toolName ? ` · ${stage.toolName}` : ''}（已采集）`,
+    status: stage.status === 'completed' ? 'success' as const : stage.status,
+    durationMs: stage.durationMs,
+    description: [stage.model, stage.outcome === 'tool_calls' ? '返回工具调用' : stage.outcome === 'answer' ? '返回回答' : '',
+      stage.chunkCount === undefined ? '' : `${stage.kind === 'context' ? '组装上下文' : '返回'} ${stage.chunkCount} 个切片`,
+      stage.usage ? `本轮已报告 Token：输入 ${stage.usage.promptTokens} / 输出 ${stage.usage.completionTokens}` : stage.kind === 'model' ? '本轮 Token 未报告' : '',
+      stage.errorCode, `实际耗时 ${duration(stage.durationMs)}`].filter(Boolean).join(' · '),
+  }));
+  const labels: Record<string, string> = { completed: 'Runtime 已完成', failed: '失败', running: '处理中', pending: '等待保存', cancelled: '已取消', interrupted: '采集中断' };
+  return <>
+    <div className="om-trace-metrics">
+      <span>调用耗时 <b>{duration(run.durationMs)}{actual.durationMs === null ? '（示例）' : ''}</b></span>
+      <span>首字响应 <b>{actual.firstTokenMs === null ? '未采集' : duration(actual.firstTokenMs)}</b></span>
+      <span>Token <b>{actual.totalTokens ?? `${run.inputTokens + run.outputTokens}（示例）`}</b></span>
+    </div>
+    <p className="om-note">输入 {actual.inputTokens ?? `${run.inputTokens}（示例）`} / 输出 {actual.outputTokens ?? `${run.outputTokens}（示例）`} Token；示例不计入实际用量。</p>
+    <div className="om-key-value"><span>Runtime 结果</span><strong>{labels[actual.status] ?? actual.status}</strong></div>
+    <div className="om-key-value"><span>消息保存状态</span><strong>{actual.messageStatus === 'completed' ? '已保存' : labels[actual.messageStatus ?? ''] ?? '不可用'}</strong></div>
+    {actual.errorCode && <Notice title="实际调用异常" tone="failed">{actual.errorCode}</Notice>}
+    <h3>已采集执行链路</h3>
+    {!actual.events ? <p>正在读取本轮采集事件…</p> : !actual.events.length ? <p>尚无过程事件，事件在本轮调用结束后保存。</p> : actual.events.filter(event => event.type !== 'runtime.stage').map((event, index) => <details className="om-snippet" key={index}>
+      <summary>{({ 'tool.started': '工具调用开始', 'tool.completed': '工具调用结果', 'knowledge.result': '知识库引用', 'runtime.result': 'Runtime 返回结果', 'run.failed': '调用失败' } as Record<string, string>)[event.type] ?? event.type}</summary>
+      <pre>{JSON.stringify(event.data, null, 2)}</pre>
+    </details>)}
+    {actual.truncated && <p className="om-note">部分事件已按大小上限截断或省略。</p>}
+    <p className="om-note">用量为 Runtime 已报告值；客户端耗时不包含消息最终保存。引用是上下文来源，不代表回答采用。</p>
+    <details className="om-snippet" open={stages.length > 0}><summary>{stages.length ? '内部阶段（实际采集，未采集项保留示例）' : '内部阶段示例（未采集，不属于本次执行）'}</summary>
+      <Stages stages={[...examples.filter(stage => stage.name.startsWith('接收请求')), ...measured, ...examples.filter(stage => !stage.name.startsWith('接收请求'))]} />
+      {stages.length > 0 && <p className="om-note">阶段为 Runtime 调用边界计时，模型耗时包含流式读取与下游消费等待；示例不属于本次执行，不参与耗时统计。</p>}
+    </details>
+  </>;
+}
+
 export function Conversation(p: ContentProps & { agentId: string; conversationId: string }) {
   const { data, agentId, conversationId, LinkComponent: L } = p;
   const conversation = data.conversations.find((c) => c.id === conversationId)!;
@@ -280,10 +326,12 @@ export function Conversation(p: ContentProps & { agentId: string; conversationId
   const run = detailParams.has('run') ? runs.find((r) => r.id === detailParams.get('run')) : runs.at(-1);
   if (!run)
     return (
+      <><PageHeader title={conversation.title} description="当前会话尚无对应的采集记录，以下为已有消息。" />
+      {data.messages?.map(message => <Panel key={message.id} title={message.role === 'user' ? '用户' : '助手'}><p className="om-answer">{message.content}</p></Panel>)}
       <Empty>
         执行记录不存在，或不属于当前会话。
         <L to={conversationPath(agentId, conversationId)}>返回会话</L>
-      </Empty>
+      </Empty></>
     );
   const node = detailParams.get('node');
   const path = `${conversationPath(agentId, conversationId)}?run=${run.id}`;
@@ -301,7 +349,7 @@ export function Conversation(p: ContentProps & { agentId: string; conversationId
       <div className={`om-chat-layout om-conversation-layout${expanded ? ' is-expanded' : closing ? ' is-closing' : ''}`}>
         <Panel
           title="对话记录"
-          action={<span className="om-note">{runs.length} 次执行 · 全部历史</span>}
+          action={<span className="om-note">{runs.length} 次执行 · {run.observed ? '已载入采集记录' : '示例记录'}</span>}
         >
           <p className="om-conversation-hint">先浏览对话，点击每轮下方的“查看执行链路”了解处理过程。</p>
           <div className="om-thread">
@@ -319,7 +367,7 @@ export function Conversation(p: ContentProps & { agentId: string; conversationId
                   <span className="om-replay-avatar" aria-hidden="true">{data.agents.find((a) => a.id === agentId)!.name.slice(0, 1)}</span>
                   <div className="om-replay-body">
                     <div className="om-speaker">{data.agents.find((a) => a.id === agentId)!.name}</div>
-                    <p className="om-answer">{r.answer || '本轮执行失败，没有生成回复。'}</p>
+                    <p className="om-answer">{r.answer || (r.observed ? '当前没有已保存的回复内容。' : '本轮执行失败，没有生成回复。')}</p>
                   </div>
                 </div>
                 <L
@@ -330,7 +378,7 @@ export function Conversation(p: ContentProps & { agentId: string; conversationId
                   onClick={event => { triggerRef.current = event.currentTarget; }}
                 >
                   <Badge tone={r.status}>{runLabels[r.status]}</Badge>
-                  <span>{duration(r.durationMs)}</span>
+                  <span>{duration(r.durationMs)}{r.observed?.durationMs === null ? '（示例）' : ''}</span>
                   <span>{expanded && r.id === run.id ? `正在查看第 ${i + 1} 轮` : `查看第 ${i + 1} 轮执行链路`}</span>
                 </L>
               </article>
@@ -390,7 +438,7 @@ export function Conversation(p: ContentProps & { agentId: string; conversationId
                 ← 返回执行链路
               </L>
             )}
-            {detail === 'knowledge' ? (
+            {run.observed ? <CollectedTrace run={run} /> : detail === 'knowledge' ? (
               <RetrievalDetail key={run.id} data={data} run={run} />
             ) : detail === 'plugin' ? (
               <PluginDetail key={run.id} run={run} />

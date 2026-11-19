@@ -11,7 +11,7 @@ import {
   type OperationStage,
 } from './model';
 
-export const runLabels = { success: '成功', warning: '完成，有异常', failed: '失败' };
+export const runLabels = { success: '成功', warning: '完成，有异常', failed: '失败', running: '运行中', cancelled: '已取消', interrupted: '采集中断' };
 
 export const taskLabels = { ready: '可检索', processing: '向量化中', failed: '向量化失败' };
 
@@ -295,17 +295,19 @@ export function Breadcrumbs({
 
 export function RunMetrics({ runs }: { runs: OperationRun[] }) {
   const s = runSummary(runs);
+  const example = runs.length > 0 && !runs.some(run => run.observed);
+  const suffix = example ? '（示例）' : '';
   return (
     <Stats
       items={[
         {
-          label: '会话数',
+          label: `会话数${suffix}`,
           value: new Set(runs.map((r) => r.conversationId)).size,
           note: '当前时间范围内',
         },
-        { label: '执行次数', value: s.count, note: `${s.failed} 次执行失败` },
-        { label: '执行成功率', value: s.rate, note: `其中 ${s.warnings} 次完成但有节点异常` },
-        { label: '平均耗时', value: s.average, note: '按已结束执行统计' },
+        { label: `执行次数${suffix}`, value: s.count, note: `${s.failed} 次执行失败` },
+        { label: `执行成功率${suffix}`, value: s.rate, note: example ? `其中 ${s.warnings} 次完成但有节点异常` : '已载入且明确结束的记录；取消和中断不计入' },
+        { label: `平均耗时${suffix}`, value: s.average, note: example ? '按已结束执行统计' : '仅已采集客户端耗时，不含示例值' },
       ]}
     />
   );
@@ -322,7 +324,7 @@ export function Stages({
   return (
     <ol className="om-stages">
       {stages.map((s) => (
-        <li key={s.name}>
+        <li key={s.id ?? s.name}>
           <span className={`om-stage-dot om-tone-${s.status}`}>
             <Icon
               name={s.status === 'success' ? 'check' : s.status === 'failed' ? 'close' : 'more'}
@@ -332,7 +334,7 @@ export function Stages({
             <div className="om-stage-title">
               <strong>{s.name}</strong>
               <span>
-                {s.status === 'pending'
+                {s.status === 'interrupted' ? `中断 · ${duration(s.durationMs)}` : s.status === 'failed' ? `失败 · ${duration(s.durationMs)}` : s.status === 'pending'
                   ? '未执行'
                   : s.status === 'running'
                     ? `进行中 · ${duration(s.durationMs)}`

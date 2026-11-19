@@ -2,6 +2,10 @@ import type { LinkComponentType } from '../../layouts/types';
 import type { OperationsData, OperationRun, OperationTask } from './model';
 
 export interface OperationsViewProps {
+  loading?: boolean;
+  error?: string;
+  onRefresh?: () => void;
+  onMoreRuns?: () => void;
   profile?: { displayName: string; email: string; avatarUrl?: string | null };
   profileError?: string;
   data: OperationsData;

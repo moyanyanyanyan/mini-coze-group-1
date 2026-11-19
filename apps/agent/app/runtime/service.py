@@ -10,6 +10,7 @@ from app.config import Settings
 from app.runtime.deepseek import check_budget, stream_model, validate_model
 from app.runtime.tool_loop import check_tool_budget, stream_tool_loop
 from app.runtime.errors import ModelError
+from app.runtime.observations import StageRecorder
 from app.runtime.providers import KnowledgeContextProvider, PluginToolProvider, UnconfiguredKnowledgeProvider, UnconfiguredPluginProvider
 from app.runtime.schemas import ChatMessage, KnowledgeRequest, KnowledgeResult, ModelInput, RuntimeRequest, RuntimeResult
 
@@ -53,6 +54,7 @@ class RuntimeService:
 
     async def events(self, request: RuntimeRequest) -> AsyncIterator[dict]:
         seq = 0
+        trace = StageRecorder()
 
         def event(kind: str, data: dict) -> dict:
             nonlocal seq
@@ -66,21 +68,25 @@ class RuntimeService:
                 knowledge = KnowledgeResult(status="no_match", chunks=[])
                 config = request.agentConfig
                 if config.knowledgeBaseIds:
-                    knowledge = await self.knowledge.get_context(KnowledgeRequest(
-                        runId=request.runId, actorId=request.actor.id, agentId=config.id,
-                        knowledgeBaseIds=config.knowledgeBaseIds, query=request.message,
-                    ))
-                    if any(chunk.citation.knowledgeBaseId not in config.knowledgeBaseIds for chunk in knowledge.chunks):
-                        raise ModelError("KNOWLEDGE_UNAVAILABLE", "检索返回了未绑定的知识库", 502)
+                    with trace.measure("retrieval") as stage:
+                        knowledge = await self.knowledge.get_context(KnowledgeRequest(
+                            runId=request.runId, actorId=request.actor.id, agentId=config.id,
+                            knowledgeBaseIds=config.knowledgeBaseIds, query=request.message,
+                        ))
+                        if any(chunk.citation.knowledgeBaseId not in config.knowledgeBaseIds for chunk in knowledge.chunks):
+                            raise ModelError("KNOWLEDGE_UNAVAILABLE", "检索返回了未绑定的知识库", 502)
+                        stage.chunkCount = len(knowledge.chunks)
                 tools = []
                 if config.pluginIds:
                     tools = await self.plugins.list_tools(request.actor.id, config.id, config.pluginIds)
                     if not tools or len(tools) > 128 or any(t.pluginId not in config.pluginIds for t in tools) or len({t.name for t in tools}) != len(tools):
                         raise ModelError("TOOL_PROTOCOL_ERROR", "插件定义为空、重复或不属于本轮绑定", 502)
-                value = ModelInput(model=config.model, messages=self.context(request, knowledge),
-                                   temperature=config.temperature, max_tokens=config.maxTokens)
-                if tools:
-                    check_tool_budget(value, tools, [m.model_dump() for m in value.messages], self.settings)
+                with trace.measure("context") as stage:
+                    value = ModelInput(model=config.model, messages=self.context(request, knowledge),
+                                       temperature=config.temperature, max_tokens=config.maxTokens)
+                    if tools:
+                        check_tool_budget(value, tools, [m.model_dump() for m in value.messages], self.settings)
+                    stage.chunkCount = len(knowledge.chunks)
                 if config.knowledgeBaseIds:
                     # 上下文校验成功后再公告来源，避免失败请求提前暴露未使用的引用。
                     yield event("knowledge.result", {
@@ -88,8 +94,8 @@ class RuntimeService:
                         "citations": [chunk.citation.model_dump(exclude_none=True) for chunk in knowledge.chunks],
                     })
                 result = None
-                source = (stream_tool_loop(value, tools, request, self.settings, self.plugins, self.client)
-                          if tools else stream_model(value, settings=self.settings, client=self.client))
+                source = (stream_tool_loop(value, tools, request, self.settings, self.plugins, self.client, trace=trace)
+                          if tools else trace.model(stream_model(value, settings=self.settings, client=self.client), config.model, 1))
                 async with aclosing(source) as model_stream:
                     async for item in model_stream:
                         if isinstance(item, str):
@@ -103,15 +109,16 @@ class RuntimeService:
                                                    citations=[chunk.citation for chunk in knowledge.chunks])
             if result is None:
                 raise ModelError("MODEL_PROTOCOL_ERROR", "模型没有返回完成结果", 502)
+            result.stages = trace.stages
             yield event("run.completed", result.model_dump(exclude_none=False))
         except TimeoutError:
-            yield event("run.failed", {"code": "RUN_TIMEOUT", "message": "本轮运行超时", "retryable": True})
+            yield event("run.failed", {"code": "RUN_TIMEOUT", "message": "本轮运行超时", "retryable": True, "stages": trace.export()})
         except ModelError as exc:
-            yield event("run.failed", {"code": exc.code, "message": exc.message, "retryable": exc.retryable})
+            yield event("run.failed", {"code": exc.code, "message": exc.message, "retryable": exc.retryable, "stages": trace.export()})
         except Exception as exc:
             # 不记录原始异常文本，避免依赖错误携带提示词或凭据。
             logger.error("Runtime failure run=%s exception=%s", request.runId, type(exc).__name__)
-            yield event("run.failed", {"code": "INTERNAL_ERROR", "message": "运行服务异常", "retryable": False})
+            yield event("run.failed", {"code": "INTERNAL_ERROR", "message": "运行服务异常", "retryable": False, "stages": trace.export()})
 
     async def run(self, request: RuntimeRequest) -> RuntimeResult:
         async for item in self.events(request):
@@ -120,12 +127,12 @@ class RuntimeService:
             if item["type"] == "run.failed":
                 data = item["data"]
                 if data["code"].endswith("_TIMEOUT"):
-                    raise ModelError(data["code"], data["message"], 504, data["retryable"])
+                    raise ModelError(data["code"], data["message"], 504, data["retryable"], stages=data.get("stages", []))
                 status = {"INVALID_REQUEST": 400, "MODEL_TIMEOUT": 504, "RUN_TIMEOUT": 504,
                           "MODEL_NOT_CONFIGURED": 503, "MODEL_RATE_LIMITED": 503,
                           "MODEL_QUOTA_EXCEEDED": 503,
                           "KNOWLEDGE_NOT_CONFIGURED": 503, "TOOL_NOT_CONFIGURED": 503,
                           "KNOWLEDGE_UNAUTHORIZED": 401, "KNOWLEDGE_FORBIDDEN": 403,
                           "KNOWLEDGE_UNAVAILABLE": 503, "TOOL_UNAVAILABLE": 503, "TOOL_NOT_SUPPORTED": 503}.get(data["code"], 502)
-                raise ModelError(data["code"], data["message"], status, data["retryable"])
+                raise ModelError(data["code"], data["message"], status, data["retryable"], stages=data.get("stages", []))
         raise ModelError("INTERNAL_ERROR", "运行未返回终态", 500)

@@ -38,8 +38,8 @@ export function createOperationsMock(now = Date.now()): OperationsData {
     '退货流程说明.txt',
     '运费计算规则.json',
     '保修服务指南.txt',
-    '退款到账说明.txt',
-    '售后联系方式.txt',
+    '退款到账说明.pdf',
+    '售后联系方式.png',
     '特殊商品说明.txt',
     '服务条款.txt',
   ];
@@ -89,7 +89,7 @@ export function createOperationsMock(now = Date.now()): OperationsData {
       data.documents.push({
         id,
         baseId,
-        name: b === 0 ? docs[d] : `${bases[b]}-${d + 1}.txt`,
+        name: b === 0 ? docs[d] : `${bases[b]}-${d + 1}.${d === 4 ? 'pdf' : d === 5 ? 'png' : 'txt'}`,
         sourceBytes: byteLength(text),
         chunks,
       });
@@ -155,6 +155,17 @@ export function createOperationsMock(now = Date.now()): OperationsData {
           status === 'failed' ? 'EMBEDDING_UNAVAILABLE · 向量化服务暂时不可用（503）' : undefined,
       });
     }
+  }
+  // 专用模拟失败记录，分别展示上传和切片失败的兜底。
+  for (const [suffix, stageIndex, name, error] of [
+    ['upload', 0, '上传失败示例.pdf', 'UPLOAD_FAILED · 文件上传连接中断'],
+    ['chunk', 2, '切片失败示例.txt', 'CHUNKING_FAILED · 文本分段处理失败'],
+  ] as const) {
+    const template = data.tasks[0];
+    const documentId = `doc-demo-${suffix}`;
+    data.documents.push({ id: documentId, baseId: 'kb-2', name, sourceBytes: suffix === 'upload' ? 0 : 18400, chunks: [] });
+    data.tasks.push({ ...template, id: `task-demo-${suffix}`, documentId, status: 'failed', startedAt: now - 5 * 60_000, error,
+      stages: template.stages.map((stage, index) => ({ ...stage, status: index < stageIndex ? 'success' : index === stageIndex ? 'failed' : 'pending', durationMs: index > stageIndex ? 0 : stage.durationMs, description: index === stageIndex ? error : index > stageIndex ? '前序阶段失败，未执行' : stage.description })) });
   }
   // 同一文件的失败与重试保留独立记录，当前状态以最后一次处理为准。
   const retried = data.tasks.find((t) => t.id === 'task-1-2')!;

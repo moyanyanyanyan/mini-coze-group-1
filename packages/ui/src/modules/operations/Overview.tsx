@@ -14,31 +14,34 @@ export function Overview(p: ContentProps) {
     ...data.runs.map(r => {
       const c = data.conversations.find(c => c.id === r.conversationId)!;
       return { id: r.id, at: r.startedAt, title: r.question, module: 'Agent 聊天',
+        sample: data.connected && !r.observed,
         status: r.status, badge: runLabels[r.status],
-        error: r.stages.filter(s => s.status === 'failed').map(s => `${s.name}：${s.description}`).join('；'),
-        href: `${conversationPath(c.agentId, c.id)}?run=${r.id}`, durationMs: r.durationMs,
-        inputTokens: r.inputTokens, outputTokens: r.outputTokens };
+        error: r.observed ? r.observed.errorCode ?? '' : r.stages.filter(s => s.status === 'failed').map(s => `${s.name}：${s.description}`).join('；'),
+        href: `${conversationPath(c.agentId, c.id)}?run=${r.id}`, durationMs: r.durationMs, durationSample: r.observed?.durationMs === null,
+        inputTokens: r.observed ? r.observed.inputTokens : r.inputTokens, outputTokens: r.observed ? r.observed.outputTokens : r.outputTokens };
     }),
-    ...data.tasks.map(t => {
+    ...data.tasks.filter(t => !t.observed).map(t => {
       const d = data.documents.find(d => d.id === t.documentId)!;
       return { id: t.id, at: t.startedAt, title: d.name, module: '知识库', status: t.status,
+        sample: data.connected,
         badge: taskLabels[t.status], error: t.error ?? t.stages.filter(s => s.status === 'failed').map(s => `${s.name}：${s.description}`).join('；'),
-        href: taskPath(d.baseId, t.id), durationMs: t.uploadMs + t.processingMs,
+        href: taskPath(d.baseId, t.id), durationMs: t.uploadMs + t.processingMs, durationSample: true,
         inputTokens: null, outputTokens: null };
     }),
   ].filter(e => e.at <= data.snapshotAt).sort((a, b) => b.at - a.at);
   // 今日按快照所在的本地自然日计算，不使用滚动 24 小时窗口。
   const midnight = new Date(data.snapshotAt).setHours(0, 0, 0, 0);
-  const errors = events.filter(e => e.at >= midnight && (e.status === 'failed' || e.status === 'warning'));
+  const errors = events.filter(e => e.at >= midnight && (e.status === 'failed' || e.status === 'warning') && (!(data.runtimeStats?.total) || !e.sample));
   const filtered = errors.filter(e => !module || e.module === module)
     .sort((a, b) => order === 'newest' ? b.at - a.at : a.at - b.at);
   const pages = Math.max(1, Math.ceil(filtered.length / 4));
   const current = Math.min(page, pages);
   const runs = data.runs.filter(r => r.startedAt <= data.snapshotAt);
-  const tokens = runs.map(r => r.inputTokens + r.outputTokens);
+  const tokens = runs.filter(r => !r.observed || r.observed.totalTokens !== null).map(r => r.observed ? r.observed.totalTokens! : r.inputTokens + r.outputTokens);
+  const actual = (data.runtimeStats?.total ?? 0) > 0;
   const metrics = [
-    ['累计 Token', tokens.reduce((sum, n) => sum + n, 0).toLocaleString()],
-    ['单次 Token 峰值', Math.max(0, ...tokens).toLocaleString()],
+    [actual ? '累计已报告 Token' : '累计 Token（示例）', actual ? data.runtimeStats?.totalTokens?.toLocaleString() ?? '未报告' : tokens.reduce((sum, n) => sum + n, 0).toLocaleString()],
+    [actual ? '单次已报告 Token 峰值' : '单次 Token 峰值（示例）', actual ? data.runtimeStats?.peakTokens?.toLocaleString() ?? '未报告' : Math.max(0, ...tokens).toLocaleString()],
   ];
   return <>
     <PageHeader title="运行概览" description="查看今日异常与最新运行情况。" />
@@ -51,12 +54,12 @@ export function Overview(p: ContentProps) {
             <p>{p.profileError || p.profile?.email || '运行数据摘要'}</p>
           </div>
         </div>
-        <span className="om-note">工作空间 · 当前模拟快照</span>
+        <span className="om-note">{actual ? `当前用户 · ${data.runtimeStats?.reported} 次报告用量，${data.runtimeStats?.missingUsage} 次未报告` : '当前示例快照 · 尚无采集记录'}</span>
         <dl className="om-profile-metrics">{metrics.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
         <TokenActivity runs={runs} snapshotAt={data.snapshotAt} />
       </section>
       <section className="om-today" aria-label="今日运行错误">
-        <Panel title={<>今日运行错误 <span className="om-count">{errors.length}</span></>} action={<span className="om-sub">{new Date(data.snapshotAt).toLocaleDateString('zh-CN')}</span>}>
+        <Panel title={<>今日运行错误{data.connected && !actual ? '（示例）' : ''} <span className="om-count">{errors.length}</span></>} action={<span className="om-sub">{new Date(data.snapshotAt).toLocaleDateString('zh-CN')}</span>}>
           <div className="om-error-filters">
             <select aria-label="错误模块" value={module} onChange={e => { const value = e.target.value; animateOperationsChange(() => { setModule(value); setPage(1); }); }}>
               <option value="">全部模块</option><option>Agent 聊天</option><option>知识库</option>
@@ -68,7 +71,7 @@ export function Overview(p: ContentProps) {
           </div>
           {filtered.slice((current - 1) * 4, current * 4).map(e => <div className="om-attention" key={e.id}>
             <div><div className="om-attention-title"><span className="om-cell-title">{e.title}</span><Badge tone={e.status}>{e.badge}</Badge></div>
-              <div className="om-sub">{e.module} · {dateTime(e.at)}</div><div className="om-error-description">{e.error || e.badge}</div></div>
+              <div className="om-sub">{e.module} · {dateTime(e.at)}{e.sample ? ' · 示例' : ''}</div><div className="om-error-description">{e.error || e.badge}</div></div>
             <L className="om-entry" title="查看错误与执行详情" to={e.href}>查看详情</L>
           </div>)}
           {!filtered.length && <Empty>今天没有符合筛选条件的错误。</Empty>}
@@ -81,9 +84,9 @@ export function Overview(p: ContentProps) {
     </div>
     <Records compact id="overview-events" title="最新运行" headers={['运行内容', '模块', '状态', 'Token 消耗', '总耗时', '开始时间', '操作']}
       rows={events.map(e => ({ id: e.id, text: `${e.title} ${e.id}`, cells: [
-        <Cell title={<L to={e.href}>{e.title}</L>} subtitle={e.id} />, e.module, <Badge tone={e.status}>{e.badge}</Badge>,
+        <Cell title={<L to={e.href}>{e.title}</L>} subtitle={`${e.id}${e.sample ? ' · 示例' : ''}`} />, e.module, <Badge tone={e.status}>{e.badge}</Badge>,
         e.inputTokens === null ? '—' : <Cell title={(e.inputTokens + (e.outputTokens ?? 0)).toLocaleString()} subtitle={`输入 ${e.inputTokens.toLocaleString()} / 输出 ${e.outputTokens?.toLocaleString()}`} />,
-        duration(e.durationMs), dateTime(e.at), <L to={e.href}>查看</L>,
+        `${duration(e.durationMs)}${e.durationSample ? '（示例）' : ''}`, dateTime(e.at), <L to={e.href}>查看</L>,
       ] }))} />
   </>;
 }

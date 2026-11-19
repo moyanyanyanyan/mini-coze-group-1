@@ -84,6 +84,7 @@ async def stream(body: RuntimeRequest, runtime: RuntimeService = Depends(get_run
 
 async def runtime_error(request: Request, exc: ModelError) -> JSONResponse:
     return JSONResponse(status_code=exc.status, content={
+        **({"stages": exc.stages} if exc.stages is not None else {}),
         "statusCode": exc.status, "message": exc.message, "path": request.url.path,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }, headers={"X-Runtime-Error-Code": exc.code})
