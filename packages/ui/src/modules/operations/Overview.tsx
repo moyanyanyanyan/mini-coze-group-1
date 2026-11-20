@@ -2,7 +2,7 @@ import { TokenActivity } from './TokenActivity';
 import { animateOperationsChange } from './motion';
 import { useState } from 'react';
 import { conversationPath, taskPath, duration, dateTime } from './model';
-import { PageHeader, Panel, Badge, Cell, Empty, Records, runLabels, taskLabels } from './components';
+import { PageHeader, Panel, Pagination, Badge, Cell, Empty, Records, runLabels, taskLabels } from './components';
 import type { ContentProps } from './view-types';
 
 export function Overview(p: ContentProps) {
@@ -44,7 +44,7 @@ export function Overview(p: ContentProps) {
     [actual ? '单次已报告 Token 峰值' : '单次 Token 峰值（示例）', actual ? data.runtimeStats?.peakTokens?.toLocaleString() ?? '未报告' : Math.max(0, ...tokens).toLocaleString()],
   ];
   return <>
-    <PageHeader title="运行概览" description="查看今日异常与最新运行情况。" />
+    <PageHeader title="运行概览" />
     <div className="om-overview-top">
       <section className="om-profile" aria-label="运行摘要">
         <div className="om-profile-identity">
@@ -54,7 +54,6 @@ export function Overview(p: ContentProps) {
             <p>{p.profileError || p.profile?.email || '运行数据摘要'}</p>
           </div>
         </div>
-        <span className="om-note">{actual ? `当前用户 · ${data.runtimeStats?.reported} 次报告用量，${data.runtimeStats?.missingUsage} 次未报告` : '当前示例快照 · 尚无采集记录'}</span>
         <dl className="om-profile-metrics">{metrics.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
         <TokenActivity runs={runs} snapshotAt={data.snapshotAt} />
       </section>
@@ -75,10 +74,7 @@ export function Overview(p: ContentProps) {
             <L className="om-entry" title="查看错误与执行详情" to={e.href}>查看详情</L>
           </div>)}
           {!filtered.length && <Empty>今天没有符合筛选条件的错误。</Empty>}
-          <div className="om-table-footer"><span role="status">共 {filtered.length} 条 · {current} / {pages}</span><div>
-            <button aria-label="错误上一页" disabled={current === 1} onClick={() => animateOperationsChange(() => setPage(current - 1))}>上一页</button>
-            <button aria-label="错误下一页" disabled={current === pages} onClick={() => animateOperationsChange(() => setPage(current + 1))}>下一页</button>
-          </div></div>
+          <Pagination page={current} total={pages} label="今日错误分页" onChange={page => animateOperationsChange(() => setPage(page))} />
         </Panel>
       </section>
     </div>
@@ -86,7 +82,7 @@ export function Overview(p: ContentProps) {
       rows={events.map(e => ({ id: e.id, text: `${e.title} ${e.id}`, cells: [
         <Cell title={<L to={e.href}>{e.title}</L>} subtitle={`${e.id}${e.sample ? ' · 示例' : ''}`} />, e.module, <Badge tone={e.status}>{e.badge}</Badge>,
         e.inputTokens === null ? '—' : <Cell title={(e.inputTokens + (e.outputTokens ?? 0)).toLocaleString()} subtitle={`输入 ${e.inputTokens.toLocaleString()} / 输出 ${e.outputTokens?.toLocaleString()}`} />,
-        `${duration(e.durationMs)}${e.durationSample ? '（示例）' : ''}`, dateTime(e.at), <L to={e.href}>查看</L>,
+        e.durationSample ? '未采集' : duration(e.durationMs), dateTime(e.at), <L to={e.href}>查看</L>,
       ] }))} />
   </>;
 }

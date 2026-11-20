@@ -128,7 +128,7 @@ export function OperationsView(props: OperationsViewProps) {
       <section className="om-content" aria-label="运行管理内容">
         <div className="om-topline">
           <Breadcrumbs items={items} LinkComponent={L} />
-          <span className="om-demo">{data.connected ? '已采集数据优先 · 示例内容已标注' : '模拟数据，不代表实际运行'}</span>
+          {!data.connected && <span className="om-demo">示例数据</span>}
         </div>
         <div className="om-top-actions">
           {timed && (
@@ -152,9 +152,8 @@ export function OperationsView(props: OperationsViewProps) {
           <span role="status">{data.connected ? '更新于' : '查看于'} {time(data.connected ? data.snapshotAt : refreshedAt)}</span>
         </div>
         {props.error && <p role="alert">{props.error} <button onClick={props.onRefresh} disabled={props.loading}>重试</button></p>}
-        {data.connected && !isKnowledge && <p className="om-note">当前载入 {data.loadedRuns} / {data.totalRuns} 条采集记录，列表统计及时间筛选基于载入记录；Token 合计取全部已报告用量。
-          {(data.loadedRuns ?? 0) < (data.totalRuns ?? 0) && <button disabled={props.loading} onClick={props.onMoreRuns}>加载更多记录</button>}
-        </p>}
+        {data.connected && !isKnowledge && (data.loadedRuns ?? 0) < (data.totalRuns ?? 0) &&
+          <button disabled={props.loading} onClick={props.onMoreRuns}>加载更多记录</button>}
         {content ?? (
           <>
             <PageHeader title="记录不存在" description="请检查链接，或返回运行管理查看已有记录。" />

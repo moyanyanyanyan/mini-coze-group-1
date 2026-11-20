@@ -52,14 +52,14 @@ export function Panel({
   );
 }
 
-export function Stats({ items }: { items: { label: string; value: ReactNode; note: string }[] }) {
+export function Stats({ items }: { items: { label: string; value: ReactNode; note?: string }[] }) {
   return (
     <div className="om-stats">
       {items.map((i) => (
         <div key={i.label}>
           <span>{i.label}</span>
           <strong>{i.value}</strong>
-          <small>{i.note}</small>
+          {i.note && <small>{i.note}</small>}
         </div>
       ))}
     </div>
@@ -101,14 +101,14 @@ export function PageHeader({
   action,
 }: {
   title: string;
-  description: string;
+  description?: string;
   action?: ReactNode;
 }) {
   return (
     <header className="om-page-head">
       <div>
         <h1>{title}</h1>
-        <p>{description}</p>
+        {description && <p>{description}</p>}
       </div>
       {action}
     </header>
@@ -246,32 +246,31 @@ export function Records({
         </table>
       </div>
       {!shown.length && <Empty />}
-      <div className="om-table-footer" aria-live="polite">
-        <span>
-          共 {filtered.length} 条记录 · 每页 {pageSize} 条
-        </span>
-        <div>
-          <button
-            aria-label="上一页"
-            disabled={current === 1}
-            onClick={() => change({ page: current - 1 })}
-          >
-            上一页
-          </button>
-          <span>
-            {current} / {pages}
-          </span>
-          <button
-            aria-label="下一页"
-            disabled={current === pages}
-            onClick={() => change({ page: current + 1 })}
-          >
-            下一页
-          </button>
-        </div>
-      </div>
+      <Pagination page={current} total={pages} label={`${title}分页`} onChange={page => change({ page })} />
     </Panel>
   );
+}
+
+export function Pagination({ page, total, onChange, label = '分页' }: {
+  page: number;
+  total: number;
+  onChange: (page: number) => void;
+  label?: string;
+}) {
+  const pages = Math.max(1, total);
+  const current = Math.max(1, Math.min(page, pages));
+  return <nav className="om-pagination" aria-label={label}>
+    <button type="button" aria-label="上一页" disabled={current === 1} onClick={() => onChange(current - 1)}>
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m14 6-6 6 6 6" /></svg>
+    </button>
+    <select aria-label={`${label}页码`} value={current} onChange={event => onChange(Number(event.target.value))}>
+      {Array.from({ length: pages }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}</option>)}
+    </select>
+    <span aria-hidden="true">/ {pages}</span>
+    <button type="button" aria-label="下一页" disabled={current === pages} onClick={() => onChange(current + 1)}>
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m10 6 6 6-6 6" /></svg>
+    </button>
+  </nav>;
 }
 
 export function Breadcrumbs({
@@ -303,11 +302,10 @@ export function RunMetrics({ runs }: { runs: OperationRun[] }) {
         {
           label: `会话数${suffix}`,
           value: new Set(runs.map((r) => r.conversationId)).size,
-          note: '当前时间范围内',
         },
-        { label: `执行次数${suffix}`, value: s.count, note: `${s.failed} 次执行失败` },
-        { label: `执行成功率${suffix}`, value: s.rate, note: example ? `其中 ${s.warnings} 次完成但有节点异常` : '已载入且明确结束的记录；取消和中断不计入' },
-        { label: `平均耗时${suffix}`, value: s.average, note: example ? '按已结束执行统计' : '仅已采集客户端耗时，不含示例值' },
+        { label: `执行次数${suffix}`, value: s.count },
+        { label: `执行成功率${suffix}`, value: s.rate },
+        { label: `平均耗时${suffix}`, value: s.average },
       ]}
     />
   );

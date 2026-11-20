@@ -23,3 +23,22 @@ model OperationRuntimeRun {
   @@index([userId, startedAt, id])
   @@index([userId, conversationId, startedAt])
 }
+
+/// 由 Operations 数据库触发器记录，不在知识库业务服务中重复写入。
+model OperationDocumentAttempt {
+  id           String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  documentId   String
+  ordinal      Int
+  source       String
+  status       String
+  stage        String
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  capturedAt   DateTime @default(now())
+  errorCode    String?
+  errorMessage String?
+  events       Json @default("[]")
+  document     KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, ordinal])
+}

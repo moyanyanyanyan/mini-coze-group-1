@@ -84,6 +84,7 @@ export interface OperationsMessage {
 }
 
 export interface OperationsBase {
+  createdAt?: string;
   id: string;
   name: string;
   description: string;
@@ -96,6 +97,8 @@ export interface OperationsBase {
 }
 
 export interface OperationsDocument {
+  attempts?: { recordedCount: number; latestSource: string; latestStatus: string };
+  sourceSize?: number | null;
   id: string;
   knowledgeBaseId: string;
   title: string;
@@ -127,3 +130,19 @@ export type OperationsMessages = OperationsPageResult<OperationsMessage> & {
 export type OperationsDocuments = OperationsPageResult<OperationsDocument> & {
   base: Pick<OperationsBase, 'id' | 'name' | 'status'>;
 };
+
+export interface OperationsDocumentText { id: string; knowledgeBaseId: string; rawText: string | null; }
+
+export interface OperationsDocumentAttempt {
+  id: string;
+  ordinal: number;
+  source: string;
+  status: string;
+  stage: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  capturedAt: string;
+  errorCode: string | null;
+  errorMessage: string | null;
+  events: { stage: string; status: string; at: string; snapshot?: boolean }[];
+}

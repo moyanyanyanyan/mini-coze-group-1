@@ -31,7 +31,7 @@ function responses(rows = [run], summary = stats) {
 const Link = ({ to, children }: { to: string; children?: React.ReactNode }) => <a href={to}>{children}</a>;
 beforeEach(() => vi.resetAllMocks());
 describe('原运行页面内接入采集数据', () => {
-  it('四类实际阶段替换对应示例，保留未采集步骤并展示多轮模型', async () => {
+  it('仅展示四类已采集阶段和多轮模型，保留零值', async () => {
     responses();
     const path = conversationPath(run.agentId, run.conversationId);
     const data = await loadOperations(path, `run=${run.id}`, 'owner');
@@ -47,8 +47,8 @@ describe('原运行页面内接入采集数据', () => {
     expect(html).toContain('返回 0 个切片');
     expect(html).toContain('本轮已报告 Token：输入 0 / 输出 0');
     expect(html).toContain('失败 · 0 ms');
-    expect(html).toContain('接收请求（示例）');
-    expect(html).toContain('回复完成（示例）');
+    expect(html).not.toContain('接收请求');
+    expect(html).not.toContain('回复完成');
     expect(html).not.toContain('知识库检索（示例）');
     expect(html).not.toContain('模型调用 · 工具选择（示例）');
     expect(html).not.toContain('订单查询插件（示例）');
@@ -62,9 +62,36 @@ describe('原运行页面内接入采集数据', () => {
     const html = renderToStaticMarkup(<OperationsView data={data} pathname={path} search={`run=${run.id}`} LinkComponent={Link} />);
     expect(html).toContain('实际提问');
     expect(html).toContain('actual-tool');
-    expect(html).toContain('内部阶段示例');
+    expect(html).toContain('暂无阶段数据');
+    expect(html).not.toContain('（示例）');
     expect(html).not.toContain('Mock 演示');
     expect(html).not.toContain('om-mode-switch');
+  });
+  it('检索失败仅显示实际失败阶段，缺失指标不使用示例补位', async () => {
+    responses();
+    const path = conversationPath(run.agentId, run.conversationId);
+    const data = await loadOperations(path, `run=${run.id}`, 'owner');
+    const observed = { ...run, status: 'failed', messageStatus: 'failed', durationMs: null, firstTokenMs: null,
+      inputTokens: null, outputTokens: null, totalTokens: null, errorCode: 'KNOWLEDGE_TIMEOUT' };
+    const row = replaceRuntime(createOperationsMock().runs[0], observed);
+    row.observed = { ...observed, events: [
+      { type: 'runtime.stage', observedAt: now, data: { stageId: 'retrieval', kind: 'retrieval', startedAt: now,
+        durationMs: 10020, status: 'failed', errorCode: 'KNOWLEDGE_TIMEOUT' } },
+      { type: 'run.failed', observedAt: now, data: { code: 'KNOWLEDGE_TIMEOUT' } },
+    ] };
+    data.runs = [row];
+    const html = renderToStaticMarkup(<OperationsView data={data} pathname={path} search={`run=${run.id}`} LinkComponent={Link} />);
+    expect(html).toContain('知识库检索（已采集）');
+    expect(html).toContain('失败 · 10.02 s');
+    expect(html).toContain('调用耗时 <b>未采集</b>');
+    expect(html).toContain('首字响应 <b>未采集</b>');
+    expect(html).toContain('Token <b>未报告</b>');
+    expect(html).toContain('输入 未报告 / 输出 未报告 Token');
+    expect(html).not.toContain('（示例）');
+    expect(html).not.toContain('接收请求');
+    expect(html).not.toContain('回复完成');
+    expect(html).not.toContain('模型调用');
+    expect(html).not.toContain('工具执行');
   });
   it('缺失指标仍保留原示例，但不进入实际耗时及成功率统计', () => {
     const row = replaceRuntime(createOperationsMock().runs[0], { ...run, durationMs: null, totalTokens: null, inputTokens: null, outputTokens: null, status: 'running', messageStatus: 'pending' });
@@ -85,7 +112,7 @@ describe('原运行页面内接入采集数据', () => {
     vi.mocked(get).mockRejectedValue(new Error('网络失败'));
     await expect(loadOperations('/workspace/operations', '', 'owner')).rejects.toThrow('网络失败');
   });
-  it('文档在原详情布局显示实际阶段和切片，未采集字节数明确为示例', async () => {
+  it('文档使用实际字节数和解析正文，保留未采集阶段说明', async () => {
     responses();
     const fallback = vi.mocked(get).getMockImplementation()!;
     vi.mocked(get).mockImplementation(async path => {
@@ -94,7 +121,8 @@ describe('原运行页面内接入采集数据', () => {
       else if (path.includes('/chunks?')) {
         expect(path).toContain('workspaceId=owner');
         data = page([{ id: 'chunk', position: 0, content: '实际切片正文', startOffset: 0, endOffset: 6, enabled: true }]);
-      } else if (path.includes('/kb/documents?')) data = page([{ id: 'doc', knowledgeBaseId: 'kb', title: '实际文档', status: 'READY', stage: 'COMPLETED', sourceType: 'TEXT', originalFileName: null, chunkCount: 1, error: null, createdAt: now, updatedAt: now }]);
+      } else if (path.endsWith('/kb/documents/doc/text')) data = { id: 'doc', knowledgeBaseId: 'kb', rawText: '实际解析正文' };
+      else if (path.includes('/kb/documents?')) data = page([{ id: 'doc', knowledgeBaseId: 'kb', title: '实际文档', sourceSize: 12, status: 'READY', stage: 'COMPLETED', sourceType: 'TEXT', originalFileName: null, chunkCount: 1, error: null, createdAt: now, updatedAt: now }]);
       else return fallback(path);
       return { code: 200, message: 'ok', data } as never;
     });
@@ -105,8 +133,9 @@ describe('原运行页面内接入采集数据', () => {
     const html = renderToStaticMarkup(<OperationsView data={data} pathname={path} search="" LinkComponent={Link} />);
     expect(html).toContain('实际文档');
     expect(html).toContain('文件大小');
-    expect(html).toContain('模拟数据');
-    expect(html).toContain('模拟预览 · 非真实原文件');
+    expect(html).toContain('12 B');
+    expect(html).toContain('实际解析正文');
+    expect(html).not.toContain('模拟预览 · 非真实原文件');
     expect(html).toContain('阶段耗时：未采集');
     expect(html).not.toContain('文件接收成功');
     const chunksHtml = renderToStaticMarkup(<OperationsView data={data} pathname={path} search="tab=chunks" LinkComponent={Link} />);

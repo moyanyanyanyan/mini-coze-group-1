@@ -34,7 +34,7 @@ function RetrievalRecords(p: ContentProps & { baseId: string }) {
   const hits = retrievals.filter((r) => r.retrieval.status === "hit");
   return (
     <div className="om-knowledge">
-      <PageHeader title={base.name} description={base.description} />
+      <PageHeader title={base.name} />
       {retrievalSample && (
         <Notice title="检索过程示例" tone="neutral">
           以下为示例查询和指标，不属于当前知识库的真实检索；已采集的引用请在对应会话执行链路查看。

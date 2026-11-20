@@ -1,3 +1,4 @@
+import { DocumentHistoryService } from './collection/document-history.service';
 import { Controller, Get, Param, ParseUUIDPipe, Query, UseGuards, UseInterceptors } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import type { CurrentUser as User } from '@minicoze/shared';
@@ -11,7 +12,7 @@ import { OperationRecordsService } from './collection/operation-records.service'
 @UseGuards(AuthGuard('jwt'))
 @UseInterceptors(ResponseInterceptor)
 export class OperationsController {
-  constructor(private readonly operations: OperationsService, private readonly records: OperationRecordsService) {}
+  constructor(private readonly operations: OperationsService, private readonly records: OperationRecordsService, private readonly documentHistory: DocumentHistoryService) {}
 
   @Get('runtime/stats')
   runtimeStats(@CurrentUser() user: User) { return this.records.stats(user.id); }
@@ -36,6 +37,12 @@ export class OperationsController {
 
   @Get('knowledge-bases')
   bases(@CurrentUser() user: User, @Query() query: OperationsSearchQuery) { return this.operations.bases(user.id, query); }
+
+  @Get('knowledge-bases/:id/documents/:documentId/attempts')
+  documentAttempts(@CurrentUser() user: User, @Param('id') id: string, @Param('documentId') documentId: string, @Query() query: OperationsPageQuery) { return this.documentHistory.list(user.id, id, documentId, query); }
+
+  @Get('knowledge-bases/:id/documents/:documentId/text')
+  documentText(@CurrentUser() user: User, @Param('id') id: string, @Param('documentId') documentId: string) { return this.operations.documentText(user.id, id, documentId); }
 
   @Get('knowledge-bases/:id/documents')
   documents(@CurrentUser() user: User, @Param('id') id: string, @Query() query: OperationsDocumentsQuery) { return this.operations.documents(user.id, id, query); }

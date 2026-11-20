@@ -1,4 +1,4 @@
-import type { OperationsAgent, OperationsBase, OperationsConversations, OperationsDocuments, OperationsDocument, OperationsChunk, OperationsMessages, OperationsRuntimeRun, OperationsRuntimeDetail, OperationsRuntimeStats, OperationsPageResult } from '@minicoze/shared';
+import type { OperationsAgent, OperationsBase, OperationsConversations, OperationsDocuments, OperationsDocument, OperationsDocumentText, OperationsDocumentAttempt, OperationsChunk, OperationsMessages, OperationsRuntimeRun, OperationsRuntimeDetail, OperationsRuntimeStats, OperationsPageResult } from '@minicoze/shared';
 import { parseOperationsRoute, type OperationsData, type OperationRun, type RunStatus } from '@minicoze/ui/operations';
 import { ApiError, get } from '../../shared/api/http';
 import { createOperationsMock } from './operations.mock';
@@ -105,6 +105,11 @@ export async function loadOperations(pathname: string, search: string, userId: s
     if (route.page === 'document') {
       const document = data.documents.find(d => d.id === route.taskId);
       if (!document) throw new ApiError(404, 'NOT_FOUND', '文档不存在或不可访问');
+      const text = await read<OperationsDocumentText>(`${api}/knowledge-bases/${encodeURIComponent(route.baseId)}/documents/${encodeURIComponent(document.id)}/text`);
+      if (text.id !== document.id || text.knowledgeBaseId !== route.baseId) throw new ApiError(404, 'NOT_FOUND', '文档不存在或不可访问');
+      document.parsedText = text.rawText;
+      const historyPage = params.get('historyPage') ?? '1';
+      document.history = await read<OperationsPageResult<OperationsDocumentAttempt>>(`${api}/knowledge-bases/${encodeURIComponent(route.baseId)}/documents/${encodeURIComponent(document.id)}/attempts?pageSize=20&page=${encodeURIComponent(historyPage)}`);
       if (document.observed?.status === 'READY' && bases.find(base => base.id === route.baseId)?.status === 'ACTIVE') {
         const scope = `workspaceId=${encodeURIComponent(userId)}`;
         const path = `/api/knowledge-bases/${encodeURIComponent(route.baseId)}/documents/${encodeURIComponent(document.id)}/chunks`;

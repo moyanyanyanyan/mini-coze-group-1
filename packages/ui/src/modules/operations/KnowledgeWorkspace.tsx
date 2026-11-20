@@ -1,8 +1,11 @@
+import { KnowledgeTokenTrend } from './KnowledgeTokenTrend';
+import { DocumentHistory } from './DocumentHistory';
 import { useState, type CSSProperties } from "react";
 import { Icon } from "../../components/Icon";
 import { animateOperationsChange } from "./motion";
 import {
   Panel,
+  Pagination,
   PageHeader,
   Badge,
   Empty,
@@ -57,49 +60,14 @@ function Sample({ children = "模拟数据" }: { children?: string }) {
   return <span className="om-k-sample">{children}</span>;
 }
 
-function Pager({
-  page,
-  total,
-  count,
-  onChange,
-}: {
-  page: number;
-  total: number;
-  count: number;
-  onChange: (page: number) => void;
-}) {
-  return (
-    <div className="om-table-footer">
-      <span>共 {count} 条</span>
-      <div>
-        <button
-          aria-label="上一页"
-          disabled={page <= 1}
-          onClick={() => animateOperationsChange(() => onChange(page - 1))}
-        >
-          上一页
-        </button>
-        <span>
-          {page} / {total}
-        </span>
-        <button
-          aria-label="下一页"
-          disabled={page >= total}
-          onClick={() => animateOperationsChange(() => onChange(page + 1))}
-        >
-          下一页
-        </button>
-      </div>
-    </div>
-  );
-}
-
 export function StorageRing({
   items,
   label,
   LinkComponent: L,
   href,
   compact = false,
+  sample = true,
+  trendAt,
   onSelect,
 }: {
   items: { id: string; name: string; value: number }[];
@@ -107,18 +75,20 @@ export function StorageRing({
   LinkComponent: LinkComponentType;
   href?: (id: string) => string;
   compact?: boolean;
+  sample?: boolean;
+  trendAt?: number;
   onSelect?: (id: string) => void;
 }) {
   const shares = groupShares(items);
   const total = shares.reduce((sum, item) => sum + item.value, 0);
   let offset = 0;
   return (
-    <div className={`om-k-storage ${compact ? "is-compact" : ""}`}>
+    <div className={`om-k-storage ${compact ? "is-compact" : ""} ${trendAt !== undefined ? "has-trend" : ""}`}>
       <div className="om-k-ring">
         <svg
           viewBox="0 0 160 160"
           role="img"
-          aria-label={`${label}：${bytes(total)}，模拟数据`}
+          aria-label={`${label}：${bytes(total)}${sample ? "，含模拟数据" : ""}`}
         >
           <circle
             className="om-k-ring-track"
@@ -164,11 +134,12 @@ export function StorageRing({
           })}
         </svg>
         <div className="om-k-ring-label">
-          <strong>{total ? bytes(total) : "暂无文件"}</strong>
+          <strong>{items.length ? bytes(total) : "暂无文件"}</strong>
           <span>{label}</span>
-          <Sample />
+          {sample && <Sample>含模拟数据</Sample>}
         </div>
       </div>
+      {trendAt !== undefined && <KnowledgeTokenTrend snapshotAt={trendAt} />}
       {!compact && (
         <ul className="om-k-legend">
           {shares.map((item, index) => (
@@ -222,15 +193,16 @@ export function Knowledge(p: ContentProps) {
     .sort((a, b) => errorAt(b.task) - errorAt(a.task));
   const errorPages = Math.max(1, Math.ceil(errors.length / 4));
   const currentError = Math.min(errorPage, errorPages);
+  const sampleSizes = data.documents.some(document => document.observed?.sourceSize == null);
   return (
     <div className="om-knowledge">
       <PageHeader
         title="知识库运行"
-        description="从存储分布到文件处理，了解每一份资料的运行情况。"
       />
       <div className="om-k-top">
-        <Panel title="文件存储分布" action={<Sample />}>
+        <Panel title="文件存储分布" action={sampleSizes ? <Sample>含模拟容量</Sample> : undefined}>
           <StorageRing
+            sample={sampleSizes}
             label="原文件总大小"
             items={data.bases.map((base) => ({
               id: base.id,
@@ -244,7 +216,7 @@ export function Knowledge(p: ContentProps) {
             href={basePath}
           />
           <p className="om-note">
-            模拟容量仅用于布局展示；不含解析文本、向量与索引占用。
+            原文件大小
           </p>
         </Panel>
         <Panel
@@ -285,14 +257,10 @@ export function Knowledge(p: ContentProps) {
               ))}
           </div>
           {!errors.length && <Empty>暂无错误记录，文件处理情况正常。</Empty>}
-          <p className="om-note">
-            真实记录展示当前失败文档，时间取文档更新时间；完整错误历史待联调。
-          </p>
-          <Pager
+          <Pagination
             page={currentError}
             total={errorPages}
-            count={errors.length}
-            onChange={setErrorPage}
+            onChange={page => animateOperationsChange(() => setErrorPage(page))}
           />
         </Panel>
       </div>
@@ -322,7 +290,7 @@ export function Knowledge(p: ContentProps) {
               fileType(document),
               (types.get(fileType(document)) ?? 0) + displaySize(document),
             );
-          const created =
+          const created = base.observed?.createdAt ? Date.parse(base.observed.createdAt) :
             data.snapshotAt - (30 + data.bases.indexOf(base) * 7) * 86400_000;
           return (
             <article className="om-k-card" key={base.id}>
@@ -343,7 +311,8 @@ export function Knowledge(p: ContentProps) {
               <div className="om-k-card-body">
                 <StorageRing
                   compact
-                  label="文件总大小"
+                  sample={files.some(({ document }) => document.observed?.sourceSize == null)}
+                  label={files.some(({ document }) => document.observed?.sourceSize == null) ? "文件总大小（含模拟）" : "文件总大小"}
                   items={[...types].map(([name, value]) => ({
                     id: name,
                     name,
@@ -358,7 +327,7 @@ export function Knowledge(p: ContentProps) {
                   </div>
                   <div>
                     <dt>
-                      创建时间 <Sample />
+                      创建时间 {!base.observed?.createdAt && <Sample />}
                     </dt>
                     <dd>{new Date(created).toLocaleDateString("zh-CN")}</dd>
                   </div>
@@ -397,7 +366,6 @@ export function Knowledge(p: ContentProps) {
                 ))}
               </div>
               <footer>
-                <span className="om-sub">{base.description || "暂无描述"}</span>
                 <L to={basePath(base.id)}>
                   查看文件 <Arrow />
                 </L>
@@ -413,10 +381,9 @@ export function Knowledge(p: ContentProps) {
             : "暂无知识库。"}
         </Empty>
       )}
-      <Pager
+      <Pagination
         page={current}
         total={pages}
-        count={bases.length}
         onChange={(next) => {
           setPage(next);
           cardMemory.page = next;
@@ -436,6 +403,7 @@ export function BaseFiles(p: ContentProps & { baseId: string }) {
   const { data, baseId, LinkComponent: L } = p;
   const base = data.bases.find((b) => b.id === baseId)!;
   const files = baseFiles(data, baseId);
+  const sampleSizes = files.some(({ document }) => document.observed?.sourceSize == null);
   const [selected, setSelected] = useState("");
   return (
     <div className="om-knowledge">
@@ -445,7 +413,7 @@ export function BaseFiles(p: ContentProps & { baseId: string }) {
       </L>
       <PageHeader
         title={base.name}
-        description={`${base.description} · ${base.observed?.documentCount ?? files.length} 个文件`}
+        description={`${base.observed?.documentCount ?? files.length} 个文件`}
         action={
           <Badge
             tone={base.observed?.status === "DISABLED" ? "neutral" : "success"}
@@ -461,8 +429,10 @@ export function BaseFiles(p: ContentProps & { baseId: string }) {
         </L>
         <L to={`${basePath(baseId)}?tab=retrieval`}>检索记录</L>
       </nav>
-      <Panel title="文件存储分布" action={<Sample />}>
+      <Panel title="存储与检索用量" action={sampleSizes ? <Sample>含模拟容量</Sample> : undefined}>
         <StorageRing
+          sample={sampleSizes}
+          trendAt={data.snapshotAt}
           items={files.map(({ document }) => ({
             id: document.id,
             name: document.name,
@@ -483,7 +453,7 @@ export function BaseFiles(p: ContentProps & { baseId: string }) {
           }}
         />
         <p className="om-note">
-          点击图例定位文件；容量为模拟数据，完整明细见下方列表。
+          点击图例筛选文件
         </p>
       </Panel>
       <div id="om-k-files">
@@ -505,7 +475,7 @@ export function BaseFiles(p: ContentProps & { baseId: string }) {
           title="文件列表"
           headers={[
             "文件名",
-            "大小（模拟）",
+            "文件大小",
             "类型",
             "切片数量",
             "切片状态",
@@ -535,7 +505,7 @@ export function BaseFiles(p: ContentProps & { baseId: string }) {
                   }
                   subtitle={document.id}
                 />,
-                uploadFailed(task) ? "未知" : bytes(displaySize(document)),
+                uploadFailed(task) ? "未知" : `${bytes(displaySize(document))}${document.observed?.sourceSize == null ? "（模拟）" : ""}`,
                 fileType(document),
                 document.observed?.chunkCount ??
                   (slicingState(task) === "成功"
@@ -546,9 +516,8 @@ export function BaseFiles(p: ContentProps & { baseId: string }) {
                   title={task ? dateTime(task.startedAt) : "未采集"}
                   subtitle={document.observed ? "文档创建时间" : "模拟时间"}
                 />,
-                <Badge tone={task?.status ?? "neutral"}>
-                  {taskState(task)}
-                </Badge>,
+                <Cell title={<Badge tone={task?.status ?? "neutral"}>{document.observed?.attempts?.latestSource === 'RETRY' && task?.status === 'processing' ? '重新处理中' : taskState(task)}</Badge>}
+                  subtitle={document.observed?.attempts?.recordedCount ? `${document.observed.attempts.latestSource === 'RETRY' && task?.status === 'ready' ? '重试后完成 · ' : ''}已记录 ${document.observed.attempts.recordedCount} 次处理` : document.observed ? '历史尚未采集' : '模拟记录'} />,
                 task ? (
                   <L className="om-k-open" to={taskPath(baseId, task.id)}>
                     查看 <Arrow />
@@ -585,6 +554,9 @@ function Preview({
         <span>原文件不可用，请查看右侧失败节点。</span>
       </Empty>
     );
+  if (document.parsedText != null) return <>
+    <pre className="om-k-text-preview">{document.parsedText || '解析文本为空'}</pre>
+  </>;
   return (
     <>
       <div className="om-k-preview-toolbar">
@@ -661,7 +633,7 @@ function Preview({
         </div>
       )}
       <p className="om-note">
-        原文件接口尚未提供；此处只演示预览样式，不代表当前文件内容。
+        示例预览
       </p>
     </>
   );
@@ -698,7 +670,7 @@ export function Document(p: ContentProps & { baseId: string; taskId: string }) {
           <strong>
             {uploadFailed(task) ? "未知" : bytes(displaySize(document))}
           </strong>{" "}
-          <Sample />
+          {document.observed?.sourceSize == null && <Sample />}
         </span>
         <span>
           {actual ? "文档创建时间" : "上传时间（模拟）"}{" "}
@@ -746,7 +718,7 @@ export function Document(p: ContentProps & { baseId: string; taskId: string }) {
         >
           {task.status !== "ready" && chunks.length > 0 && (
             <p className="om-note">
-              已生成，尚未入库；以下仅展示当前可获得的切片。
+              已生成，尚未入库
             </p>
           )}
           {!chunks.length && (
@@ -789,17 +761,16 @@ export function Document(p: ContentProps & { baseId: string; taskId: string }) {
               </article>
             ))}
           </div>
-          <Pager
+          <Pagination
             page={page}
             total={pages}
-            count={chunks.length}
             onChange={setChunkPage}
           />
         </Panel>
       ) : (
         <div className="om-k-document-layout">
           <Panel
-            title="原文件预览"
+            title={document.parsedText != null ? "解析文本预览" : "原文件预览"}
             action={
               <Badge tone={task.status}>
                 {uploadFailed(task) ? "上传失败" : taskState(task)}
@@ -812,9 +783,10 @@ export function Document(p: ContentProps & { baseId: string; taskId: string }) {
             className={focusError ? "om-k-chain is-focused" : "om-k-chain"}
             aria-label="文件处理链路"
           >
+            {actual && <DocumentHistory document={document} baseId={baseId} LinkComponent={L} />}
             <Panel
               title="文件处理链路"
-              action={<Sample>{actual ? "历史阶段待接入" : "模拟链路"}</Sample>}
+              action={<span className="om-sub">{actual ? "当前状态" : "模拟链路"}</span>}
             >
               {actual && (
                 <div className="om-k-preview-toolbar">
@@ -837,9 +809,6 @@ export function Document(p: ContentProps & { baseId: string; taskId: string }) {
               )}
               {actual && !sampleChain ? (
                 <div className="om-padding">
-                  <p className="om-note">
-                    当前状态为真实数据；接口未提供历次节点和耗时，不推断其他阶段已完成。
-                  </p>
                   <ol className="om-stages">
                     <li>
                       <span className={`om-stage-dot om-tone-${task.status}`}>
@@ -930,11 +899,6 @@ export function Document(p: ContentProps & { baseId: string; taskId: string }) {
                     : "处理尚未结束。"}
                 </p>
               )}
-              <p className="om-note">
-                {actual
-                  ? "历史阶段、重试记录与耗时等待联调。"
-                  : "失败节点之后的阶段不会继续执行。"}
-              </p>
               <L className="om-k-open" to="/workspace/knowledge">
                 前往知识库模块 <Arrow />
               </L>

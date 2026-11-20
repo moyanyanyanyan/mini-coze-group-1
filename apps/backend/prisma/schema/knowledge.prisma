@@ -41,6 +41,7 @@ enum KnowledgeDocumentStage {
 }
 
 model KnowledgeDocument {
+  operationAttempts OperationDocumentAttempt[]
   id               String                      @id @default(uuid())
   knowledgeBaseId  String
   knowledgeBase    KnowledgeBase               @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)

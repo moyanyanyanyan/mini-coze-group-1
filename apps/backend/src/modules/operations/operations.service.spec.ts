@@ -9,12 +9,33 @@ import { OperationsAgentsQuery, OperationsDocumentsQuery, OperationsPageQuery } 
 const now = new Date('2026-11-14T00:00:00Z');
 function setup() {
   const model = () => ({ findFirst: jest.fn(), findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0), groupBy: jest.fn().mockResolvedValue([]) });
-  const tx = { agent: model(), conversation: model(), message: model(), knowledgeBase: model(), knowledgeDocument: model(), knowledgeChunk: model() };
-  const prisma = { $transaction: jest.fn(async (fn: (client: typeof tx) => unknown) => fn(tx)) };
+  const tx = { $queryRaw: jest.fn().mockResolvedValue([]), agent: model(), conversation: model(), message: model(), knowledgeBase: model(), knowledgeDocument: model(), knowledgeChunk: model() };
+  const prisma = { knowledgeDocument: tx.knowledgeDocument, $transaction: jest.fn(async (fn: (client: typeof tx) => unknown) => fn(tx)) };
   return { tx, prisma, service: new OperationsService(prisma as never) };
 }
 
 describe('Operations 当前用户查询', () => {
+  it('列表只返回原文件字节长度，保留零字节和未知并限制本人及父知识库', async () => {
+    const { tx, service } = setup();
+    tx.knowledgeBase.findFirst.mockResolvedValue({ id: 'kb', name: '资料', status: 'ACTIVE' });
+    tx.knowledgeDocument.findMany.mockResolvedValue(['empty', 'missing', 'text'].map(id => ({ id, createdAt: now, updatedAt: now, errorCode: null, errorMessage: null })));
+    tx.$queryRaw.mockResolvedValue([{ id: 'empty', sourceSize: 0 }, { id: 'missing', sourceSize: null }, { id: 'text', sourceSize: 6 }]);
+    const result = await service.documents('owner', 'kb', { page: 1, pageSize: 20 });
+    expect(result.items.map(row => row.sourceSize)).toEqual([0, null, 6]);
+    const sql = tx.$queryRaw.mock.calls[0][0];
+    expect(sql.values).toEqual(['owner', 'kb', 'empty', 'missing', 'text']);
+    expect(sql.sql).toContain('octet_length');
+    expect(result.items[2]).not.toHaveProperty('sourceBytes');
+  });
+
+  it('解析文本只读取本人且属于指定知识库的文档，缺失返回 404', async () => {
+    const { tx, service } = setup();
+    tx.knowledgeDocument.findFirst.mockResolvedValue(null);
+    await expect(service.documentText('owner', 'kb', 'other')).rejects.toBeInstanceOf(NotFoundException);
+    expect(tx.knowledgeDocument.findFirst).toHaveBeenCalledWith({ where: { id: 'other', knowledgeBaseId: 'kb', knowledgeBase: { workspaceId: 'owner' } }, select: { id: true, knowledgeBaseId: true, rawText: true } });
+    tx.knowledgeDocument.findFirst.mockResolvedValue({ id: 'doc', knowledgeBaseId: 'kb', rawText: '' });
+    await expect(service.documentText('owner', 'kb', 'doc')).resolves.toMatchObject({ rawText: '' });
+  });
   it('概览全部限制当前用户，失败文档与处理中分别计数', async () => {
     const { tx, service, prisma } = setup();
     tx.agent.count.mockResolvedValue(2);
@@ -82,7 +103,7 @@ describe('Operations 当前用户查询', () => {
 
   it('可用切片只统计 READY、启用且有向量的记录，不读取正文', async () => {
     const { tx, service } = setup();
-    tx.knowledgeBase.findMany.mockResolvedValue([{ id: 'kb', name: '资料', description: '', status: 'DISABLED', updatedAt: now }]);
+    tx.knowledgeBase.findMany.mockResolvedValue([{ id: 'kb', name: '资料', description: '', status: 'DISABLED', createdAt: now, updatedAt: now }]);
     tx.knowledgeBase.count.mockResolvedValue(1);
     tx.knowledgeDocument.groupBy.mockResolvedValue([
       { knowledgeBaseId: 'kb', status: 'READY', _count: { _all: 2 } },

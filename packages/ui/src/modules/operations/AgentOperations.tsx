@@ -29,7 +29,7 @@ export function Agents(p: ContentProps) {
   const { data, runs, LinkComponent: L } = p;
   return (
     <>
-      <PageHeader title="Agent 聊天" description="从智能体进入会话，追踪每一轮执行。" />
+      <PageHeader title="Agent 聊天" />
       <RunMetrics runs={runs} />
       <Records
         id="agents"
@@ -50,7 +50,7 @@ export function Agents(p: ContentProps) {
             text: `${a.name} ${a.description} ${a.id}`,
             status: s.failed ? 'failed' : 'success',
             cells: [
-              <Cell title={<L to={agentPath(a.id)}>{a.name}</L>} subtitle={a.description} />,
+              <Cell title={<L to={agentPath(a.id)}>{a.name}</L>} />,
               a.conversationCount ?? new Set(selected.map((r) => r.conversationId)).size,
               s.count,
               <Cell title={s.rate} subtitle={`${s.failed} 次失败`} />,
@@ -73,7 +73,7 @@ export function Conversations(p: ContentProps & { agentId: string }) {
   );
   return (
     <>
-      <PageHeader title={agent.name} description="查看会话中的执行记录，失败和内部异常分别标记。" />
+      <PageHeader title={agent.name} />
       <RunMetrics runs={selected} />
       <Records
         id={`conversations-${agentId}`}
@@ -253,12 +253,6 @@ export function PluginDetail({ run }: { run: OperationRun }) {
 function CollectedTrace({ run }: { run: OperationRun }) {
   const actual = run.observed!;
   const stages = parseRuntimeStages(actual.events?.filter(event => event.type === 'runtime.stage').map(event => event.data));
-  const captured = new Set(stages.map(stage => stage.kind));
-  const examples = run.stages.filter(stage => !(
-    (stage.name.includes('知识库检索') && captured.has('retrieval')) ||
-    (stage.name.includes('模型调用') && captured.has('model')) ||
-    (stage.name.includes('插件') && captured.has('tool'))
-  )).map(stage => ({ ...stage, name: `${stage.name}（示例）`, description: `示例说明：${stage.description}` }));
   const measured = stages.map(stage => ({
     id: stage.stageId,
     name: `${({ retrieval: '知识库检索', context: '上下文组装', model: '模型调用', tool: '工具执行' })[stage.kind]}${stage.round ? ` · 第 ${stage.round} 轮` : ''}${stage.toolName ? ` · ${stage.toolName}` : ''}（已采集）`,
@@ -272,11 +266,11 @@ function CollectedTrace({ run }: { run: OperationRun }) {
   const labels: Record<string, string> = { completed: 'Runtime 已完成', failed: '失败', running: '处理中', pending: '等待保存', cancelled: '已取消', interrupted: '采集中断' };
   return <>
     <div className="om-trace-metrics">
-      <span>调用耗时 <b>{duration(run.durationMs)}{actual.durationMs === null ? '（示例）' : ''}</b></span>
+      <span>调用耗时 <b>{actual.durationMs === null ? '未采集' : duration(actual.durationMs)}</b></span>
       <span>首字响应 <b>{actual.firstTokenMs === null ? '未采集' : duration(actual.firstTokenMs)}</b></span>
-      <span>Token <b>{actual.totalTokens ?? `${run.inputTokens + run.outputTokens}（示例）`}</b></span>
+      <span>Token <b>{actual.totalTokens ?? '未报告'}</b></span>
     </div>
-    <p className="om-note">输入 {actual.inputTokens ?? `${run.inputTokens}（示例）`} / 输出 {actual.outputTokens ?? `${run.outputTokens}（示例）`} Token；示例不计入实际用量。</p>
+    <p className="om-note">输入 {actual.inputTokens ?? '未报告'} / 输出 {actual.outputTokens ?? '未报告'} Token。</p>
     <div className="om-key-value"><span>Runtime 结果</span><strong>{labels[actual.status] ?? actual.status}</strong></div>
     <div className="om-key-value"><span>消息保存状态</span><strong>{actual.messageStatus === 'completed' ? '已保存' : labels[actual.messageStatus ?? ''] ?? '不可用'}</strong></div>
     {actual.errorCode && <Notice title="实际调用异常" tone="failed">{actual.errorCode}</Notice>}
@@ -286,10 +280,8 @@ function CollectedTrace({ run }: { run: OperationRun }) {
       <pre>{JSON.stringify(event.data, null, 2)}</pre>
     </details>)}
     {actual.truncated && <p className="om-note">部分事件已按大小上限截断或省略。</p>}
-    <p className="om-note">用量为 Runtime 已报告值；客户端耗时不包含消息最终保存。引用是上下文来源，不代表回答采用。</p>
-    <details className="om-snippet" open={stages.length > 0}><summary>{stages.length ? '内部阶段（实际采集，未采集项保留示例）' : '内部阶段示例（未采集，不属于本次执行）'}</summary>
-      <Stages stages={[...examples.filter(stage => stage.name.startsWith('接收请求')), ...measured, ...examples.filter(stage => !stage.name.startsWith('接收请求'))]} />
-      {stages.length > 0 && <p className="om-note">阶段为 Runtime 调用边界计时，模型耗时包含流式读取与下游消费等待；示例不属于本次执行，不参与耗时统计。</p>}
+    <details className="om-snippet" open={stages.length > 0}><summary>内部阶段（实际采集）</summary>
+      {stages.length > 0 ? <Stages stages={measured} /> : <p>{actual.events ? '暂无阶段数据' : '正在读取本轮阶段数据…'}</p>}
     </details>
   </>;
 }
@@ -378,7 +370,7 @@ export function Conversation(p: ContentProps & { agentId: string; conversationId
                   onClick={event => { triggerRef.current = event.currentTarget; }}
                 >
                   <Badge tone={r.status}>{runLabels[r.status]}</Badge>
-                  <span>{duration(r.durationMs)}{r.observed?.durationMs === null ? '（示例）' : ''}</span>
+                  <span>{r.observed?.durationMs === null ? '未采集' : duration(r.durationMs)}</span>
                   <span>{expanded && r.id === run.id ? `正在查看第 ${i + 1} 轮` : `查看第 ${i + 1} 轮执行链路`}</span>
                 </L>
               </article>

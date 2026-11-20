@@ -51,6 +51,5 @@ export function TokenActivity({ runs, snapshotAt }: { runs: OperationRun[]; snap
     </div>
     <div className="om-token-range"><span>{days[0].date.slice(5)}</span><span>{days[last].date.slice(5)}</span></div>
     <div className="om-token-reading" aria-live="polite">{current.date} · <strong>{current.total.toLocaleString()}</strong> Token</div>
-    <div className="om-token-legend" aria-label="颜色越深，单日 Token 消耗越多"><span>少</span>{[0, 1, 2, 3, 4].map(level => <i key={level} data-level={level} />)}<span>多</span></div>
   </section>;
 }

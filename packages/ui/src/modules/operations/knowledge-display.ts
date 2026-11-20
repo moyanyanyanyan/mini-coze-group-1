@@ -90,9 +90,9 @@ export function taskState(task?: OperationTask) {
   return `${stage ?? "处理"}中`;
 }
 
-// 容量接口尚未提供：模拟值只用于 UI，占比和总数始终使用同一组值。
+// 旧接口没有字节数时保留示例；零字节是有效的实际值。
 export function displaySize(document: OperationDocument) {
-  return document.sourceBytes;
+  return document.observed?.sourceSize ?? document.sourceBytes;
 }
 
 export function baseFiles(data: OperationsData, id: string) {
@@ -102,8 +102,9 @@ export function baseFiles(data: OperationsData, id: string) {
 }
 
 export function originalText(document: OperationDocument) {
+  if (document.parsedText != null) return document.parsedText;
   if (document.observed)
-    return "模拟解析文本 · 非当前文件内容\n\n这里展示文件解析／OCR 后的文本样式。原文件与完整解析文本接口尚未接入。";
+    return "模拟解析文本 · 非当前文件内容\n\n这里展示文件解析／OCR 后的文本样式。当前文档尚无可读取的解析文本，以下内容仅为示例。";
   // 模拟切片存在重叠，按原始字符位置还原，避免重复拼接。
   let text = "";
   for (const chunk of [...document.chunks].sort((a, b) => a.start - b.start)) {

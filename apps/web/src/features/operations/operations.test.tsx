@@ -107,7 +107,7 @@ describe('运行管理页面与边界', () => {
   it('智能体列表每条记录链接自己的会话列表', () => {
     const html = render(`${operationsRoot}/agents`);
     for (const agent of data.agents) expect(html).toContain(`href="${agentPath(agent.id)}"`);
-    expect(html).toContain('模拟数据，不代表实际运行');
+    expect(html).toContain('示例数据');
   });
 
   it('失败与完成但有异常分别显示，未命中不是失败', () => {
@@ -198,5 +198,27 @@ describe('知识库运行三层界面', () => {
     const history = render(taskPath('kb-1', 'task-1-2-attempt-1'));
     expect(history).toContain('正在查看历史处理记录');
     expect(history).toContain(taskPath('kb-1', 'task-1-2'));
+  });
+});
+
+
+describe('运行管理精简展示', () => {
+  it('列表使用可选页码和图标按钮，不展示记录说明及热力图图例', () => {
+    const html = render(operationsRoot);
+    expect(html).toContain('aria-label="最新运行分页页码"');
+    expect(html).toContain('aria-label="今日错误分页页码"');
+    expect(html).toContain('aria-label="上一页" disabled=""');
+    expect(html).not.toContain('>上一页<');
+    expect(html).not.toContain('>下一页<');
+    expect(html).not.toContain('条记录 · 每页');
+    expect(html).not.toContain('om-token-legend');
+  });
+  it('智能体名称不附带描述，四项指标没有开发说明', () => {
+    const html = render(`${operationsRoot}/agents`);
+    expect(html).not.toContain(data.agents[0].description);
+    expect(html).not.toContain('当前时间范围内');
+    expect(html).not.toContain('仅已采集客户端耗时');
+    expect(html).toContain('执行成功率');
+    expect(html).toContain('平均耗时');
   });
 });

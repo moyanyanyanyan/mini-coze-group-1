@@ -1,3 +1,4 @@
+import type { OperationsDocumentAttempt, OperationsPageResult } from '../../../../shared/src/operations';
 import type { OperationsRuntimeRun, OperationsRuntimeDetail, OperationsRuntimeStats, OperationsBase, OperationsDocument } from '../../../../shared/src/operations';
 export type RunStatus = 'success' | 'warning' | 'failed' | 'running' | 'cancelled' | 'interrupted';
 export type TaskStatus = 'ready' | 'processing' | 'failed';
@@ -23,6 +24,8 @@ export interface OperationChunk {
   end: number;
 }
 export interface OperationDocument {
+  history?: OperationsPageResult<OperationsDocumentAttempt>;
+  parsedText?: string | null;
   observed?: OperationsDocument;
   id: string;
   baseId: string;

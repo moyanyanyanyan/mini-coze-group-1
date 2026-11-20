@@ -9,9 +9,11 @@ import { OperationsAgentsQuery, OperationsDocumentsQuery, OperationsPageQuery, O
 
 const order = [{ updatedAt: 'desc' }, { id: 'desc' }] as const;
 const agentSelect = { id: true, name: true, description: true, status: true, updatedAt: true } as const;
-const baseSelect = { id: true, name: true, description: true, status: true, updatedAt: true } as const;
+const baseSelect = { createdAt: true, id: true, name: true, description: true, status: true, updatedAt: true } as const;
 const conversationSelect = { id: true, agentId: true, title: true, createdAt: true, updatedAt: true } as const;
 const documentSelect = {
+  _count: { select: { operationAttempts: true } },
+  operationAttempts: { orderBy: { ordinal: 'desc' }, take: 1, select: { source: true, status: true } },
   id: true, knowledgeBaseId: true, title: true, sourceType: true, originalFileName: true,
   status: true, stage: true, chunkCount: true, errorCode: true, errorMessage: true,
   createdAt: true, updatedAt: true,
@@ -111,7 +113,7 @@ export class OperationsService {
       return page(rows.map(row => {
         const counts = documents.filter(d => d.knowledgeBaseId === row.id);
         return {
-          ...row, updatedAt: row.updatedAt.toISOString(),
+          ...row, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
           documentCount: counts.reduce((n, d) => n + d._count._all, 0),
           processingDocuments: counts.find(d => d.status === 'PROCESSING')?._count._all ?? 0,
           failedDocuments: counts.find(d => d.status === 'FAILED')?._count._all ?? 0,
@@ -119,6 +121,15 @@ export class OperationsService {
         };
       }), total, query);
     });
+  }
+
+  async documentText(userId: string, knowledgeBaseId: string, id: string) {
+    const document = await this.prisma.knowledgeDocument.findFirst({
+      where: { id, knowledgeBaseId, knowledgeBase: { workspaceId: userId } },
+      select: { id: true, knowledgeBaseId: true, rawText: true },
+    });
+    if (!document) throw new NotFoundException('文档不存在或不可访问');
+    return document;
   }
 
   documents(userId: string, knowledgeBaseId: string, query: OperationsDocumentsQuery): Promise<OperationsDocuments> {
@@ -133,8 +144,16 @@ export class OperationsService {
         tx.knowledgeDocument.findMany({ where, select: documentSelect, orderBy: [...order], ...pagination(query) }),
         tx.knowledgeDocument.count({ where }),
       ]);
+      // 只在数据库中计算长度，不将原始文件载入列表查询。
+      const sizes = rows.length ? await tx.$queryRaw<{ id: string; sourceSize: number | null }[]>(Prisma.sql`
+        SELECT d.id, octet_length(d."sourceBytes") AS "sourceSize"
+        FROM "KnowledgeDocument" d JOIN "KnowledgeBase" b ON b.id = d."knowledgeBaseId"
+        WHERE b."workspaceId" = ${userId} AND d."knowledgeBaseId" = ${knowledgeBaseId}
+          AND d.id IN (${Prisma.join(rows.map(row => row.id))})
+      `) : [];
+      const byId = new Map(sizes.map(row => [row.id, row.sourceSize]));
       return {
-        ...page(rows.map(({ errorCode, errorMessage, ...row }) => ({ ...dates(row), error: errorCode ? { code: errorCode, message: errorMessage } : null })), total, query), base,
+        ...page(rows.map(({ errorCode, errorMessage, _count, operationAttempts, ...row }) => ({ ...dates(row), attempts: { recordedCount: _count?.operationAttempts ?? 0, latestSource: operationAttempts?.[0]?.source ?? '', latestStatus: operationAttempts?.[0]?.status ?? '' }, sourceSize: byId.get(row.id) ?? null, error: errorCode ? { code: errorCode, message: errorMessage } : null })), total, query), base,
       };
     });
   }
