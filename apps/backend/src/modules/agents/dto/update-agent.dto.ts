@@ -31,7 +31,7 @@ export class UpdateAgentDto {
 
   @IsOptional()
   @IsString()
-  model?: string;
+  modelConfigId?: string | null;
 
   @IsOptional()
   @IsNumber()
