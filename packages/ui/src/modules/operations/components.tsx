@@ -1,3 +1,5 @@
+import { DiceLoader, EditorialStatCard, SourcePagination } from '../../components/uiverse';
+import { MenuFilter } from './SourceControls';
 import { animateOperationsChange } from './motion';
 import { useState, type ReactNode } from 'react';
 import { Icon } from '../../components/Icon';
@@ -10,6 +12,10 @@ import {
   type OperationRun,
   type OperationStage,
 } from './model';
+
+export function OperationsLoader({ compact = false }: { compact?: boolean }) {
+  return <span className={`om-source-loader${compact ? ' is-compact' : ''}`}><DiceLoader /></span>;
+}
 
 export const runLabels = { success: '成功', warning: '完成，有异常', failed: '失败', running: '运行中', cancelled: '已取消', interrupted: '采集中断' };
 
@@ -56,11 +62,8 @@ export function Stats({ items }: { items: { label: string; value: ReactNode; not
   return (
     <div className="om-stats">
       {items.map((i) => (
-        <div key={i.label}>
-          <span>{i.label}</span>
-          <strong>{i.value}</strong>
-          {i.note && <small>{i.note}</small>}
-        </div>
+        <EditorialStatCard key={i.label} meta={i.label} value={i.value}
+          caption={i.note ?? null} />
       ))}
     </div>
   );
@@ -76,12 +79,9 @@ export function Notice({
   tone?: string;
 }) {
   return (
-    <div className={`om-notice om-tone-${tone}`}>
-      <Icon name={tone === 'success' ? 'check' : 'stop'} />
-      <div>
-        <strong>{title}</strong>
-        <p>{children}</p>
-      </div>
+    <div className={`om-source-notice om-tone-${tone}`}>
+      <div className="om-source-notice-header"><span className="om-source-notice-icon"><Icon name={tone === 'success' ? 'check' : 'stop'} /></span><strong>{title}</strong></div>
+      <div className="om-source-notice-message">{children}</div>
     </div>
   );
 }
@@ -190,30 +190,12 @@ export function Records({
           />
           <div>
             {sourceOptions.length > 0 && (
-              <select
-                aria-label="来源筛选"
-                value={filters.source}
-                onChange={(e) => change({ source: e.target.value })}
-              >
-                <option value="">全部来源</option>
-                {sourceOptions.map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
+              <MenuFilter label="来源筛选" value={filters.source} onChange={source => change({ source })}
+                items={[{ id: '', label: '全部来源' }, ...sourceOptions.map(source => ({ id: source, label: source }))]} />
             )}
             {statusOptions.length > 0 && (
-              <select
-                aria-label="状态筛选"
-                value={filters.status}
-                onChange={(e) => change({ status: e.target.value })}
-              >
-                <option value="">全部状态</option>
-                {statusOptions.map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
+              <MenuFilter label="状态筛选" value={filters.status} onChange={status => change({ status })}
+                items={[{ id: '', label: '全部状态' }, ...statusOptions.map(([id, label]) => ({ id, label }))]} />
             )}
             {(filters.query || filters.source || filters.status) && (
               <button onClick={() => change({ query: '', status: '', source: '' })}>
@@ -257,20 +239,7 @@ export function Pagination({ page, total, onChange, label = '分页' }: {
   onChange: (page: number) => void;
   label?: string;
 }) {
-  const pages = Math.max(1, total);
-  const current = Math.max(1, Math.min(page, pages));
-  return <nav className="om-pagination" aria-label={label}>
-    <button type="button" aria-label="上一页" disabled={current === 1} onClick={() => onChange(current - 1)}>
-      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m14 6-6 6 6 6" /></svg>
-    </button>
-    <select aria-label={`${label}页码`} value={current} onChange={event => onChange(Number(event.target.value))}>
-      {Array.from({ length: pages }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}</option>)}
-    </select>
-    <span aria-hidden="true">/ {pages}</span>
-    <button type="button" aria-label="下一页" disabled={current === pages} onClick={() => onChange(current + 1)}>
-      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m10 6 6 6-6 6" /></svg>
-    </button>
-  </nav>;
+  return <div className="om-source-pagination"><SourcePagination page={page} totalPages={total} label={label} onChange={onChange} /></div>;
 }
 
 export function Breadcrumbs({

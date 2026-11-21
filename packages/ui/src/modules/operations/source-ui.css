@@ -1,0 +1,395 @@
+/* 基于原作源码；仅作用于运行管理。原作编号、配色与结构适配见 SOURCE-UI.md。 */
+/* 02 · From Uiverse.io by another-kennyotsu — sharp-fox-30。 */
+.om .om-source-keycap {
+  transition: 180ms ease-in-out;
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  width: auto;
+  height: 46px;
+  background: linear-gradient(#ffffff, #ded9ea);
+  border-radius: 10px;
+  box-shadow: 0 2px 4px #3024430d, inset -3px 0 4px rgba(196, 196, 196, 0.12), inset 0 -3px 4px rgba(134, 134, 134, 0.08);
+}
+
+.om .om-source-keycap::before {
+  transition: 180ms ease-in-out;
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  bottom: 7px;
+  right: 8px;
+  background: linear-gradient(90deg, #f1eef7, #ffffff);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6),
+  1px 2px 3px rgba(48, 36, 67, 0.06);
+  border-radius: 10px;
+  border-left: 1px solid #0004;
+  border-top: 1px solid #0004;
+  border-right: 1px solid #0004;
+  border-bottom: 1px solid #0004;
+}
+
+.om .om-source-keycap:active {
+  box-shadow: 0 1px 2px #30244308, inset 0 -2px 3px rgba(134, 134, 134, 0.08);
+}
+
+.om .om-source-keycap:active::before {
+  transition: 180ms ease-in-out;
+  top: 3px;
+  left: 1px;
+  bottom: 7px;
+  right: 6px;
+  filter: brightness(0.95);
+}
+
+.om .om-source-keycap i {
+  position: absolute;
+  bottom: 9px;
+  height: 4px;
+  width: 24px;
+  border-radius: 8px;
+  background: rgb(179, 179, 179);
+}
+
+.om .om-source-keycap > span {
+  list-style: none;
+  position: absolute;
+  font-size: medium;
+  font-family: Arial, Helvetica, sans-serif;
+  font-style: normal;
+  margin-top: 0;
+}
+
+.om .om-source-keycap { min-width: 116px; padding: 6px 18px 12px; border: 0; align-items:center; }
+.om .om-source-keycap > span { position:relative; display:flex; align-items:center; gap:8px; z-index:1; font:inherit; }
+.om .om-source-keycap i { height:2px; width:16px; background:#c4bdd7; }
+
+/* From Uiverse.io by Sujitkavaiya - Tags: card */
+.om .om-panel {
+
+
+ background: rgb(255, 255, 255);
+ border-radius: 0.4em;
+ box-shadow: 0.3em 0.3em 0.7em #00000015;
+ transition: border 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+ border: rgb(250, 250, 250) 0.2em solid;
+}
+
+.om .om-panel:hover {
+ border: var(--violet-300) 0.2em solid;
+}
+
+
+/* From Uiverse.io by Kilian-DM - Tags: 3d, button */
+.om .om-primary {
+  display: inline-block;
+  padding: 0.5em 1em;
+  font-size: 1.06em;
+  font-weight: bold;
+  text-transform: uppercase;
+  color: #fff;
+  background-color: var(--violet-600);
+  border: none;
+  border-radius: 0.25em;
+  box-shadow: 0 0.15em 0.3em rgba(0, 0, 0, 0.3);
+  transform: perspective(1em) rotateX(-1deg) rotateY(1deg);
+  transition: all 0.2s ease-in-out;
+}
+
+.om .om-primary:hover {
+  transform: perspective(1em) rotateX(-3deg) rotateY(3deg) translateY(-0.05em);
+  background-color: var(--violet-500);
+  box-shadow: 0 0.3em 0.6em rgba(0, 0, 0, 0.3);
+}
+
+.om .om-primary:focus,
+.om .om-primary:active {
+  transform: perspective(1em) rotateX(-3deg) rotateY(3deg) translateY(-0.05em);
+  background-color: var(--violet-700);
+  box-shadow: 0 0.3em 0.6em rgba(0, 0, 0, 0.3);
+
+}
+
+
+/* From Uiverse.io by Yaya12085 - Tags: alert, notification, card */
+.om .om-source-notice {
+  max-width: 100%; margin: 16px 0; border-style: solid;
+  border-width: 1px;
+  border-color: var(--violet-200);
+  border-radius: 1rem;
+  background-color: rgba(255, 255, 255, 1);
+  padding: 1rem;
+}
+
+.om .om-source-notice-header {
+  display: flex;
+  align-items: center;
+  grid-gap: 1rem;
+  gap: 1rem;
+}
+
+.om .om-source-notice-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background-color: var(--violet-500);
+  padding: 0.5rem;
+  color: rgba(255, 255, 255, 1);
+}
+
+.om .om-source-notice-icon svg {
+  height: 1rem;
+  width: 1rem;
+}
+
+.om .om-source-notice-header strong {
+  font-weight: 600;
+  color: var(--ink-600);
+}
+
+.om .om-source-notice-message {
+  margin-top: 1rem;
+  color: var(--ink-600);
+}
+
+
+
+/* From Uiverse.io by Galahhad - Tags: icon, button, copy, clipboard */
+/* tooltip settings 👇 */
+
+.om .om-source-copy {
+  /* button */
+  --button-bg: #ffffff;
+  --button-hover-bg: #f3efff;
+  --button-text-color: #63518c;
+  --button-hover-text-color: #6f56d9;
+  --button-border-radius: 10px;
+  --button-diameter: 36px;
+  --button-outline-width: 1px;
+  --button-outline-color: rgb(141, 141, 141);
+  /* tooltip */
+  --tooltip-bg: #f4f3f3;
+  --toolptip-border-radius: 4px;
+  --tooltip-font-family: Menlo, Roboto Mono, monospace;
+  /* 👆 this field should not be empty */
+  --tooltip-font-size: 12px;
+  /* 👆 this field should not be empty */
+  --tootip-text-color: rgb(50, 50, 50);
+  --tooltip-padding-x: 7px;
+  --tooltip-padding-y: 7px;
+  --tooltip-offset: 8px;
+  /* --tooltip-transition-duration: 0.3s; */
+  /* 👆 if you need a transition, 
+  just remove the comment,
+  but I didn't like the transition :| */
+}
+
+.om .om-source-copy {
+  box-sizing: border-box;
+  width: var(--button-diameter);
+  height: var(--button-diameter);
+  border-radius: var(--button-border-radius);
+  background-color: var(--button-bg);
+  color: var(--button-text-color);
+  border: none;
+  cursor: pointer;
+  position: relative;
+  outline: none;
+}
+
+.om-source-copy-tooltip {
+  position: absolute;
+  opacity: 0;
+  visibility: hidden;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font: var(--tooltip-font-size) var(--tooltip-font-family);
+  color: var(--tootip-text-color);
+  background: var(--tooltip-bg);
+  padding: var(--tooltip-padding-y) var(--tooltip-padding-x);
+  border-radius: var(--toolptip-border-radius);
+  pointer-events: none;
+  transition: all var(--tooltip-transition-duration) cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.om-source-copy-tooltip::before {
+  content: attr(data-text-initial);
+}
+
+.om-source-copy-tooltip::after {
+  content: "";
+  position: absolute;
+  bottom: calc(var(--tooltip-padding-y) / 2 * -1);
+  width: var(--tooltip-padding-y);
+  height: var(--tooltip-padding-y);
+  background: inherit;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  z-index: -999;
+  pointer-events: none;
+}
+
+.om .om-source-copy svg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.om-source-checkmark {
+  display: none;
+}
+
+/* actions */
+
+.om .om-source-copy:hover .om-source-copy-tooltip,
+.om .om-source-copy[data-copied="true"] .om-source-copy-tooltip {
+  opacity: 1;
+  visibility: visible;
+  top: calc((100% + var(--tooltip-offset)) * -1);
+}
+
+.om .om-source-copy[data-copied="true"] .om-source-copy-tooltip::before {
+  content: attr(data-text-end);
+}
+
+.om .om-source-copy[data-copied="true"] .om-source-clipboard {
+  display: none;
+}
+
+.om .om-source-copy[data-copied="true"] .om-source-checkmark {
+  display: block;
+}
+
+.om .om-source-copy:hover,
+.om .om-source-copy:focus {
+  background-color: var(--button-hover-bg);
+}
+
+.om .om-source-copy:active {
+  outline: var(--button-outline-width) solid var(--button-outline-color);
+}
+
+.om .om-source-copy:hover svg {
+  color: var(--button-hover-text-color);
+}
+
+/* 15 · From Uiverse.io by uiverse-astronaut — purple-zebra-62。
+   保留原作底座、白色选中块与过渡；焦点的青柠色按用户要求换成紫色。 */
+.om .om-source-tabs, .om .om-tabs, .om .om-navigation nav {
+  --vl-ink:#0b1015; --vl-paper:#fff; --vl-mist:#f2f5f8; --vl-slate:#6b7785;
+  --vl-hairline:#d6dce3; --vl-focus-ring:0 0 0 3px #6f56d935;
+  --vl-ease:cubic-bezier(.2,.7,.2,1);
+  display:inline-flex; align-items:center; background:var(--vl-mist);
+  border:1px solid var(--vl-hairline); border-radius:999px; padding:4px; gap:2px; font-family:inherit;
+  box-shadow:none; max-width:100%; flex-wrap:wrap;
+}
+.om .om-source-tab, .om .om-tabs a, .om .om-navigation nav a {
+  appearance:none; border:0; cursor:pointer; font-family:inherit; font-size:13px; font-weight:500;
+  color:var(--vl-slate); background:transparent; height:36px; padding:0 20px; border-radius:999px;
+  display:inline-flex; align-items:center; gap:8px; white-space:nowrap; box-shadow:none;
+  transition:background 200ms var(--vl-ease),color 200ms var(--vl-ease),box-shadow 200ms var(--vl-ease);
+}
+.om .om-source-tab:hover, .om .om-tabs a:hover, .om .om-navigation nav a:hover { color:var(--vl-ink); transform:none; }
+.om .om-source-tab:focus-visible, .om .om-tabs a:focus-visible { outline:none; box-shadow:var(--vl-focus-ring); }
+.om .om-source-tab.is-active, .om .om-tabs a.is-active, .om .om-navigation nav a.is-active {
+  background:var(--vl-paper); color:var(--violet-700); box-shadow:0 1px 0 #0b10150a,0 1px 2px #0b10150a; font-weight:600;
+}
+/* 12 · AtharvaMistry 原作 Tailwind 属性转为局部 CSS；正文尺寸与白底适配。 */
+.om input[type="search"] { border-radius:999px; background:#fff; font-size:14px; border:2px solid var(--violet-300); padding:10px 16px; box-shadow:none; }
+.om input[type="search"]::placeholder { color:#817591; }
+.om input[type="search"]:focus { color:var(--violet-900); border-color:var(--violet-700); outline:none; box-shadow:0 0 0 2px var(--violet-300); }
+/* 01 保留原作运动轨迹/周期，取消彩色循环。缩放的是完整画布，位移不会溢出按钮。 */
+.om-source-loader { display:inline-flex; width:160px; height:60px; align-items:center; justify-content:center; flex:none; }
+.om-source-loader .uv-dice-loader { background:var(--violet-600,#6f56d9) !important; filter:drop-shadow(2px 3px 12px #6f56d940); }
+.om-source-loader.is-compact { width:36px; height:20px; }
+.om-source-loader.is-compact .uv-dice-loader { zoom:.22; }
+/* 14 的按钮不叠加旧分页器的厚底边。 */
+.om .om-source-pagination { display:flex; justify-content:flex-end; padding-top:16px; margin-top:auto; }
+.om .uv-marque-pager { --color-paper:#fff; --color-indigo:var(--violet-700); gap:6px; padding:8px; }
+.om .uv-marque-pager button { padding:0; min-height:36px; box-shadow:none; font-size:14px; transform:none; }
+.om .uv-marque-pager__page[aria-current="page"] { color:#fff; background:var(--violet-700); }
+.om .uv-marque-pager__edge { width:36px; }
+.om .uv-marque-pager__jump { min-height:36px; width:54px; padding:4px 8px; }
+/* 16 保留大数字、角部圆面与信息层次，压缩到四项业务指标。 */
+.om .uv-stat-tile { --bc-t-ink:var(--ink-900); --bc-t-bone:#fff; --bc-t-chartreuse:var(--violet-100); --bc-t-tangerine:var(--violet-600);
+  width:auto; min-width:0; min-height:150px; gap:18px; padding:20px; border-color:var(--violet-200); border-radius:20px; }
+.om .uv-stat-tile::before { width:150px; height:150px; inset:-55px -45px auto auto; }
+.om .uv-stat-tile__meta { font-family:inherit; font-size:14px; font-weight:500; line-height:1.5; letter-spacing:0; }
+.om .uv-stat-tile__number { font-size:clamp(24px,2.5vw,36px); line-height:1.2; white-space:nowrap; margin:0; }
+.om .uv-stat-tile__caption { margin:0; max-width:none; }
+.om .uv-stat-tile__body { gap:8px; }
+/* 06 保留全部原作 3D 层、位移与延迟；内容面改为白色，采用内容高度。 */
+.om .om-source-base { min-width:0; padding:12px 6px 22px; }
+.om .om-source-base .uv-card-parent { width:100%; height:auto; }
+.om .om-source-base .uv-card-card { position:relative; height:auto; min-height:380px; background:linear-gradient(135deg,#fff 70%,#f1ecff); border:1px solid #e6e0f3; }
+.om .om-source-base .uv-card-glass { pointer-events:none; background:linear-gradient(0deg,#ffffff70,#ffffffd9); }
+.om .om-source-base .uv-card-content { padding:92px 24px 76px; }
+.om .om-source-base .uv-card-title { font-size:18px; }
+.om .om-source-base-title { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+.om .om-source-base-title > a { display:inline-flex; gap:8px; align-items:center; overflow-wrap:anywhere; }
+.om .om-source-base .uv-card-text { font-size:14px; color:var(--ink-700); }
+.om .om-source-base .uv-card-bottom { bottom:16px; left:20px; right:20px; padding:8px 4px; }
+.om .om-source-base .uv-card-view-more { width:auto; }
+.om .om-source-base .uv-card-view-more a { display:inline-flex; align-items:center; gap:8px; font-weight:600; }
+.om .om-source-base .uv-card-logo svg { color:#fff; width:20px; height:20px; }
+.om .om-source-base .om-k-card-body { flex-wrap:wrap; justify-content:center; gap:12px; padding:8px 0 16px; }
+.om .om-source-base dl { min-width:130px; }
+.om .om-source-base .om-k-type-legend { gap:5px 8px; }
+/* 10 原作菜单保持侧面标记和相邻项反馈；背景改为白色。 */
+.om .om-source-filter { position:relative; z-index:4; }
+.om .om-source-filter[open] { z-index:10; }
+.om .om-source-filter > summary { display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer; padding:7px 12px; border:1px solid var(--violet-200); border-radius:8px; background:#fff; list-style:none; }
+.om .om-source-filter > summary::-webkit-details-marker { display:none; }
+.om .om-source-filter .uv-icon-menu { position:absolute; top:calc(100% + 8px); right:0; background:#fff; border:1px solid #e5dfef; padding:8px; box-shadow:0 12px 28px #25223220; }
+.om .om-source-filter .uv-icon-menu-value { color:var(--ink-700); font-size:14px; text-align:left; box-shadow:none; justify-content:flex-start; min-height:36px; }
+.om .om-source-filter .uv-icon-menu-value:is(:hover,:focus,:active,[aria-pressed="true"]) { background:var(--violet-50); color:var(--violet-700); }
+.om .om-source-filter .uv-icon-menu-value::before { background:var(--violet-500); left:-5px; }
+/* 17 原作灰色标题/内容底板与旋转箭头应用到原生 details，保留业务多项展开行为。 */
+.om :is(.om-snippet,.om-k-history details) { margin-bottom:8px; border:1px solid #e5e1ef; border-radius:8px; overflow:visible; background:#fafafa; }
+.om :is(.om-snippet,.om-k-history details) > summary { display:flex; align-items:center; gap:8px; justify-content:space-between; background:#f1f1f1; padding:10px 12px; font-weight:600; cursor:pointer; list-style:none; border-radius:8px; }
+.om :is(.om-snippet,.om-k-history details) > summary::marker { content:''; }
+.om :is(.om-snippet,.om-k-history details) > summary::after { content:''; width:8px; height:8px; flex:none; border-right:2px solid currentColor; border-bottom:2px solid currentColor; transform:rotate(45deg); transition:transform .5s ease; }
+.om :is(.om-snippet,.om-k-history details)[open] > summary::after { transform:rotate(225deg); }
+.om .om-source-copy { padding:0; margin-right:12px; box-shadow:none; }
+.om .om-source-copy:focus-visible { outline:2px solid var(--violet-500); outline-offset:3px; }
+.om .om-source-copy:focus-visible .om-source-copy-tooltip { opacity:1; visibility:visible; top:calc((100% + var(--tooltip-offset)) * -1); }
+/* 09 保留提示层结构，改为白底紫边。 */
+.om .uv-info-tooltip { display:inline-block; }
+.om .uv-info-tooltip button { color:var(--violet-700); background:#fff; border:1px solid #e6e0f3; box-shadow:none; padding:5px 8px; min-height:30px; font-size:12px; }
+.om .uv-info-tooltip [role="tooltip"] { z-index:40; left:auto; right:0; --tw-translate-x:0px; width:min(288px, calc(100vw - 48px)); }
+.om .uv-info-tooltip [role="tooltip"] > div { background:#fff; border-color:#e6e0f3; color:var(--ink-700); }
+.om .uv-info-tooltip [role="tooltip"] :is(h3,p,span) { color:var(--ink-700); }
+.om .uv-info-tooltip [role="tooltip"] .absolute { pointer-events:none; background:#fff; }
+.om .uv-info-tooltip button > .absolute { background:transparent; }
+.om .om-primary:disabled, .om .om-source-keycap:disabled { transform:none; opacity:.45; cursor:not-allowed; }
+@media (max-width:700px) {
+  .om .om-source-tab,.om .om-navigation nav a,.om .om-tabs a { padding:0 12px; }
+  .om .uv-stat-tile { padding:16px; min-height:132px; }
+  .om .om-source-base .uv-card-content { padding-inline:18px; }
+  .om .uv-marque-pager { gap:2px; border-radius:16px; }
+  .om .uv-marque-pager__page,.om .uv-marque-pager__edge { width:30px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .om .om-primary:is(:hover,:focus,:active),.om .om-source-keycap:active { transform:none; }
+}
+
+.om .om-k-history summary::after { rotate:0deg; }
+
+.om .uv-stat-tile__number { font-family:inherit; font-variant-numeric:tabular-nums; }
+.om .om-source-empty-folder { width:120px; height:110px; margin:0 auto 16px; }
+.om .om-source-empty-folder .uv-folder { zoom:.5; width:240px; cursor:default; }
+.om .om-source-empty-folder .uv-folder-back,.om .om-source-empty-folder .uv-folder-back::before,.om .om-source-empty-folder .uv-folder-back::after { background:#8c75cf; }
+.om .om-source-empty-folder .uv-folder-front { background:linear-gradient(to top,#a18bd8,#c7b8e8); }
+.om .om-source-empty-folder .uv-folder-front::before,.om .om-source-empty-folder .uv-folder-front::after { background:#c7b8e8; }
+.om .om-source-empty-folder .uv-folder:hover .uv-folder-front { box-shadow:inset 0 20px 40px #c7b8e8,inset 0 -20px 40px #8c75cf; }
+.om .om-source-empty-folder .uv-folder-caption { display:none; }
+
+.om .om-source-filter::details-content { overflow:visible; height:auto; transition:none; }
+.om .om-source-filter .uv-icon-menu { width:200px; max-width:none; }

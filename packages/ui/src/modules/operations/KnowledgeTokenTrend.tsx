@@ -23,6 +23,7 @@ export function KnowledgeTokenTrend({ snapshotAt }: { snapshotAt: number }) {
         <defs><linearGradient id={gradient} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="currentColor" stopOpacity=".16" /><stop offset="100%" stopColor="currentColor" stopOpacity="0" /></linearGradient></defs>
         <path d={`${path} L 468 118 L 12 118 Z`} fill={`url(#${gradient})`} />
         <path d={path} fill="none" stroke="currentColor" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+        {active !== null && <rect x={points[active].x - 4} y={points[active].y - 4} width="8" height="8" rx="2" fill="currentColor" stroke="white" strokeWidth="2" vectorEffect="non-scaling-stroke" />}
       </svg>
       <div className="om-k-token-targets">{values.map((value, index) => <button key={index} type="button" aria-label={`${dates[index]}，示例 ${value.toLocaleString()} Token`}
         onFocus={() => setActive(index)} onBlur={() => setActive(null)} onMouseEnter={() => setActive(index)} onMouseLeave={() => setActive(null)} onClick={() => setActive(index)} />)}</div>

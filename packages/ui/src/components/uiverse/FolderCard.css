@@ -1,0 +1,23 @@
+/* From Uiverse.io by Cobp — mighty-pig-13，Tailwind 等价展开。 */
+.uv-folder { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; width:100%; height:100%; border:0; background:transparent; padding:20px 0 0; font:inherit; cursor:pointer; }
+.uv-folder *, .uv-folder *::before, .uv-folder *::after { box-sizing:border-box; }
+.uv-folder-file { display:block; position:relative; width:240px; height:160px; max-width:100%; transform-origin:bottom; perspective:1500px; z-index:1; }
+.uv-folder-back { display:block; position:relative; background:#d97706; width:100%; height:100%; transform-origin:top; border-radius:16px; border-top-left-radius:0; transition:all 300ms ease; }
+.uv-folder-back::after { position:absolute; content:""; bottom:99%; left:0; width:80px; height:16px; background:#d97706; border-radius:16px 16px 0 0; }
+.uv-folder-back::before { position:absolute; content:""; top:-15px; left:75.5px; width:16px; height:16px; background:#d97706; clip-path:polygon(0 35%,0% 100%,50% 100%); }
+.uv-folder-sheet { position:absolute; inset:4px; border-radius:16px; transition:all 300ms ease; transform-origin:bottom; }
+.uv-folder-sheet4 { background:#a1a1aa; user-select:none; }
+.uv-folder-sheet3 { background:#d4d4d8; }
+.uv-folder-sheet2 { background:#e4e4e7; }
+.uv-folder-front { position:absolute; bottom:0; background:linear-gradient(to top,#f59e0b,#fbbf24); width:100%; height:156px; border-radius:16px; border-top-right-radius:0; transition:all 300ms ease; transform-origin:bottom; display:flex; align-items:flex-end; }
+.uv-folder-front::after { position:absolute; content:""; bottom:99%; right:0; width:146px; height:16px; background:#fbbf24; border-radius:16px 16px 0 0; }
+.uv-folder-front::before { position:absolute; content:""; top:-10px; right:142px; width:12px; height:12px; background:#fbbf24; clip-path:polygon(100% 14%,50% 100%,100% 100%); }
+.uv-folder-caption { font-size:30px; line-height:36px; padding-top:16px; opacity:.2; }
+.uv-folder:not(:disabled):is(:hover,:focus-visible) .uv-folder-back { box-shadow:0 20px 40px rgba(0,0,0,.2); }
+.uv-folder:not(:disabled):is(:hover,:focus-visible) .uv-folder-sheet4 { transform:rotateX(-20deg); }
+.uv-folder:not(:disabled):is(:hover,:focus-visible) .uv-folder-sheet3 { transform:rotateX(-30deg); }
+.uv-folder:not(:disabled):is(:hover,:focus-visible) .uv-folder-sheet2 { transform:rotateX(-38deg); }
+.uv-folder:not(:disabled):is(:hover,:focus-visible) .uv-folder-front { box-shadow:inset 0 20px 40px #fbbf24,inset 0 -20px 40px #d97706; transform:rotateX(-46deg) translateY(1px); }
+.uv-folder:focus-visible { outline:2px solid #d97706; outline-offset:4px; }
+.uv-folder:disabled { opacity:.45; cursor:not-allowed; }
+@media (prefers-reduced-motion:reduce) { .uv-folder * { transition:none; } .uv-folder:not(:disabled):is(:hover,:focus-visible) :is(.uv-folder-sheet,.uv-folder-front) { transform:none; } }

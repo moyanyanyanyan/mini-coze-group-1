@@ -1,3 +1,4 @@
+import { KeycapButton, RangeTabs } from './SourceControls';
 import { animateOperationsChange } from './motion';
 import { useState, type ReactNode } from 'react';
 import { Icon } from '../../components/Icon';
@@ -9,12 +10,13 @@ import {
   basePath,
   time,
 } from './model';
-import { Breadcrumbs, PageHeader } from './components';
+import { Breadcrumbs, PageHeader, OperationsLoader } from './components';
 import { Overview } from './Overview';
 import { Agents, Conversations, Conversation } from './AgentOperations';
 import { Knowledge, Base, Document } from './KnowledgeOperations';
 import type { OperationsViewProps, ContentProps } from './view-types';
 import './operations.css';
+import './source-ui.css';
 
 let rememberedDays = 1;
 
@@ -96,7 +98,7 @@ export function OperationsView(props: OperationsViewProps) {
         : operationsRoot + '/agents';
   const timed = ['agents', 'conversations'].includes(route.page) || (route.page === 'base' && new URLSearchParams(props.search).get('tab') === 'retrieval');
   return (
-    <div className={route.page === 'overview' ? 'om om-overview' : 'om'}>
+    <div className={route.page === 'overview' ? 'om om-overview' : 'om'} aria-busy={props.loading || undefined}>
       <header className="om-navigation">
         <h2>运行管理</h2>
         <nav aria-label="运行管理导航">
@@ -132,28 +134,20 @@ export function OperationsView(props: OperationsViewProps) {
         </div>
         <div className="om-top-actions">
           {timed && (
-            <select
-              aria-label="时间范围"
-              value={days}
-              onChange={(e) => {
-                rememberedDays = Number(e.target.value);
-                animateOperationsChange(() => setDays(rememberedDays));
-              }}
-            >
-              <option value={1}>最近 24 小时</option>
-              <option value={7}>最近 7 天</option>
-              <option value={30}>最近 30 天</option>
-            </select>
+            <RangeTabs value={days} onChange={value => {
+              rememberedDays = value;
+              animateOperationsChange(() => setDays(value));
+            }} />
           )}
-          <button disabled={props.loading} onClick={() => props.onRefresh ? props.onRefresh() : animateOperationsChange(() => setRefreshedAt(Date.now()))}>
-            <Icon name="repeat" />
+          <KeycapButton disabled={props.loading} onClick={() => props.onRefresh ? props.onRefresh() : animateOperationsChange(() => setRefreshedAt(Date.now()))}>
+            {props.loading ? <OperationsLoader compact /> : <Icon name="repeat" />}
             {props.loading ? '更新中…' : '刷新数据'}
-          </button>
+          </KeycapButton>
           <span role="status">{data.connected ? '更新于' : '查看于'} {time(data.connected ? data.snapshotAt : refreshedAt)}</span>
         </div>
-        {props.error && <p role="alert">{props.error} <button onClick={props.onRefresh} disabled={props.loading}>重试</button></p>}
+        {props.error && <p role="alert">{props.error} <button className="om-primary" onClick={props.onRefresh} disabled={props.loading}>重试</button></p>}
         {data.connected && !isKnowledge && (data.loadedRuns ?? 0) < (data.totalRuns ?? 0) &&
-          <button disabled={props.loading} onClick={props.onMoreRuns}>加载更多记录</button>}
+          <button className="om-primary" disabled={props.loading} onClick={props.onMoreRuns}>加载更多记录</button>}
         {content ?? (
           <>
             <PageHeader title="记录不存在" description="请检查链接，或返回运行管理查看已有记录。" />

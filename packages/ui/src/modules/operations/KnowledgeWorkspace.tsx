@@ -1,3 +1,5 @@
+import { FolderCard } from '../../components/uiverse/FolderCard';
+import { PurpleGlassCard } from '../../components/uiverse/PurpleGlassCard';
 import { KnowledgeTokenTrend } from './KnowledgeTokenTrend';
 import { DocumentHistory } from './DocumentHistory';
 import { useState, type CSSProperties } from "react";
@@ -81,94 +83,61 @@ export function StorageRing({
 }) {
   const shares = groupShares(items);
   const total = shares.reduce((sum, item) => sum + item.value, 0);
+  const [active, setActive] = useState<string | null>(null);
   let offset = 0;
   return (
     <div className={`om-k-storage ${compact ? "is-compact" : ""} ${trendAt !== undefined ? "has-trend" : ""}`}>
       <div className="om-k-ring">
-        <svg
-          viewBox="0 0 160 160"
-          role="img"
-          aria-label={`${label}：${bytes(total)}${sample ? "，含模拟数据" : ""}`}
-        >
-          <circle
-            className="om-k-ring-track"
-            cx="80"
-            cy="80"
-            r="62"
-            fill="none"
-            strokeWidth="17"
-          />
+        <svg viewBox="0 0 160 160" role={href || onSelect ? "group" : "img"}
+          aria-label={`${label}：${bytes(total)}${sample ? "，含模拟数据" : ""}`}>
+          <circle className="om-k-ring-track" cx="80" cy="80" r="62" fill="none" strokeWidth="17" />
           {shares.map((item, index) => {
-            const percent = (item.value / total) * 100;
+            const percent = item.value / total * 100;
             const start = offset;
             offset += percent;
-            const circle = (
-              <circle
-                cx="80"
-                cy="80"
-                r="62"
-                pathLength="100"
-                fill="none"
-                strokeWidth="17"
-                strokeDasharray={`${Math.max(0.1, percent - 0.8)} ${100 - Math.max(0.1, percent - 0.8)}`}
-                strokeDashoffset={-start}
-                transform="rotate(-90 80 80)"
-                style={{ stroke: `var(--om-k-chart-${index})` }}
-              >
-                <title>
-                  {item.name} · {percent.toFixed(1)}% · {bytes(item.value)}
-                </title>
-              </circle>
-            );
-            return href && item.id !== "__other" ? (
-              <L
-                key={item.id}
-                to={href(item.id)}
-                aria-label={`查看${item.name}`}
-              >
-                {circle}
-              </L>
-            ) : (
-              <g key={item.id}>{circle}</g>
-            );
+            const interactive = item.id !== "__other" && (href || onSelect);
+            const feedback = {
+              onMouseEnter: () => setActive(item.id), onMouseLeave: () => setActive(null),
+              onFocus: () => setActive(item.id), onBlur: () => setActive(null),
+            };
+            const circle = <circle cx="80" cy="80" r="62" pathLength="100" fill="none" strokeWidth="17"
+              className={`om-k-ring-segment${active === item.id ? ' is-active' : active ? ' is-muted' : ''}`}
+              strokeDasharray={`${percent} ${100 - percent}`} strokeDashoffset={-start} transform="rotate(-90 80 80)"
+              style={{ stroke: `var(--om-k-chart-${index})`, '--swatch': `var(--om-k-chart-${index})` } as CSSProperties}>
+              <title>{item.name} · {percent.toFixed(1)}% · {bytes(item.value)}</title>
+            </circle>;
+            if (interactive && href) return <L key={item.id} to={href(item.id)} aria-label={`查看${item.name}`} {...feedback}>{circle}</L>;
+            if (interactive && onSelect) return <g key={item.id} role="button" tabIndex={0} aria-label={`筛选${item.name}`}
+              {...feedback} onClick={() => animateOperationsChange(() => onSelect(item.id))}
+              onKeyDown={event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  animateOperationsChange(() => onSelect(item.id));
+                }
+              }}>{circle}</g>;
+            return <g key={item.id} {...feedback}>{circle}</g>;
           })}
+          <circle className="om-k-ring-highlight" cx="80" cy="79.5" r="54.5" fill="none" stroke="white" strokeWidth="1.5" aria-hidden="true" />
         </svg>
         <div className="om-k-ring-label">
           <strong>{items.length ? bytes(total) : "暂无文件"}</strong>
-          <span>{label}</span>
-          {sample && <Sample>含模拟数据</Sample>}
+          <span>{compact ? (sample ? "示例容量" : "文件大小") : label}</span>
+          {sample && !compact && <Sample>含模拟数据</Sample>}
         </div>
       </div>
       {trendAt !== undefined && <KnowledgeTokenTrend snapshotAt={trendAt} />}
-      {!compact && (
-        <ul className="om-k-legend">
-          {shares.map((item, index) => (
-            <li
-              key={item.id}
-              style={
-                { "--swatch": `var(--om-k-chart-${index})` } as CSSProperties
-              }
-            >
-              <i />
-              {href && item.id !== "__other" ? (
-                <L to={href(item.id)}>{item.name}</L>
-              ) : onSelect && item.id !== "__other" ? (
-                <button
-                  onClick={() =>
-                    animateOperationsChange(() => onSelect(item.id))
-                  }
-                >
-                  {item.name}
-                </button>
-              ) : (
-                <span>{item.name}</span>
-              )}
-              <strong>{((item.value / total) * 100).toFixed(1)}%</strong>
-              <small>{bytes(item.value)}</small>
-            </li>
-          ))}
-        </ul>
-      )}
+      {!compact && <ul className="om-k-legend">
+        {shares.map((item, index) => <li key={item.id} className={active === item.id ? 'is-active' : undefined}
+          onMouseEnter={() => setActive(item.id)} onMouseLeave={() => setActive(null)}
+          onFocus={() => setActive(item.id)} onBlur={() => setActive(null)}
+          style={{ '--swatch': `var(--om-k-chart-${index})` } as CSSProperties}>
+          <i />
+          {href && item.id !== '__other' ? <L to={href(item.id)}>{item.name}</L>
+            : onSelect && item.id !== '__other' ? <button onClick={() => animateOperationsChange(() => onSelect(item.id))}>{item.name}</button>
+            : <span>{item.name}</span>}
+          <strong>{(item.value / total * 100).toFixed(1)}%</strong><small>{bytes(item.value)}</small>
+        </li>)}
+      </ul>}
       {!total && !compact && <p className="om-note">暂无可统计的文件。</p>}
     </div>
   );
@@ -293,8 +262,8 @@ export function Knowledge(p: ContentProps) {
           const created = base.observed?.createdAt ? Date.parse(base.observed.createdAt) :
             data.snapshotAt - (30 + data.bases.indexOf(base) * 7) * 86400_000;
           return (
-            <article className="om-k-card" key={base.id}>
-              <header>
+            <div className="om-source-base" key={base.id}><PurpleGlassCard logo={<Icon name="book" />}
+              title={<span className="om-source-base-title">
                 <L to={basePath(base.id)}>
                   <Icon name="book" />
                   {base.name}
@@ -307,8 +276,8 @@ export function Knowledge(p: ContentProps) {
                   {base.observed?.status === "DISABLED" ? "已停用" : "可用"}
                   {!base.observed ? " · 模拟" : ""}
                 </Badge>
-              </header>
-              <div className="om-k-card-body">
+              </span>}
+              description={<><div className="om-k-card-body">
                 <StorageRing
                   compact
                   sample={files.some(({ document }) => document.observed?.sourceSize == null)}
@@ -365,17 +334,15 @@ export function Knowledge(p: ContentProps) {
                   </span>
                 ))}
               </div>
-              <footer>
-                <L to={basePath(base.id)}>
-                  查看文件 <Arrow />
-                </L>
-              </footer>
-            </article>
+              </>}
+              actionLink={<L to={basePath(base.id)}>查看文件 <Arrow /></L>}
+            /></div>
           );
         })}
       </div>
       {!bases.length && (
         <Empty>
+          <div className="om-source-empty-folder" aria-hidden="true"><FolderCard label="" /></div>
           {data.bases.length
             ? "没有匹配的知识库，请调整搜索名称。"
             : "暂无知识库。"}

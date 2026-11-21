@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ComponentProps } from 'react';
-import { OperationsView, animateOperationsChange, type OperationsData } from '@minicoze/ui/operations';
+import { OperationsView, OperationsLoader, animateOperationsChange, type OperationsData } from '@minicoze/ui/operations';
 import { getMe } from '../auth/api/auth-api';
 import type { AuthUser } from '../auth/types';
 import { AppLink } from '../../shared/routing/AppLink';
@@ -78,7 +78,10 @@ function OperationsController({ pathname, search }: { pathname: string; search: 
     scroller?.addEventListener('scroll', remember, { passive: true });
     return () => scroller?.removeEventListener('scroll', remember);
   }, [pathname]);
-  if (!data) return <div className="om"><div className="om-empty" role={error ? 'alert' : 'status'}>{error || '正在加载运行数据…'}{error && <button onClick={() => setAttempt(n => n + 1)}>重试</button>}</div></div>;
+  if (!data) return <div className="om">{error
+    ? <div className="om-empty" role="alert">{error}<button onClick={() => setAttempt(n => n + 1)}>重试</button></div>
+    : <div className="om-loading" role="status"><OperationsLoader /><span>正在加载运行数据…</span></div>}
+  </div>;
   return <OperationsView data={data} profile={profile} pathname={pathname} search={search} LinkComponent={OperationsLink}
     loading={loading} error={error} onRefresh={() => setAttempt(n => n + 1)} onMoreRuns={() => setRunPages(n => n + 1)} />;
 }

@@ -1,0 +1,247 @@
+/* From Uiverse.io by chase2k25 */ 
+.parent {
+  width: 300px;
+  height: 320px;
+  perspective: 1200px;
+}
+
+.card {
+  height: 100%;
+  border-radius: 40px;
+  background: linear-gradient(
+    135deg,
+    rgb(106, 90, 205) 0%,
+    rgb(147, 112, 219) 100%
+  );
+  transition: all 0.6s ease-in-out;
+  transform-style: preserve-3d;
+  box-shadow:
+    rgba(30, 30, 60, 0) 40px 50px 25px -40px,
+    rgba(30, 30, 60, 0.2) 0px 25px 25px -5px;
+}
+
+.glass {
+  transform-style: preserve-3d;
+  position: absolute;
+  inset: 10px;
+  border-radius: 45px;
+  border-top-left-radius: 100%;
+  background: linear-gradient(
+    0deg,
+    rgba(255, 255, 255, 0.2) 0%,
+    rgba(255, 255, 255, 0.7) 100%
+  );
+  transform: translate3d(0px, 0px, 30px);
+  border-right: 1px solid rgba(255, 255, 255, 0.5);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+  transition: all 0.6s ease-in-out;
+}
+
+.content {
+  padding: 90px 50px 0px 25px;
+  transform: translate3d(0, 0, 31px);
+}
+
+.content .title {
+  display: block;
+  color: #3c2f80;
+  font-weight: 900;
+  font-size: 22px;
+}
+
+.content .text {
+  display: block;
+  color: rgba(60, 47, 128, 0.8);
+  font-size: 14px;
+  margin-top: 15px;
+}
+
+.bottom {
+  padding: 12px 15px;
+  transform-style: preserve-3d;
+  position: absolute;
+  bottom: 25px;
+  left: 25px;
+  right: 25px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transform: translate3d(0, 0, 31px);
+}
+
+.bottom .view-more {
+  display: flex;
+  align-items: center;
+  width: 40%;
+  justify-content: flex-end;
+  transition: all 0.3s ease-in-out;
+}
+
+.bottom .view-more:hover {
+  transform: translate3d(0, 0, 15px);
+}
+
+.bottom .view-more .view-more-button {
+  background: none;
+  border: none;
+  color: #6a5acd;
+  font-weight: bold;
+  font-size: 13px;
+}
+
+.bottom .view-more .svg {
+  fill: none;
+  stroke: #6a5acd;
+  stroke-width: 2.5px;
+  max-height: 14px;
+}
+
+.bottom .social-buttons-container {
+  display: flex;
+  gap: 12px;
+  transform-style: preserve-3d;
+}
+
+.bottom .social-buttons-container .social-button {
+  width: 32px;
+  aspect-ratio: 1;
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  border: none;
+  display: grid;
+  place-content: center;
+  box-shadow: rgba(30, 30, 60, 0.4) 0px 8px 6px -5px;
+}
+
+.bottom .social-buttons-container .social-button:first-child {
+  transition:
+    transform 0.3s ease-in-out 0.3s,
+    box-shadow 0.3s ease-in-out 0.3s;
+}
+
+.bottom .social-buttons-container .social-button:nth-child(2) {
+  transition:
+    transform 0.3s ease-in-out 0.5s,
+    box-shadow 0.3s ease-in-out 0.5s;
+}
+
+.bottom .social-buttons-container .social-button:nth-child(3) {
+  transition:
+    transform 0.3s ease-in-out 0.7s,
+    box-shadow 0.3s ease-in-out 0.7s;
+}
+
+.bottom .social-buttons-container .social-button .svg {
+  width: 16px;
+  fill: #3c2f80;
+}
+
+.bottom .social-buttons-container .social-button:hover {
+  background: #3c2f80;
+}
+
+.bottom .social-buttons-container .social-button:hover .svg {
+  fill: #ffffff;
+}
+
+.bottom .social-buttons-container .social-button:active {
+  background: #ffd700;
+}
+
+.bottom .social-buttons-container .social-button:active .svg {
+  fill: #3c2f80;
+}
+
+.logo {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-style: preserve-3d;
+}
+
+.logo .circle {
+  display: block;
+  position: absolute;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  top: 0;
+  left: 0;
+  box-shadow: rgba(100, 100, 111, 0.2) 10px 10px 20px 0px;
+  background: rgba(147, 112, 219, 0.3);
+  transition: all 0.6s ease-in-out;
+}
+
+.logo .circle1 {
+  width: 160px;
+  transform: translate3d(0, 0, 25px);
+  top: 10px;
+  left: 10px;
+}
+
+.logo .circle2 {
+  width: 130px;
+  transform: translate3d(0, 0, 45px);
+  top: 12px;
+  left: 12px;
+  transition-delay: 0.3s;
+}
+
+.logo .circle3 {
+  width: 100px;
+  transform: translate3d(0, 0, 65px);
+  top: 15px;
+  left: 15px;
+  transition-delay: 0.6s;
+}
+
+.logo .circle4 {
+  width: 70px;
+  transform: translate3d(0, 0, 85px);
+  top: 20px;
+  left: 20px;
+  transition-delay: 0.9s;
+}
+
+.logo .circle5 {
+  width: 40px;
+  transform: translate3d(0, 0, 105px);
+  top: 25px;
+  left: 25px;
+  display: grid;
+  place-content: center;
+  transition-delay: 1.2s;
+}
+
+.logo .circle5 .svg {
+  width: 18px;
+  fill: #ffffff;
+}
+
+.parent:hover .card {
+  transform: rotate3d(1, -1, 0, 25deg);
+  box-shadow:
+    rgba(30, 30, 60, 0.3) 30px 50px 25px -40px,
+    rgba(30, 30, 60, 0.15) 0px 25px 30px 0px;
+}
+
+.parent:hover .card .bottom .social-buttons-container .social-button {
+  transform: translate3d(0, 0, 60px);
+  box-shadow: rgba(30, 30, 60, 0.25) 5px 20px 10px 0px;
+}
+
+.parent:hover .card .logo .circle2 {
+  transform: translate3d(0, 0, 65px);
+}
+
+.parent:hover .card .logo .circle3 {
+  transform: translate3d(0, 0, 85px);
+}
+
+.parent:hover .card .logo .circle4 {
+  transform: translate3d(0, 0, 105px);
+}
+
+.parent:hover .card .logo .circle5 {
+  transform: translate3d(0, 0, 125px);
+}

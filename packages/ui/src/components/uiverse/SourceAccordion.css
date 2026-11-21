@@ -1,0 +1,14 @@
+/* From Uiverse.io by SivarajRathinam — curly-rabbit-26 */
+.uv-accordion { width:300px; max-width:100%; margin:0 auto; }
+.uv-accordion-item { margin-bottom:5px; position:relative; }
+.uv-accordion-item .uv-accordion-content { font-size:12px; }
+/* 原作 display:none 改为视觉隐藏，保留原生单选键盘操作。 */
+.uv-accordion input[type="radio"] { position:absolute; width:1px; height:1px; clip-path:inset(50%); overflow:hidden; }
+.uv-accordion .uv-accordion-content { height:0; padding:0; background:#fafafa; border-top:1px solid #ccc; overflow:hidden; transition:all .3s ease; }
+.uv-accordion input:checked + .uv-accordion-header + .uv-accordion-content { height:auto; padding:15px; }
+.uv-accordion-icon { display:flex; align-items:center; transition:all .5s ease; }
+.uv-accordion input:checked + .uv-accordion-header .uv-accordion-icon { transform:rotate(180deg); }
+.uv-accordion-header { display:flex; justify-content:space-between; align-items:center; padding:8px; background:#f1f1f1; cursor:pointer; font-weight:bold; text-align:left; }
+.uv-accordion-title { font-size:14px; }
+.uv-accordion input:focus-visible + .uv-accordion-header { outline:2px solid #6f56d9; outline-offset:2px; }
+@media (prefers-reduced-motion:reduce) { .uv-accordion * { transition:none !important; } }

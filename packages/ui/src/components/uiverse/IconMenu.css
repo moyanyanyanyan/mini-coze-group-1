@@ -1,0 +1,11 @@
+/* From Uiverse.io by HetPatel69 — nervous-treefrog-70 */
+.uv-icon-menu { display:flex; flex-direction:column; width:200px; max-width:100%; background-color:#0D1117; justify-content:center; border-radius:5px; }
+.uv-icon-menu-value { background-color:transparent; border:none; padding:10px; color:white; display:flex; position:relative; gap:5px; cursor:pointer; border-radius:4px; }
+.uv-icon-menu-value:not(:active):hover, .uv-icon-menu-value:focus { background-color:#21262C; }
+.uv-icon-menu-value:focus, .uv-icon-menu-value:active, .uv-icon-menu-value[aria-pressed="true"] { background-color:#1A1F24; outline:none; }
+.uv-icon-menu-value::before { content:""; position:absolute; top:5px; left:-10px; width:5px; height:80%; background-color:#2F81F7; border-radius:5px; opacity:0; }
+.uv-icon-menu-value:focus::before, .uv-icon-menu-value:active::before, .uv-icon-menu-value[aria-pressed="true"]::before { opacity:1; }
+.uv-icon-menu-value svg { width:15px; }
+.uv-icon-menu:hover > :not(.uv-icon-menu-value:hover) { transition:300ms; filter:blur(1px); transform:scale(.95,.95); }
+.uv-icon-menu-value:disabled { cursor:not-allowed; opacity:.5; }
+@media (prefers-reduced-motion:reduce) { .uv-icon-menu:hover > :not(.uv-icon-menu-value:hover) { transition:none; transform:none; filter:none; } }

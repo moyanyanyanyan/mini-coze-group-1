@@ -1,3 +1,5 @@
+import { InfoTooltip } from '../../components/uiverse/InfoTooltip';
+import { Icon } from '../../components/Icon';
 import { parseRuntimeStages } from '../../../../shared/src/runtime-stages';
 import { animateOperationsChange } from './motion';
 import { useEffect, useRef, useState } from 'react';
@@ -232,12 +234,16 @@ export function PluginDetail({ run }: { run: OperationRun }) {
       </div>
       <div className="om-section-heading">
         <h3>输入参数</h3>
-        <span>敏感字段已脱敏</span>
+        <InfoTooltip label="脱敏说明" title="调用信息">敏感字段已脱敏，复制内容与下方展示一致。</InfoTooltip>
       </div>
       <pre>{JSON.stringify(plugin.input, null, 2)}</pre>
       <h3>返回结果</h3>
       <pre>{JSON.stringify(plugin.output, null, 2)}</pre>
-      <button onClick={copy}>复制调用信息</button>
+      <button type="button" className="om-source-copy" data-copied={feedback === '已复制脱敏内容'} onClick={copy} aria-label="复制调用信息">
+        <span className="om-source-copy-tooltip" data-text-initial="复制调用信息" data-text-end="已复制" aria-hidden="true" />
+        <span aria-hidden="true"><svg className="om-source-clipboard" viewBox="0 0 6.35 6.35"><path fill="currentColor" d="M2.43.265c-.3 0-.548.236-.573.53h-.328a.74.74 0 0 0-.735.734v3.822a.74.74 0 0 0 .735.734H4.82a.74.74 0 0 0 .735-.734V1.529a.74.74 0 0 0-.735-.735h-.328a.58.58 0 0 0-.573-.53zm0 .529h1.49c.032 0 .049.017.049.049v.431c0 .032-.017.049-.049.049H2.43c-.032 0-.05-.017-.05-.049V.843c0-.032.018-.05.05-.05zm-.901.53h.328c.026.292.274.528.573.528h1.49a.58.58 0 0 0 .573-.529h.328a.2.2 0 0 1 .206.206v3.822a.2.2 0 0 1-.206.205H1.53a.2.2 0 0 1-.206-.205V1.529a.2.2 0 0 1 .206-.206z" /></svg>
+        <svg className="om-source-checkmark" viewBox="0 0 24 24"><path fill="currentColor" d="M9.707 19.121a.997.997 0 0 1-1.414 0l-5.646-5.647a1.5 1.5 0 0 1 0-2.121l.707-.707a1.5 1.5 0 0 1 2.121 0L9 14.171l9.525-9.525a1.5 1.5 0 0 1 2.121 0l.707.707a1.5 1.5 0 0 1 0 2.121z" /></svg></span>
+      </button>
       <span className="om-note" role="status">
         {feedback}
       </span>
@@ -311,7 +317,7 @@ export function Conversation(p: ContentProps & { agentId: string; conversationId
       const timer = window.setTimeout(() => {
         setRetainedSearch(null);
         triggerRef.current?.focus({ preventScroll: true });
-      }, window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 1050);
+      }, window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 240);
       return () => window.clearTimeout(timer);
     }
   }, [expanded, p.search]);
@@ -343,7 +349,6 @@ export function Conversation(p: ContentProps & { agentId: string; conversationId
           title="对话记录"
           action={<span className="om-note">{runs.length} 次执行 · {run.observed ? '已载入采集记录' : '示例记录'}</span>}
         >
-          <p className="om-conversation-hint">先浏览对话，点击每轮下方的“查看执行链路”了解处理过程。</p>
           <div className="om-thread">
             {runs.map((r, i) => (
               <article className={`om-turn${expanded && r.id === run.id ? ' is-selected' : ''}`} key={r.id}>
