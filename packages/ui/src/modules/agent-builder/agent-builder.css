@@ -5,6 +5,21 @@
   color: var(--ink-900);
 }
 
+.agent-builder {
+  background:
+    radial-gradient(circle at 82% 4%, rgba(114,88,214,.07), transparent 24rem),
+    radial-gradient(circle at 7% 36%, rgba(95,201,195,.055), transparent 20rem);
+}
+.ab-list-eyebrow {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--violet-700);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .14em;
+}
+
 .ab-list {
   width: min(100%, var(--page-max));
   margin-inline: auto;
