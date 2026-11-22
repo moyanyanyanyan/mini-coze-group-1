@@ -7,10 +7,9 @@ const required = {
 };
 
 describe('validateEnvironment', () => {
-  it('preserves model, internal authentication and OAuth configuration together', () => {
+  it('preserves internal authentication and OAuth configuration together', () => {
     const config = {
       ...required,
-      AGENT_MODEL: 'custom-model',
       INTERNAL_SERVICE_TOKEN: 'test-internal-token',
       GOOGLE_CLIENT_ID: 'test-client',
       GOOGLE_CLIENT_SECRET: 'test-client-secret',
@@ -26,7 +25,6 @@ describe('validateEnvironment', () => {
       GOOGLE_CALLBACK_URL: '',
       AUTH_GOOGLE_MOCK: '',
     })).toMatchObject({
-      AGENT_MODEL: 'deepseek-chat',
       INTERNAL_SERVICE_TOKEN: '',
     });
   });

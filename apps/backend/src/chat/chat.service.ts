@@ -493,7 +493,8 @@ export class ChatService {
       return { userMessage, assistantMessage };
     });
 
-    const { contextLimit = MAX_HISTORY_TURNS, ...runtimeConfig } = input.agentConfig;
+    const { contextLimit = MAX_HISTORY_TURNS, model, ...runtimeRest } = input.agentConfig;
+    const runtimeConfig = { ...runtimeRest, model };
     const history = await this.buildHistory(input.conversationId, contextLimit, [
       turn.userMessage.id,
       turn.assistantMessage.id,
@@ -550,7 +551,6 @@ export class ChatService {
         pendingUser = { id: row.id, role: 'user', content: row.content };
         continue;
       }
-    //   配对成功并且清空pendingUser
       if (pendingUser) {
         pairs.push(pendingUser, { id: row.id, role: 'assistant', content: row.content });
         pendingUser = null;
