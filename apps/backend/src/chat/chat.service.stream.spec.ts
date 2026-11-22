@@ -17,6 +17,7 @@ const agentConfig = {
   name: 'Public Agent',
   systemPrompt: 'Published prompt',
   model: 'deepseek-chat',
+  modelConfigId: 'model-config-1',
   temperature: 0.3,
   maxTokens: 1024,
   knowledgeBaseIds: [],
@@ -111,7 +112,18 @@ describe('ChatService stream persistence', () => {
 
     const events = await collect(harness.service);
 
-    expect(request?.agentConfig).toEqual(agentConfig);
+    expect(request?.agentConfig).toEqual({
+      id: agentConfig.id,
+      revision: agentConfig.revision,
+      name: agentConfig.name,
+      systemPrompt: agentConfig.systemPrompt,
+      model: agentConfig.model,
+      modelConfigId: agentConfig.modelConfigId,
+      temperature: agentConfig.temperature,
+      maxTokens: agentConfig.maxTokens,
+      knowledgeBaseIds: agentConfig.knowledgeBaseIds,
+      pluginIds: agentConfig.pluginIds,
+    });
     expect(harness.agents.getAgentConfig).not.toHaveBeenCalled();
     expect(events.map((item) => item.type)).toEqual([
       'run.started',

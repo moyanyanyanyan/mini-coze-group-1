@@ -17,6 +17,7 @@ const plan: PublicStreamPlan = {
     name: 'Agent',
     systemPrompt: '',
     model: 'model',
+    modelConfigId: 'model-config-1',
     temperature: 0.7,
     maxTokens: 1024,
     knowledgeBaseIds: [],

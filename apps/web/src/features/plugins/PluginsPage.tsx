@@ -49,11 +49,12 @@ export function PluginsPage() {
   const [catalog, setCatalog] = useState<PluginCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [category, setCategory] = useState<PluginCategory | 'all'>('all');
+  const [reload, setReload] = useState(0);
   const [addOpen, setAddOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<number | null>(null);
-
-  const market = useMemo(() => catalog.map(toMarketPlugin), [catalog]);
 
   const notify = useCallback((message: string) => {
     setToast(message);
@@ -63,21 +64,10 @@ export function PluginsPage() {
     toastTimer.current = window.setTimeout(() => setToast(null), 3000);
   }, []);
 
-  const loadCatalog = useCallback(() => {
-    fetchPluginCatalog()
-      .then((items) => {
-        setCatalog(items);
-        setLoading(false);
-        setError(null);
-      })
-      .catch((err: Error) => {
-        setError(err.message);
-        setLoading(false);
-      });
-  }, []);
-
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setError(null);
     fetchPluginCatalog()
       .then((items) => {
         if (!cancelled) {
@@ -93,29 +83,52 @@ export function PluginsPage() {
       });
     return () => {
       cancelled = true;
-      if (toastTimer.current !== null) {
-        window.clearTimeout(toastTimer.current);
-      }
     };
+  }, [reload]);
+
+  useEffect(() => () => {
+    if (toastTimer.current !== null) {
+      window.clearTimeout(toastTimer.current);
+    }
   }, []);
 
-  const handleSaved = () => {
-    loadCatalog();
-  };
+  const market = useMemo(() => catalog.map(toMarketPlugin), [catalog]);
+
+  const filteredMarket = useMemo(() => {
+    const keyword = query.trim().toLowerCase();
+    return market.filter((plugin) => {
+      const matchesCategory = category === 'all' || plugin.category === category;
+      const matchesQuery = !keyword
+        || plugin.name.toLowerCase().includes(keyword)
+        || plugin.description.toLowerCase().includes(keyword)
+        || plugin.pluginId.toLowerCase().includes(keyword);
+      return matchesCategory && matchesQuery;
+    });
+  }, [category, market, query]);
 
   return (
     <>
       <PluginsView
         loading={loading}
         error={error}
-        market={market}
-        toast={toast}
+        query={query}
+        category={category}
+        filteredMarket={filteredMarket}
+        onQueryChange={setQuery}
+        onCategoryChange={setCategory}
+        onRetry={() => setReload((value) => value + 1)}
+        onClearFilters={() => {
+          setQuery('');
+          setCategory('all');
+        }}
         onOpenAdd={() => setAddOpen(true)}
+        toast={toast}
       />
+
       {addOpen ? (
         <AddPluginModal
           onClose={() => setAddOpen(false)}
-          onSaved={handleSaved}
+          onSaved={() => setReload((value) => value + 1)}
           onNotify={notify}
           onConnect={(input) => connectMcpPlugin(input)}
           onSave={async (draft) => {

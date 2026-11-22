@@ -56,7 +56,7 @@ export function SdkDocsView({ LinkComponent, apiManagementRoute }: SdkDocsViewPr
               <span>Run + Stream</span>
             </div>
             <p>
-              通过 MiniCoze 公开 API 调用 API Key 绑定的已发布 Agent。
+              通过妙搭公开 API 调用 API Key 绑定的已发布 Agent。
               TypeScript SDK 支持非流式 Run 和逐事件消费的 Stream。
             </p>
           </header>

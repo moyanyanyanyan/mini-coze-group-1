@@ -1,18 +1,26 @@
 import type { FormEvent } from 'react';
+import type { AgentModelOption } from './types';
 
 export interface CreateAgentViewProps {
   name: string;
   description: string;
+  model: string;
+  modelOptions: AgentModelOption[];
+  modelNotice: string | null;
+  openingMessage: string;
   error: string | null;
   canSubmit: boolean;
   onNameChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
+  onModelChange: (value: string) => void;
+  onOpeningMessageChange: (value: string) => void;
   onClose: () => void;
   handleSubmit: (event: FormEvent) => void;
 }
 
 export function CreateAgentView({
-  name, description, error, canSubmit, onNameChange, onDescriptionChange, onClose, handleSubmit,
+  name, description, model, modelOptions, modelNotice, openingMessage, error, canSubmit,
+  onNameChange, onDescriptionChange, onModelChange, onOpeningMessageChange, onClose, handleSubmit,
 }: CreateAgentViewProps) {
   return (
     <div className="ab-modal-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-label="新建智能体">
@@ -56,6 +64,34 @@ export function CreateAgentView({
               rows={3}
             />
             <span className="ab-field-hint">{description.length}/200</span>
+          </div>
+
+          <div className="ab-field">
+            <label htmlFor="ab-create-model" className="ab-label">模型</label>
+            <select
+              id="ab-create-model"
+              className="ab-input"
+              value={model}
+              onChange={(e) => { onModelChange(e.target.value); }}
+            >
+              {modelOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+            {modelNotice && <span className="ab-field-notice" role="status">{modelNotice}</span>}
+          </div>
+
+          <div className="ab-field">
+            <label htmlFor="ab-create-opening" className="ab-label">开场白（可选）</label>
+            <textarea
+              id="ab-create-opening"
+              className="ab-textarea"
+              value={openingMessage}
+              onChange={(e) => { onOpeningMessageChange(e.target.value); }}
+              placeholder="你好，我是你的智能助手，有什么可以帮你？"
+              rows={3}
+            />
+            <span className="ab-field-hint">用户首次进入对话时展示。</span>
           </div>
 
           {error && <div className="ab-error">{error}</div>}

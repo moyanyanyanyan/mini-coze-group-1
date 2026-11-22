@@ -6,7 +6,10 @@ import type {
   WorkflowBindingView,
 } from './types';
 
-export function buildAgentConfig(agent: AgentDetail, revision = 0): RuntimeAgentConfig {
+export function buildAgentConfig(
+  agent: AgentDetail,
+  revision = 0,
+): RuntimeAgentConfig {
   return {
     id: agent.id,
     revision,
@@ -14,6 +17,7 @@ export function buildAgentConfig(agent: AgentDetail, revision = 0): RuntimeAgent
     name: agent.name,
     systemPrompt: agent.systemPrompt,
     model: agent.model,
+    modelConfigId: agent.modelConfigId as string,
     temperature: agent.temperature,
     maxTokens: agent.maxTokens,
     knowledgeBaseIds: agent.knowledgeBaseBindings
@@ -52,6 +56,8 @@ export function parseRuntimeAgentConfigSnapshot(
     || typeof value.systemPrompt !== 'string'
     || typeof value.model !== 'string'
     || !value.model
+    || typeof value.modelConfigId !== 'string'
+    || !value.modelConfigId
     || typeof value.temperature !== 'number'
     || !Number.isFinite(value.temperature)
     || typeof value.maxTokens !== 'number'
@@ -70,6 +76,7 @@ export function parseRuntimeAgentConfigSnapshot(
     name: value.name,
     systemPrompt: value.systemPrompt,
     model: value.model,
+    modelConfigId: value.modelConfigId,
     temperature: value.temperature,
     maxTokens: value.maxTokens,
     knowledgeBaseIds: value.knowledgeBaseIds,
@@ -94,6 +101,7 @@ export function toAgentDetail(
     avatarUrl: agent.avatarUrl ?? undefined,
     systemPrompt: agent.systemPrompt,
     model: agent.model,
+    modelConfigId: agent.modelConfigId ?? null,
     temperature: agent.temperature,
     maxTokens: agent.maxTokens,
     contextLimit: agent.contextLimit,

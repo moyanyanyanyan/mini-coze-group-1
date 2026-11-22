@@ -18,8 +18,10 @@ model User {
   avatarUrl    String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-  conversations Conversation[]
-  apiKeys       ApiKey[]
+  conversations  Conversation[]
+  apiKeys        ApiKey[]
+  modelProviders ModelProvider[]
+  modelConfigs   ModelConfig[]
 }
 
 enum AgentStatus {
@@ -38,6 +40,8 @@ model Agent {
   avatarUrl              String?
   systemPrompt           String
   model                  String      @default("deepseek-ai/DeepSeek-V4.1-Flash")
+  /// 绑定的模型配置；运行时由模型管理统一解析地址与凭据
+  modelConfigId          String?
   temperature            Float       @default(0.7)
   maxTokens              Int         @default(4096)
   contextLimit           Int         @default(20)
@@ -52,9 +56,72 @@ model Agent {
   knowledgeBaseBindings KnowledgeBaseAgentBinding[]
   workflowBindings      AgentWorkflow[]
   apiKeys               ApiKey[]
+  modelConfig           ModelConfig? @relation(fields: [modelConfigId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId])
   @@index([status])
+  @@index([modelConfigId])
+}
+
+enum ModelType {
+  CHAT
+  EMBEDDING
+}
+
+/// 模型服务商：名称、协议与默认调用地址。
+model ModelProvider {
+  id             String   @id @default(cuid())
+  ownerId        String   @db.Uuid
+  name           String
+  /// 首期统一使用 OpenAI 兼容 Chat Completions 协议
+  protocol       String   @default("openai_compatible")
+  defaultBaseUrl String
+  /// 内置服务商标识（deepseek / bailian / siliconflow / custom），便于幂等初始化
+  builtinKey     String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  owner   User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  configs ModelConfig[]
+
+  @@unique([ownerId, name])
+  @@unique([ownerId, builtinKey])
+  @@index([ownerId])
+}
+
+/// 模型配置：一张连接卡片。API Key 加密入库，接口只返回前 4 位。
+model ModelConfig {
+  id              String    @id @default(cuid())
+  ownerId         String    @db.Uuid
+  providerId      String
+  name            String
+  modelIdentifier String
+  type            ModelType @default(CHAT)
+  /// 向量模型维度，对话模型为空
+  dimension       Int?
+  /// 独立调用地址；为空时继承服务商默认地址
+  baseUrl         String?
+  apiKeyCipher    String
+  /// 明文前 4 位，仅用于脱敏展示
+  keyPrefix       String
+  enabled         Boolean   @default(true)
+
+  /// 内部连通性测试结果（不作为启停依据）
+  lastTestedAt    DateTime?
+  lastTestStatus  String?
+  lastTestLatencyMs Int?
+  lastTestErrorType String?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  owner    User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  provider ModelProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  agents   Agent[]
+
+  @@unique([ownerId, name])
+  @@index([ownerId, type, enabled])
+  @@index([providerId])
 }
 
 model ApiKey {
@@ -197,3 +264,4 @@ model Plugin {
 
   @@map("plugins")
 }
+

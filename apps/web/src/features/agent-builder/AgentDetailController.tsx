@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AgentDetailView } from '@minicoze/ui/agent-builder';
+import { AgentDetailView, type AgentSaveState } from '@minicoze/ui/agent-builder';
 import {
-  modelOptions,
+  listChatModelOptions,
   contextLimitOptions,
   getAgentVersion,
   listAgentVersions,
+  updateAgent,
   type AgentVersionDetail,
   type AgentVersionSummary,
   type Agent,
@@ -14,6 +15,7 @@ import {
   type PluginSummary,
   type UpdateAgentInput,
 } from './agent.api';
+import { createConversation, deleteConversation, streamMessage } from '../agent-chat/api/chat-api';
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 type PickerKind = 'plugin' | 'knowledge';
@@ -22,6 +24,7 @@ interface Props {
   agent: Agent;
   knowledgeBases: KnowledgeBaseSummary[];
   plugins: PluginSummary[];
+  modelNotice: string | null;
   saveState: SaveState;
   saveMessage: string;
   onBack: () => void;
@@ -39,6 +42,7 @@ export function AgentDetailController({
   agent,
   knowledgeBases,
   plugins,
+  modelNotice,
   saveState,
   saveMessage,
   onBack,
@@ -50,6 +54,7 @@ export function AgentDetailController({
   const [pluginSaving, setPluginSaving] = useState(false);
   const [pluginSaveError, setPluginSaveError] = useState<string | null>(null);
   const pluginSavePending = useRef(false);
+  const [modelOptions, setModelOptions] = useState<{ value: string; label: string }[]>([]);
   const [pickerOpen, setPickerOpen] = useState<PickerKind | null>(null);
   const [versions, setVersions] = useState<AgentVersionSummary[]>([]);
   const [versionsLoading, setVersionsLoading] = useState(false);
@@ -108,15 +113,56 @@ export function AgentDetailController({
     description: agent.description ?? '',
     systemPrompt: agent.systemPrompt,
     model: agent.model,
+    modelConfigId: agent.modelConfigId ?? '',
     temperature: agent.temperature,
     maxTokens: agent.maxTokens,
     contextLimit: agent.contextLimit,
     openingMessage: agent.openingMessage ?? '',
   });
 
+  useEffect(() => {
+    let active = true;
+    listChatModelOptions()
+      .then((items) => {
+        if (!active) return;
+        setModelOptions(items.map((item) => ({
+          value: item.id,
+          label: `${item.name} · ${item.modelIdentifier}`,
+        })));
+      })
+      .catch(() => {
+        if (!active) return;
+        setModelOptions([]);
+      });
+    return () => { active = false; };
+  }, []);
+
   const update = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => {
     setForm((f) => ({ ...f, [key]: value }));
   };
+
+  const dirty =
+    form.name !== agent.name ||
+    form.description !== (agent.description ?? '') ||
+    form.systemPrompt !== agent.systemPrompt ||
+    form.modelConfigId !== (agent.modelConfigId ?? '') ||
+    form.temperature !== agent.temperature ||
+    form.maxTokens !== agent.maxTokens ||
+    form.contextLimit !== agent.contextLimit ||
+    form.openingMessage !== (agent.openingMessage ?? '');
+
+  useEffect(() => {
+    if (!dirty) return;
+    const handler = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [dirty]);
+
+  const effectiveSaveState: AgentSaveState =
+    dirty && (saveState === 'idle' || saveState === 'saved') ? 'dirty' : saveState;
 
   const toggleKb = (kbId: string) => {
     const bindings = agent.knowledgeBaseBindings.map((b) => ({
@@ -157,6 +203,81 @@ export function AgentDetailController({
 
   const availableKnowledgeBases = knowledgeBases.filter((kb) => kb.status === 'ACTIVE');
 
+  const testConvIdRef = useRef<string | null>(null);
+  const testAbortRef = useRef<AbortController | null>(null);
+
+  const saveFormForTest = async () => {
+    const input: UpdateAgentInput = {
+      name: form.name,
+      description: form.description,
+      systemPrompt: form.systemPrompt,
+      modelConfigId: form.modelConfigId,
+      temperature: form.temperature,
+      maxTokens: form.maxTokens,
+      contextLimit: form.contextLimit,
+      openingMessage: form.openingMessage,
+    };
+    await updateAgent(agent.id, input);
+  };
+
+  const sendTestMessage = async (
+    content: string,
+    handlers: {
+      onDelta: (chunk: string) => void;
+      onCompleted: (content: string) => void;
+      onFailed: (message: string) => void;
+    },
+  ) => {
+    if (dirty) {
+      try {
+        await saveFormForTest();
+      } catch {
+        handlers.onFailed('保存失败，请先修复再测试');
+        return;
+      }
+    }
+
+    testAbortRef.current?.abort();
+    if (testConvIdRef.current) {
+      try { await deleteConversation(testConvIdRef.current).catch(() => null); } catch { /* 忽略 */ }
+    }
+
+    let conversationId: string;
+    try {
+      const conv = await createConversation(agent.id);
+      conversationId = conv.id;
+      testConvIdRef.current = conversationId;
+    } catch (err) {
+      handlers.onFailed(err instanceof Error ? err.message : '创建测试会话失败');
+      return;
+    }
+
+    const controller = new AbortController();
+    testAbortRef.current = controller;
+    try {
+      await streamMessage(conversationId, content, {
+        onDelta: handlers.onDelta,
+        onCompleted: handlers.onCompleted,
+        onFailed: (code, message) => handlers.onFailed(message || code),
+      }, controller.signal);
+    } catch (err) {
+      if (controller.signal.aborted) {
+        handlers.onCompleted('已停止生成。');
+      } else {
+        handlers.onFailed(err instanceof Error ? err.message : '请求失败');
+      }
+    } finally {
+      if (testAbortRef.current === controller) {
+        testAbortRef.current = null;
+      }
+    }
+  };
+
+  const stopTestMessage = () => {
+    testAbortRef.current?.abort();
+    testAbortRef.current = null;
+  };
+
   const confirmPlugins = async (ids: string[]) => {
     const bindings = ids.map((pluginId) => ({
       pluginId,
@@ -182,8 +303,9 @@ export function AgentDetailController({
       form={form}
       update={update}
       modelOptions={modelOptions}
+      modelNotice={modelNotice}
       contextLimitOptions={contextLimitOptions}
-      saveState={saveState}
+      saveState={effectiveSaveState}
       saveMessage={saveMessage}
       pluginSaving={pluginSaving}
       pluginSaveError={pluginSaveError}
@@ -209,6 +331,8 @@ export function AgentDetailController({
       onConfirmKnowledge={confirmKnowledge}
       openVersionDetail={openVersionDetail}
       closeVersionDetail={closeVersionDetail}
+      onTestSend={sendTestMessage}
+      onTestStop={stopTestMessage}
     />
   );
 }

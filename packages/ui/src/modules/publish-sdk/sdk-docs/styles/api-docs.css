@@ -1,6 +1,7 @@
 .api-docs-page {
   padding: clamp(40px, 5vw, 68px) clamp(22px, 4vw, 56px) 96px;
   color: var(--ink-800);
+  background: radial-gradient(circle at 82% 3%,rgba(95,201,195,.06),transparent 24rem);
 }
 
 .api-doc-layout {
@@ -17,9 +18,11 @@
 }
 
 .api-doc-hero {
+  position: relative;
   padding-bottom: 42px;
   border-bottom: 1px solid var(--line);
 }
+.api-doc-hero::before { content: ''; display: block; width: 64px; height: 7px; margin-bottom: 22px; border-radius: 3px; background: linear-gradient(90deg,var(--block-violet) 0 28%,transparent 28% 35%,var(--block-cyan) 35% 65%,transparent 65% 72%,var(--block-coral) 72%); }
 
 .api-doc-eyebrow {
   margin: 0 0 15px;
@@ -127,6 +130,12 @@
 }
 
 .api-doc-steps li > span {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--violet-50);
   color: var(--violet-500);
   font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
   font-size: 11px;

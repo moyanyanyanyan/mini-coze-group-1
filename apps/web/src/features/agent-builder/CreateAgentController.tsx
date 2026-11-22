@@ -1,14 +1,19 @@
 import { useState } from 'react';
-import { CreateAgentView } from '@minicoze/ui/agent-builder';
+import { CreateAgentView, type AgentModelOption } from '@minicoze/ui/agent-builder';
+import { defaultModelKey } from './agentModels';
 
 interface Props {
+  modelOptions: AgentModelOption[];
+  modelNotice: string | null;
   onClose: () => void;
-  onSubmit: (data: { name: string; description: string }) => void;
+  onSubmit: (data: { name: string; description: string; modelConfigId: string; openingMessage: string }) => void;
 }
 
-export function CreateAgentController({ onClose, onSubmit }: Props) {
+export function CreateAgentController({ modelOptions, modelNotice, onClose, onSubmit }: Props) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [modelConfigId, setModelConfigId] = useState(() => defaultModelKey(modelOptions));
+  const [openingMessage, setOpeningMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -25,17 +30,32 @@ export function CreateAgentController({ onClose, onSubmit }: Props) {
       setError('描述不能超过 200 字');
       return;
     }
-    onSubmit({ name: name.trim(), description: description.trim() });
+    if (!modelConfigId) {
+      setError('请选择模型配置');
+      return;
+    }
+    onSubmit({
+      name: name.trim(),
+      description: description.trim(),
+      modelConfigId,
+      openingMessage: openingMessage.trim(),
+    });
   };
 
   return (
     <CreateAgentView
       name={name}
       description={description}
+      model={modelConfigId}
+      modelOptions={modelOptions}
+      modelNotice={modelNotice}
+      openingMessage={openingMessage}
       error={error}
       canSubmit={Boolean(name.trim())}
       onNameChange={(value) => { setName(value); setError(null); }}
       onDescriptionChange={(value) => { setDescription(value); setError(null); }}
+      onModelChange={setModelConfigId}
+      onOpeningMessageChange={setOpeningMessage}
       onClose={onClose}
       handleSubmit={handleSubmit}
     />
