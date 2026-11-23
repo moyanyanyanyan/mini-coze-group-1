@@ -17,6 +17,8 @@ import { Icon } from '../../shared/ui/Icon';
 import { navigate } from '../../shared/routing/navigation';
 import styles from './agent-chat.module.css';
 
+const CONTEXT_HISTORY_ROUND_LIMIT = 10;
+
 export function AgentChatPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -26,15 +28,19 @@ export function AgentChatPage() {
   const [citationsByMessage, setCitationsByMessage] = useState<Record<string, ChatCitation[]>>({});
   /** 非空 = 这一轮还在生成，同时用作「禁止再发 / 禁止切换」的闸门 */
   const [streamingId, setStreamingId] = useState<string | null>(null);
+  const [generationPhase, setGenerationPhase] = useState<'connecting' | 'thinking' | 'generating' | null>(null);
   const [sendError, setSendError] = useState('');
   const [bootError, setBootError] = useState('');
   const [loadingConversation, setLoadingConversation] = useState(false);
   const [preparingMessage, setPreparingMessage] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [showScrollJump, setShowScrollJump] = useState(false);
+  const [activePromptId, setActivePromptId] = useState<string | null>(null);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const streamRef = useRef<HTMLDivElement | null>(null);
+  const promptRefs = useRef(new Map<string, HTMLDivElement>());
+  const promptMarkRefs = useRef(new Map<string, HTMLButtonElement>());
   // React 严格模式下 effect 会跑两次，没有这个闸门就会重复拉数据
   const booted = useRef(false);
   // 同一个 AbortController 贯穿整轮：前端 abort → 后端 res.on('close') → Runtime 那条 HTTP 也断
@@ -108,7 +114,26 @@ export function AgentChatPage() {
     }
     atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
     setShowScrollJump(!atBottomRef.current);
+
+    const streamTop = el.getBoundingClientRect().top;
+    const cutoff = streamTop + 140;
+    let currentPrompt: string | null = null;
+    for (const message of messages) {
+      if (message.role !== 'user') continue;
+      const element = promptRefs.current.get(message.id);
+      if (element) {
+        const top = element.getBoundingClientRect().top - streamTop + 13;
+        const mark = promptMarkRefs.current.get(message.id);
+        if (mark) mark.style.top = `${top}px`;
+        if (element.getBoundingClientRect().top <= cutoff) currentPrompt = message.id;
+      }
+    }
+    setActivePromptId(currentPrompt);
   };
+
+  useEffect(() => {
+    handleStreamScroll();
+  }, [messages]);
 
   const refreshConversations = async (agentList: Agent[]) => {
     try {
@@ -214,30 +239,17 @@ export function AgentChatPage() {
     setPreparingMessage(true);
     setSendError('');
 
-    // 没有会话就先建一个（新对话 / 首次进入）
     let convId = conversationId;
-    if (!convId) {
-      try {
-        const created = await createConversation(selectedAgentId);
-        convId = created.id;
-        setConversationId(created.id);
-        setConversations((prev) => [created, ...prev]);
-      } catch (caught) {
-        setSendError(caught instanceof ApiError ? caught.message : '创建对话失败，请稍后再试');
-        sendingRef.current = false;
-        setPreparingMessage(false);
-        return;
-      }
-    }
-
     const now = new Date().toISOString();
-    const assistantKey = `tmp-assistant-${Date.now()}`;
-    // 乐观插入：不等后端回包就把两条气泡画出来，打字效果才不卡
+    const key = `${Date.now()}-${Math.random()}`;
+    const assistantKey = `tmp-assistant-${key}`;
+    const userKey = `tmp-user-${key}`;
+    // 先显示本轮消息；新会话的创建请求也可能需要一段时间。
     setMessages((prev) => [
       ...prev,
       {
-        id: `tmp-user-${Date.now()}`,
-        conversationId: convId,
+        id: userKey,
+        conversationId: convId ?? '',
         role: 'user',
         status: 'completed',
         seq: -2,
@@ -246,9 +258,9 @@ export function AgentChatPage() {
       },
       {
         id: assistantKey,
-        conversationId: convId,
+        conversationId: convId ?? '',
         role: 'assistant',
-        status: 'running',
+        status: 'pending',
         seq: -1,
         content: '',
         createdAt: now,
@@ -259,10 +271,17 @@ export function AgentChatPage() {
     const controller = new AbortController();
     abortRef.current = controller;
     setStreamingId(assistantKey);
+    setGenerationPhase('connecting');
     targetIdRef.current = assistantKey;
     deltaBuffer.current = '';
-    let aborted = false;
     let terminalStatus: ChatMessage['status'] | null = null;
+    let phase: 'connecting' | 'thinking' | 'generating' = 'connecting';
+    const advancePhase = (next: typeof phase) => {
+      if (phase !== next && !controller.signal.aborted) {
+        phase = next;
+        setGenerationPhase(next);
+      }
+    };
 
     const flushDelta = () => {
       frameRef.current = null;
@@ -273,16 +292,29 @@ export function AgentChatPage() {
       deltaBuffer.current = '';
       const id = targetIdRef.current;
       setMessages((prev) =>
-        prev.map((item) => (item.id === id ? { ...item, content: item.content + text } : item)),
+        prev.map((item) => (item.id === id ? { ...item, content: item.content + text, status: 'running' } : item)),
       );
     };
 
     try {
+      if (!convId) {
+        const created = await createConversation(selectedAgentId);
+        convId = created.id;
+        setConversationId(created.id);
+        setConversations((prev) => [created, ...prev]);
+        setMessages((prev) => prev.map((item) =>
+          item.id === userKey || item.id === assistantKey ? { ...item, conversationId: created.id } : item,
+        ));
+      }
+      if (controller.signal.aborted) throw new DOMException('Stopped', 'AbortError');
       await streamMessage(
         convId,
         content,
         {
+          onConnected: () => advancePhase('thinking'),
           onStarted: (assistantMessageId) => {
+            if (controller.signal.aborted || !assistantMessageId) return;
+            advancePhase('thinking');
             targetIdRef.current = assistantMessageId;
             setStreamingId(assistantMessageId);
             setMessages((prev) =>
@@ -292,6 +324,8 @@ export function AgentChatPage() {
             );
           },
           onDelta: (chunk) => {
+            if (controller.signal.aborted || !chunk) return;
+            advancePhase('generating');
             deltaBuffer.current += chunk;
             if (frameRef.current !== null) {
               return;
@@ -299,6 +333,7 @@ export function AgentChatPage() {
             frameRef.current = requestAnimationFrame(flushDelta);
           },
           onKnowledge: (_status, citations) => {
+            if (controller.signal.aborted) return;
             const id = targetIdRef.current;
             if (!id) {
               return;
@@ -306,6 +341,7 @@ export function AgentChatPage() {
             setCitationsByMessage((prev) => ({ ...prev, [id]: citations }));
           },
           onCompleted: (finalContent) => {
+            if (controller.signal.aborted) return;
             terminalStatus = 'completed';
             // 后端给的全量优先，避免网络抖动丢过某个 delta
             if (frameRef.current !== null) {
@@ -321,8 +357,11 @@ export function AgentChatPage() {
                   : item,
               ),
             );
+            setGenerationPhase(null);
+            setStreamingId(null);
           },
           onFailed: (_code, message) => {
+            if (controller.signal.aborted) return;
             terminalStatus = 'failed';
             if (frameRef.current !== null) {
               cancelAnimationFrame(frameRef.current);
@@ -337,14 +376,15 @@ export function AgentChatPage() {
                 item.id === id ? { ...item, content: item.content + rest, status: 'failed' } : item,
               ),
             );
+            setGenerationPhase(null);
+            setStreamingId(null);
           },
         },
         controller.signal,
       );
     } catch (caught) {
       // 主动停止是正常路径，不弹错误
-      if (caught instanceof DOMException && caught.name === 'AbortError') {
-        aborted = true;
+      if (controller.signal.aborted || (caught instanceof DOMException && caught.name === 'AbortError')) {
         terminalStatus = 'cancelled';
       } else {
         terminalStatus = 'failed';
@@ -360,18 +400,20 @@ export function AgentChatPage() {
       const id = targetIdRef.current;
       setMessages((prev) =>
         prev.map((item) => {
-          if (item.role !== 'assistant' || item.status !== 'running') {
+          if (item.id !== id || (item.status !== 'running' && item.status !== 'pending')) {
             return item;
           }
-          const nextContent = item.id === id ? item.content + rest : item.content;
+          const nextContent = item.content + rest;
           // 只有服务端明确 completed 才算完成；无终态断流不能因为已有部分文本就误判成功。
-          const nextStatus: ChatMessage['status'] = terminalStatus ?? (aborted ? 'cancelled' : 'failed');
+          const nextStatus: ChatMessage['status'] = terminalStatus ?? 'failed';
           return { ...item, content: nextContent, status: nextStatus };
         }),
       );
+      if (!terminalStatus) setSendError('连接中断，请重试发送');
       abortRef.current = null;
       targetIdRef.current = null;
       setStreamingId(null);
+      setGenerationPhase(null);
       sendingRef.current = false;
       setPreparingMessage(false);
       // 第一轮结束后标题会变，顺手刷新左侧列表
@@ -380,7 +422,18 @@ export function AgentChatPage() {
   };
 
   const handleStop = () => {
-    abortRef.current?.abort();
+    if (!abortRef.current) return;
+    abortRef.current.abort();
+    if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+    frameRef.current = null;
+    const rest = deltaBuffer.current;
+    deltaBuffer.current = '';
+    const id = targetIdRef.current;
+    setMessages((prev) => prev.map((item) => item.id === id
+      ? { ...item, content: item.content + rest, status: 'cancelled' }
+      : item));
+    setStreamingId(null);
+    setGenerationPhase(null);
   };
 
   const agentNames: Record<string, string> = Object.fromEntries(
@@ -389,6 +442,12 @@ export function AgentChatPage() {
   const activeTitle = conversations.find((item) => item.id === conversationId)?.title;
   const activeAgent = agents.find((agent) => agent.id === selectedAgentId);
   const chatBusy = preparingMessage || streamingId !== null || loadingConversation;
+  const completedTurns = messages.reduce((count, message, index) => {
+    const next = messages[index + 1];
+    return count + (message.role === 'user' && next?.role === 'assistant' && next.status === 'completed' ? 1 : 0);
+  }, 0);
+  const contextRemaining = Math.max(0, CONTEXT_HISTORY_ROUND_LIMIT - completedTurns);
+  const userPrompts = messages.filter((message) => message.role === 'user');
   const quickPrompts = [
     '帮我梳理今天最重要的三件事',
     '根据已有知识总结关键结论',
@@ -440,11 +499,31 @@ export function AgentChatPage() {
           </label>
           <span className={`${styles.badge}${streamingId ? ` ${styles.badgeActive}` : ''}`}>
             <span className={styles.badgeDot} aria-hidden="true" />
-            {streamingId ? '正在生成' : '准备就绪'}
+            {generationPhase === 'connecting' ? '正在连接' : generationPhase === 'thinking' ? '正在思考' : generationPhase === 'generating' ? '正在生成' : '准备就绪'}
           </span>
         </header>
 
-        <div className={styles.stream} ref={streamRef} onScroll={handleStreamScroll}>
+        <div className={styles.streamFrame}>
+          {userPrompts.length > 0 ? (
+            <nav className={styles.turnRail} aria-label="本轮对话提问">
+              {userPrompts.map((message, index) => (
+                <button
+                  key={message.id}
+                  ref={(element) => {
+                    if (element) promptMarkRefs.current.set(message.id, element);
+                    else promptMarkRefs.current.delete(message.id);
+                  }}
+                  type="button"
+                  className={`${styles.turnMark}${activePromptId === message.id ? ` ${styles.turnMarkActive}` : ''}`}
+                  title={`第 ${index + 1} 轮：${message.content}`}
+                  aria-label={`跳转到第 ${index + 1} 轮提问：${message.content}`}
+                  aria-current={activePromptId === message.id ? 'location' : undefined}
+                  onClick={() => promptRefs.current.get(message.id)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                />
+              ))}
+            </nav>
+          ) : <div aria-hidden="true" />}
+          <div className={styles.stream} ref={streamRef} onScroll={handleStreamScroll}>
           {loadingConversation ? <div className={styles.chatLoading}><span /><span /><span /><p>正在加载对话</p></div> : null}
           {!loadingConversation && messages.length === 0 ? (
             <div className={styles.empty}>
@@ -469,9 +548,22 @@ export function AgentChatPage() {
             </div>
           ) : null}
 
-          {!loadingConversation ? messages.map((message) => (
-            <div key={message.id}>
-              <ChatBubble message={message} />
+          {!loadingConversation ? messages.map((message, index) => (
+            <div
+              key={message.id}
+              ref={message.role === 'user' ? (element) => {
+                if (element) promptRefs.current.set(message.id, element);
+                else promptRefs.current.delete(message.id);
+              } : undefined}
+              className={message.role === 'user' ? styles.userTurnAnchor : undefined}
+            >
+              <ChatBubble
+                message={message}
+                phase={message.id === streamingId ? generationPhase ?? undefined : undefined}
+                onRetry={(message.status === 'failed' || ((message.status === 'pending' || message.status === 'running') && message.id !== streamingId)) && messages[index - 1]?.role === 'user' && !chatBusy
+                  ? () => void handleSend(messages[index - 1].content)
+                  : undefined}
+              />
               {citationsByMessage[message.id]?.length ? (
                 <div className={styles.citations} aria-label="本次检索来源">
                   来源：{citationsByMessage[message.id].map((source) => source.title).join('、')}
@@ -481,6 +573,7 @@ export function AgentChatPage() {
           )) : null}
 
           <div ref={bottomRef} />
+          </div>
         </div>
 
         {showScrollJump ? <button className={styles.scrollJump} type="button" onClick={() => { atBottomRef.current = true; setShowScrollJump(false); bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }}>回到底部 ↓</button> : null}
@@ -507,6 +600,8 @@ export function AgentChatPage() {
 
           <MessageComposer
             disabled={!selectedAgentId || chatBusy}
+            contextRemaining={contextRemaining}
+            contextMax={CONTEXT_HISTORY_ROUND_LIMIT}
             onSend={(content) => void handleSend(content)}
           />
           <p className={styles.composerHint}>AI 生成内容可能不准确，请核对重要信息。</p>

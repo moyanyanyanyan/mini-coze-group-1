@@ -8,6 +8,8 @@ export type IconName =
   | 'plug'
   | 'workflow'
   | 'send'
+  | 'image'
+  | 'close'
   | 'api'
   | 'plus'
   | 'trash';
