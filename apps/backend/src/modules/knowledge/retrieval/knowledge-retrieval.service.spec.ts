@@ -1,4 +1,4 @@
-import { ForbiddenException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, ServiceUnavailableException } from '@nestjs/common';
 import { EmbeddingUnavailableError } from '../../../integrations/embedding.client';
 import { KnowledgeRetrievalService } from './knowledge-retrieval.service';
 
@@ -35,6 +35,30 @@ describe('KnowledgeRetrievalService', () => {
 
     await expect(service.searchAuthorized(['kb-1', 'kb-2'], '报销标准', 5)).resolves.toEqual({ status: 'HIT', hits: [second, first] });
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([601, 8000])('长问题的全部 %i 个字符都参与检索', async (length) => {
+    const { service, prisma, embedding } = createService();
+    prisma.knowledgeBase.findMany.mockResolvedValue([{ id: 'kb', workspaceId: 'ws' }]);
+    prisma.knowledgeChunk.findFirst.mockResolvedValueOnce({ id: 'chunk' }).mockResolvedValueOnce(null);
+    const query = '问'.repeat(length - 1) + '😀';
+    embedding.embed.mockImplementation(async (parts: string[]) => {
+      expect(parts.join('')).toBe(query);
+      expect(parts.every((part) => Array.from(part).length <= 600)).toBe(true);
+      return { model: 'test', vectors: parts.map((_, index) => [index + 1, 1]) };
+    });
+    prisma.$queryRaw.mockResolvedValue([]);
+    await service.searchAuthorized(['kb'], query);
+    expect(embedding.embed).toHaveBeenCalledTimes(1);
+    const sql = prisma.$queryRaw.mock.calls[0][0];
+    expect(sql.values).toContain('[1,1]');
+    expect(sql.values).toContain(`[${Math.ceil(length / 600)},1]`);
+  });
+
+  it.each(['   ', '问'.repeat(8001)])('非法检索问题返回 400', async (query) => {
+    const { service, embedding } = createService();
+    await expect(service.searchAuthorized(['kb'], query)).rejects.toBeInstanceOf(BadRequestException);
+    expect(embedding.embed).not.toHaveBeenCalled();
   });
 
   it('rejects cross-workspace KBs and does not embed the query', async () => {

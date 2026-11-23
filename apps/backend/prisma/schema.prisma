@@ -18,7 +18,10 @@ model User {
   avatarUrl    String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-  conversations Conversation[]
+  conversations  Conversation[]
+  apiKeys        ApiKey[]
+  modelProviders ModelProvider[]
+  modelConfigs   ModelConfig[]
 }
 
 enum AgentStatus {
@@ -37,6 +40,8 @@ model Agent {
   avatarUrl              String?
   systemPrompt           String
   model                  String      @default("deepseek-ai/DeepSeek-V4.1-Flash")
+  /// 绑定的模型配置；运行时由模型管理统一解析地址与凭据
+  modelConfigId          String?
   temperature            Float       @default(0.7)
   maxTokens              Int         @default(4096)
   contextLimit           Int         @default(20)
@@ -50,9 +55,91 @@ model Agent {
   pluginBindings        AgentPluginBinding[]
   knowledgeBaseBindings KnowledgeBaseAgentBinding[]
   workflowBindings      AgentWorkflow[]
+  apiKeys               ApiKey[]
+  modelConfig           ModelConfig? @relation(fields: [modelConfigId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId])
   @@index([status])
+  @@index([modelConfigId])
+}
+
+enum ModelType {
+  CHAT
+  EMBEDDING
+}
+
+/// 模型服务商：名称、协议与默认调用地址。
+model ModelProvider {
+  id             String   @id @default(cuid())
+  ownerId        String   @db.Uuid
+  name           String
+  /// 首期统一使用 OpenAI 兼容 Chat Completions 协议
+  protocol       String   @default("openai_compatible")
+  defaultBaseUrl String
+  /// 内置服务商标识（deepseek / bailian / siliconflow / custom），便于幂等初始化
+  builtinKey     String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  owner   User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  configs ModelConfig[]
+
+  @@unique([ownerId, name])
+  @@unique([ownerId, builtinKey])
+  @@index([ownerId])
+}
+
+/// 模型配置：一张连接卡片。API Key 加密入库，接口只返回前 4 位。
+model ModelConfig {
+  id              String    @id @default(cuid())
+  ownerId         String    @db.Uuid
+  providerId      String
+  name            String
+  modelIdentifier String
+  type            ModelType @default(CHAT)
+  /// 向量模型维度，对话模型为空
+  dimension       Int?
+  /// 独立调用地址；为空时继承服务商默认地址
+  baseUrl         String?
+  apiKeyCipher    String
+  /// 明文前 4 位，仅用于脱敏展示
+  keyPrefix       String
+  enabled         Boolean   @default(true)
+
+  /// 内部连通性测试结果（不作为启停依据）
+  lastTestedAt    DateTime?
+  lastTestStatus  String?
+  lastTestLatencyMs Int?
+  lastTestErrorType String?
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  owner    User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  provider ModelProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  agents   Agent[]
+
+  @@unique([ownerId, name])
+  @@index([ownerId, type, enabled])
+  @@index([providerId])
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  agentId     String
+  createdById String    @db.Uuid
+  name        String
+  keyPrefix   String
+  keyHash     String    @unique
+  createdAt   DateTime  @default(now())
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+
+  agent     Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  createdBy User  @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([createdById, revokedAt, createdAt])
+  @@index([agentId, revokedAt])
 }
 
 model AgentVersion {
@@ -94,6 +181,9 @@ model KnowledgeBaseAgentBinding {
 
   agent Agent @relation(fields: [agentId], references: [id])
 
+  knowledgeBase KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+
+  @@index([knowledgeBaseId])
   @@unique([agentId, knowledgeBaseId])
 }
 
@@ -138,10 +228,10 @@ model Message {
 
 /// 插件目录表。
 ///
-/// - 内置插件（plugin_echo / plugin_time）由代码在启动时 upsert 进表，
-///   目录元数据以此处为准；执行器仍走代码里的 EchoExecutor / TimeExecutor。
-/// - 用户自定义插件（kind = http）由 POST /api/plugins 写入，
-///   执行时由 HttpExecutor 按 endpoint 转发请求。
+/// - 内置插件由代码中的统一注册表在启动时 upsert 进表，
+///   目录元数据以此处为准；执行器仍走对应的内置代码类。
+/// - 用户自定义插件（kind = http / mcp）由 POST /api/plugins 写入，
+///   http 由 HttpExecutor 按 endpoint 转发，mcp 由 McpExecutor 经 JSON-RPC 调用。
 model Plugin {
   id           Int      @id @default(autoincrement())
   /// 全局唯一插件 ID，形如 plugin_echo / plugin_weather
@@ -155,10 +245,18 @@ model Plugin {
   configSchema Json     @default("{}")
   /// PluginToolDefinition[]，与目录同源
   tools        Json
-  /// builtin | http
+  /// builtin | http | mcp
   kind         String   @default("builtin")
-  /// kind = http 时必填，工具执行时 POST 到该地址
+  /// kind = http/mcp 时必填，工具执行时请求该地址
   endpoint     String?
+  /// none | bearer | api_key；MCP/HTTP 插件访问远端服务时的鉴权方式
+  authType     String   @default("none")
+  /// 鉴权凭证（bearer token 或 api key），none 时为空；阶段项目明文存库
+  authCredential String?
+  /// unknown | connected | error，最近一次握手/连接状态
+  connectionStatus String @default("unknown")
+  /// 最近一次连接失败原因，成功后清空
+  lastError    String?
   /// 运行时是否可用；false 时不进入目录与允许列表
   enabled      Boolean  @default(true)
   createdAt    DateTime @default(now())

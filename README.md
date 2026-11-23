@@ -1,6 +1,6 @@
-# 织跃
+# 妙搭
 
-织跃是一个一站式 AI Agent 工作空间，将智能体搭建、对话、知识库、插件、工作流与 API 接入串成完整路径。项目内部仍保留 `minicoze` 包名与服务标识，以避免破坏现有依赖和运行配置。
+妙搭是一个一站式 AI Agent 工作空间，将角色、知识库、插件和工作流像积木一样组合，让智能体从想法走向执行。项目内部仍保留 `minicoze` 包名与服务标识，以避免破坏现有依赖和运行配置。
 
 ## 目录
 
@@ -27,6 +27,13 @@ python -m venv .venv
 python -m pip install -r apps/agent/requirements.txt
 pnpm --filter @minicoze/backend prisma:generate
 ```
+
+## 插件 MVP 边界
+
+- 页面仅提供现有插件目录和智能体绑定，不开放自定义插件创建或直接测试。
+- 后端启动时在事务内同步内置插件，保留已有启停状态；从代码移除的内置插件只停用、不删除历史记录。插件 ID 或工具名冲突会阻止启动，不覆盖其他类型插件。
+- 数据库必须可用，不再以可执行内存目录降级。目录在启动或 `reload()` 时刷新；执行前另查数据库，已停用或移除的工具返回 `TOOL_NOT_FOUND`，状态查询失败返回 HTTP 503。已经开始的调用不会被撤销。
+- `PUT /api/agents/:agentId/plugins` 的绑定项仅接受 `pluginId` 和 `enabled`。显式传入 `autoInvoke`、`sortOrder` 或 `config` 返回 400；历史字段保留但不参与 MVP 执行，普通启停不清空历史配置。解除绑定会删除对应绑定记录。
 
 ## 本地启动
 

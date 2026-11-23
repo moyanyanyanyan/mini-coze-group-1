@@ -1,6 +1,7 @@
 import { AgentBuilderPage, agentBuilderManifest } from '../features/agent-builder';
 import { AgentChatPage, agentChatManifest } from '../features/agent-chat';
 import { KnowledgePage, knowledgeManifest } from '../features/knowledge';
+import { ModelManagementPage, modelManagementManifest } from '../features/model-management';
 import { PluginsPage, pluginsManifest } from '../features/plugins';
 import { PublishSdkPage, publishSdkManifest } from '../features/publish-sdk';
 import { WorkflowPage, workflowManifest } from '../features/workflow-editor';
@@ -23,6 +24,12 @@ export const workspaceFeatures: readonly FeatureDefinition[] = [
   {
     ...agentChatManifest,
     Component: AgentChatPage,
+    showInLanding: true,
+    showInNavigation: true,
+  },
+  {
+    ...modelManagementManifest,
+    Component: ModelManagementPage,
     showInLanding: true,
     showInNavigation: true,
   },
@@ -61,16 +68,15 @@ export const landingModules = workspaceFeatures.filter(
 );
 
 export function getWorkspaceFeature(pathname: string) {
-  const candidates = workspaceFeatures
-    .filter((feature) => {
-      if (pathname === feature.route) {
-        return true;
-      }
-      // 一级路由（/workspace 本身）只做精确匹配：
-      // 否则 /workspace/任意地址 都会被它兜住，未知路由永远落不到兜底页
-      const isIndexRoute = feature.route.split('/').filter(Boolean).length === 1;
-      return !isIndexRoute && pathname.startsWith(`${feature.route}/`);
-    })
-    .sort((a, b) => b.route.length - a.route.length);
-  return candidates[0];
+  const exact = workspaceFeatures.find((feature) => feature.route === pathname);
+  if (exact) {
+    return exact;
+  }
+
+  return [...workspaceFeatures]
+    .filter((feature) => (
+      feature.route !== workspaceManifest.route
+      && pathname.startsWith(`${feature.route}/`)
+    ))
+    .sort((left, right) => right.route.length - left.route.length)[0];
 }

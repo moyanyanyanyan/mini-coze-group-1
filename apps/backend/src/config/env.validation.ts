@@ -1,18 +1,21 @@
 import { plainToInstance, Type } from 'class-transformer';
-import { 
-  IsInt, 
-  IsString, 
-  IsUrl, 
+import {
+  IsInt,
   IsIn,
   IsOptional,
-  Max, 
-  Min, 
+  IsString,
+  IsUrl,
+  Max,
+  Min,
   validateSync,
   MinLength,
   ValidateIf
 } from 'class-validator';
 
 class EnvironmentVariables {
+  @IsIn(['development', 'test', 'production'])
+  NODE_ENV = 'development';
+
   @Type(() => Number)
   @IsInt()
   @Min(1)
@@ -25,9 +28,19 @@ class EnvironmentVariables {
   @IsUrl({ require_tld: false })
   AGENT_SERVICE_URL = 'http://localhost:8000';
 
+  // Runtime 未配置时后端仍可启动，实际内部调用时再明确报错。
+  @IsOptional()
+  @IsString()
+  INTERNAL_SERVICE_TOKEN = '';
+
   // 传给 Runtime 的模型名，随模型供应商不同而不同
   @IsString()
   AGENT_MODEL = 'deepseek-chat';
+
+  // 模型管理凭据加密密钥；未配置时保存模型配置会明确报错，不会明文落库
+  @IsOptional()
+  @IsString()
+  MODEL_CREDENTIAL_SECRET = '';
 
   @IsString()
   DATABASE_URL!: string;

@@ -1,0 +1,42 @@
+.app-notice {
+  position: fixed;
+  z-index: 1100;
+  top: 22px;
+  left: 50%;
+  max-width: min(460px, calc(100vw - 40px));
+  padding: 11px 16px;
+  border: 1px solid;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(37, 34, 50, 0.14);
+  font-size: 13px;
+  font-weight: 590;
+  line-height: 1.45;
+  text-align: center;
+  transform: translateX(-50%);
+  animation: app-notice-in 180ms ease both;
+}
+
+.app-notice--success {
+  color: #176d50;
+  border-color: #bfe2d4;
+  background: #f1fbf7;
+}
+
+.app-notice--error {
+  color: #a92b3e;
+  border-color: #f0c4cc;
+  background: #fff5f6;
+}
+
+@keyframes app-notice-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-notice {
+    animation: none;
+  }
+}

@@ -6,19 +6,81 @@ import type {
   WorkflowBindingView,
 } from './types';
 
-export function buildAgentConfig(agent: AgentDetail, revision = 0): RuntimeAgentConfig {
+export function buildAgentConfig(
+  agent: AgentDetail,
+  revision = 0,
+): RuntimeAgentConfig {
   return {
     id: agent.id,
     revision,
+    contextLimit: agent.contextLimit,
     name: agent.name,
     systemPrompt: agent.systemPrompt,
     model: agent.model,
+    modelConfigId: agent.modelConfigId as string,
     temperature: agent.temperature,
     maxTokens: agent.maxTokens,
     knowledgeBaseIds: agent.knowledgeBaseBindings
       .filter((b) => b.enabled)
       .map((b) => b.knowledgeBaseId),
     pluginIds: agent.pluginBindings.filter((b) => b.enabled).map((b) => b.pluginId),
+  };
+}
+
+export function parseRuntimeAgentConfigSnapshot(
+  snapshot: Prisma.JsonValue,
+  expectedAgentId: string,
+  expectedRevision: number,
+  legacyContextLimit: number,
+): RuntimeAgentConfig | null {
+  if (!snapshot || typeof snapshot !== 'object' || Array.isArray(snapshot)) {
+    return null;
+  }
+
+  const value = snapshot as Record<string, unknown>;
+  // 旧快照未记录历史轮数，只能沿用该 Agent 当前的配置。
+  const contextLimit = value.contextLimit === undefined ? legacyContextLimit : value.contextLimit;
+  const isStringArray = (input: unknown): input is string[] => (
+    Array.isArray(input) && input.every((item) => typeof item === 'string')
+  );
+
+  if (
+    value.id !== expectedAgentId
+    || value.revision !== expectedRevision
+    || typeof contextLimit !== 'number'
+    || !Number.isInteger(contextLimit)
+    || contextLimit < 0
+    || contextLimit > 100
+    || typeof value.name !== 'string'
+    || !value.name
+    || typeof value.systemPrompt !== 'string'
+    || typeof value.model !== 'string'
+    || !value.model
+    || typeof value.modelConfigId !== 'string'
+    || !value.modelConfigId
+    || typeof value.temperature !== 'number'
+    || !Number.isFinite(value.temperature)
+    || typeof value.maxTokens !== 'number'
+    || !Number.isInteger(value.maxTokens)
+    || value.maxTokens <= 0
+    || !isStringArray(value.knowledgeBaseIds)
+    || !isStringArray(value.pluginIds)
+  ) {
+    return null;
+  }
+
+  return {
+    id: value.id,
+    revision: value.revision,
+    contextLimit,
+    name: value.name,
+    systemPrompt: value.systemPrompt,
+    model: value.model,
+    modelConfigId: value.modelConfigId,
+    temperature: value.temperature,
+    maxTokens: value.maxTokens,
+    knowledgeBaseIds: value.knowledgeBaseIds,
+    pluginIds: value.pluginIds,
   };
 }
 
@@ -39,6 +101,7 @@ export function toAgentDetail(
     avatarUrl: agent.avatarUrl ?? undefined,
     systemPrompt: agent.systemPrompt,
     model: agent.model,
+    modelConfigId: agent.modelConfigId ?? null,
     temperature: agent.temperature,
     maxTokens: agent.maxTokens,
     contextLimit: agent.contextLimit,

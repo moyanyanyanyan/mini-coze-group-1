@@ -26,7 +26,8 @@ class RuntimeService:
 
     def preflight(self, request: RuntimeRequest) -> None:
         validate_model(ModelInput(model=request.agentConfig.model, messages=[ChatMessage(role="user", content=request.message)],
-                                  temperature=request.agentConfig.temperature, max_tokens=request.agentConfig.maxTokens), self.settings)
+                                  temperature=request.agentConfig.temperature, max_tokens=request.agentConfig.maxTokens), self.settings,
+                       request.agentConfig.connection)
 
     def context(self, request: RuntimeRequest, knowledge: KnowledgeResult) -> list[ChatMessage]:
         prefix = [ChatMessage(role="system", content=request.agentConfig.systemPrompt)] if request.agentConfig.systemPrompt else []
@@ -88,8 +89,10 @@ class RuntimeService:
                         "citations": [chunk.citation.model_dump(exclude_none=True) for chunk in knowledge.chunks],
                     })
                 result = None
-                source = (stream_tool_loop(value, tools, request, self.settings, self.plugins, self.client)
-                          if tools else stream_model(value, settings=self.settings, client=self.client))
+                source = (stream_tool_loop(value, tools, request, self.settings, self.plugins, self.client,
+                                           connection=config.connection)
+                          if tools else stream_model(value, settings=self.settings, client=self.client,
+                                                     connection=config.connection))
                 async with aclosing(source) as model_stream:
                     async for item in model_stream:
                         if isinstance(item, str):
