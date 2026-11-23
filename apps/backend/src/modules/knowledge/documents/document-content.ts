@@ -1,6 +1,7 @@
 import { extname } from 'node:path';
 
 export const MAX_DOCUMENT_BYTES = 1024 * 1024;
+export const MAX_PDF_DOCUMENT_BYTES = 10 * 1024 * 1024;
 
 export class DocumentContentError extends Error {
   constructor(public readonly code: string, message: string) {
@@ -19,11 +20,12 @@ export function decodeUploadFilename(filename: string): string {
   }
 }
 
-export function sourceTypeFromFilename(filename: string): 'TXT' | 'JSON' {
+export function sourceTypeFromFilename(filename: string): 'TXT' | 'JSON' | 'PDF' {
   const extension = extname(filename).toLowerCase();
   if (extension === '.txt') return 'TXT';
   if (extension === '.json') return 'JSON';
-  throw new DocumentContentError('UNSUPPORTED_FILE', '只支持 .txt 和 .json 文件');
+  if (extension === '.pdf') return 'PDF';
+  throw new DocumentContentError('UNSUPPORTED_FILE', '只支持 .txt、.json 和 .pdf 文件');
 }
 
 export interface DocumentTextPage {

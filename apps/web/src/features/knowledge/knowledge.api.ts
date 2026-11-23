@@ -12,7 +12,7 @@ export interface KnowledgeDocument {
   id: string;
   knowledgeBaseId: string;
   title: string;
-  sourceType: 'TEXT' | 'TXT' | 'JSON';
+  sourceType: 'TEXT' | 'TXT' | 'JSON' | 'PDF';
   originalFileName: string | null;
   status: 'PROCESSING' | 'READY' | 'FAILED';
   stage: 'VALIDATING' | 'EXTRACTING' | 'CHUNKING' | 'EMBEDDING' | 'PERSISTING' | 'COMPLETED' | 'FAILED';

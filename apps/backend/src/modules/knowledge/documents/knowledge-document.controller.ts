@@ -4,7 +4,7 @@ import type { Request } from 'express';
 import { CreateTextDocumentDto } from '../dto/create-text-document.dto';
 import { resolveKnowledgeWorkspace } from '../knowledge-local-access';
 import { KnowledgeWorkspaceGuard } from '../knowledge-workspace.guard';
-import { MAX_DOCUMENT_BYTES } from './document-content';
+import { MAX_PDF_DOCUMENT_BYTES } from './document-content';
 import { KnowledgeDocumentService } from './knowledge-document.service';
 
 @Controller()
@@ -54,7 +54,7 @@ export class KnowledgeDocumentController {
 
   @Post('knowledge-bases/:id/documents/files')
   @HttpCode(202)
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_DOCUMENT_BYTES } }))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_PDF_DOCUMENT_BYTES } }))
   async createFile(@Req() request: Request, @Param('id') id: string, @Body() body: { workspaceId?: string; title?: string }, @UploadedFile() file?: { originalname: string; buffer: Buffer; size: number }) {
     if (typeof body.workspaceId !== 'string' || (body.title !== undefined && typeof body.title !== 'string')) {
       throw new BadRequestException('上传字段格式无效');

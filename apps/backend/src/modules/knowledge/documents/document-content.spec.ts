@@ -1,6 +1,17 @@
-import { decodeUploadFilename, DocumentContentError, extractDocumentText, readDocumentTextPage, sourceTypeFromFilename } from './document-content';
+import { decodeUploadFilename, DocumentContentError, extractDocumentText, MAX_DOCUMENT_BYTES, readDocumentTextPage, sourceTypeFromFilename } from './document-content';
 
 describe('document content extraction', () => {
+  it.each(['TXT', 'JSON'] as const)('enforces the 1 MiB %s extraction boundary', (sourceType) => {
+    const jsonWrapper = '{"value":""}';
+    const bytes = sourceType === 'TXT'
+      ? Buffer.alloc(MAX_DOCUMENT_BYTES, 0x61)
+      : Buffer.from('{"value":"' + 'a'.repeat(MAX_DOCUMENT_BYTES - jsonWrapper.length) + '"}');
+    expect(bytes.byteLength).toBe(MAX_DOCUMENT_BYTES);
+    expect(extractDocumentText(sourceType, bytes).length).toBeGreaterThan(0);
+    expect(() => extractDocumentText(sourceType, Buffer.concat([bytes, Buffer.from('a')]))).toThrow(
+      new DocumentContentError('FILE_TOO_LARGE', '资料不能超过 1 MB'),
+    );
+  });
   it('keeps nested JSON field paths and array order', () => {
     const bytes = Buffer.from(JSON.stringify({ policy: { meal: 80 }, items: ['发票', '审批单'] }));
     expect(extractDocumentText('JSON', bytes)).toBe('policy.meal: 80\nitems[0]: 发票\nitems[1]: 审批单');
@@ -23,8 +34,10 @@ describe('document content extraction', () => {
   });
 
   it('accepts supported extensions without trusting unrelated file types', () => {
+    expect(sourceTypeFromFilename('rules.txt')).toBe('TXT');
     expect(sourceTypeFromFilename('rules.JSON')).toBe('JSON');
-    expect(() => sourceTypeFromFilename('rules.pdf')).toThrow(DocumentContentError);
+    expect(sourceTypeFromFilename('rules.PDF')).toBe('PDF');
+    expect(() => sourceTypeFromFilename('rules.png')).toThrow(DocumentContentError);
   });
 
   it('recovers a UTF-8 Chinese upload filename read as Latin-1', () => {

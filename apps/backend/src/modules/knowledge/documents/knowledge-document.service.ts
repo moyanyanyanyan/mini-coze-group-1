@@ -4,8 +4,9 @@ import { randomUUID } from 'node:crypto';
 import { basename, extname } from 'node:path';
 import { PrismaService } from '../../../database/prisma.service';
 import { EmbeddingClient, EMBEDDING_DIMENSION, EmbeddingUnavailableError } from '../../../integrations/embedding.client';
-import { decodeUploadFilename, DocumentContentError, extractDocumentText, MAX_DOCUMENT_BYTES, readDocumentTextPage, sourceTypeFromFilename } from './document-content';
+import { decodeUploadFilename, DocumentContentError, extractDocumentText, MAX_DOCUMENT_BYTES, MAX_PDF_DOCUMENT_BYTES, readDocumentTextPage, sourceTypeFromFilename } from './document-content';
 import { chunkDocument } from './chunk-document';
+import { extractPdfDocumentText } from './pdf-document-content';
 import { CreateTextDocumentDto } from '../dto/create-text-document.dto';
 
 interface UploadedDocumentFile {
@@ -43,15 +44,19 @@ export class KnowledgeDocumentService implements OnModuleInit {
 
   async createFile(knowledgeBaseId: string, workspaceId: string, title: string | undefined, file: UploadedDocumentFile | undefined) {
     await this.assertKnowledgeBase(knowledgeBaseId, workspaceId);
-    if (!file) throw new BadRequestException('请选择 TXT 或 JSON 文件');
+    if (!file) throw new BadRequestException('请选择 TXT、JSON 或 PDF 文件');
     const filename = decodeUploadFilename(file.originalname);
-    let sourceType: 'TXT' | 'JSON';
+    let sourceType: 'TXT' | 'JSON' | 'PDF';
     try {
       sourceType = sourceTypeFromFilename(filename);
     } catch (error) {
       throw new BadRequestException(error instanceof Error ? error.message : '文件类型不支持');
     }
-    if (file.size > MAX_DOCUMENT_BYTES) throw new BadRequestException('文件不能超过 1 MB');
+    if (sourceType === 'PDF') {
+      if (file.size > MAX_PDF_DOCUMENT_BYTES) throw new BadRequestException('PDF 文件不能超过 10 MiB');
+    } else if (file.size > MAX_DOCUMENT_BYTES) {
+      throw new BadRequestException('TXT 和 JSON 文件不能超过 1 MiB');
+    }
     const documentTitle = (title?.trim() || basename(filename, extname(filename))).trim();
     if (!documentTitle || documentTitle.length > 100) throw new BadRequestException('文档标题长度必须为 1～100 字符');
 
@@ -133,7 +138,10 @@ export class KnowledgeDocumentService implements OnModuleInit {
     try {
       const document = await this.prisma.knowledgeDocument.findUniqueOrThrow({ where: { id } });
       await this.prisma.knowledgeDocument.update({ where: { id }, data: { stage: 'EXTRACTING' } });
-      const text = extractDocumentText(document.sourceType, document.sourceBytes ?? new Uint8Array());
+      const bytes = document.sourceBytes ?? new Uint8Array();
+      const text = document.sourceType === 'PDF'
+        ? await extractPdfDocumentText(bytes)
+        : extractDocumentText(document.sourceType, bytes);
       await this.prisma.knowledgeDocument.update({ where: { id }, data: { rawText: text, stage: 'CHUNKING' } });
       const chunks = chunkDocument(text);
       if (chunks.length === 0) throw new DocumentContentError('EMPTY_CONTENT', '资料无法生成可检索片段');

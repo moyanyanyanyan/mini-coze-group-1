@@ -39,6 +39,27 @@ function props(): KnowledgeViewProps {
 }
 
 describe('knowledge view', () => {
+  it('offers PDF upload and displays its extracted text through the existing drawer', () => {
+    const input = props();
+    input.documentState.addingDocument = true;
+    input.documentState.sourceMode = 'file';
+    input.documentState.documentDrawerOpen = true;
+    input.documentState.documents = [{ ...document, sourceType: 'PDF' }];
+    input.documentState.selectedDocument = input.documentState.documents[0];
+    input.documentContentState.content = 'Extracted PDF text';
+    const html = renderToStaticMarkup(<KnowledgeView {...input} />);
+    expect(html).toContain('accept=".txt,.json,.pdf"');
+    expect(html).toContain('PDF 最多 10 MiB');
+    expect(html).toContain('<td>PDF</td>');
+    expect(html).toContain('Extracted PDF text');
+  });
+
+  it('shows a useful message for an unreadable PDF', () => {
+    const input = props();
+    input.documentState.documents = [{ ...document, sourceType: 'PDF', status: 'FAILED', error: { message: 'PDF 文件无法解析' } }];
+    const html = renderToStaticMarkup(<KnowledgeView {...input} />);
+    expect(html).toContain('PDF 文件无法解析，请检查文件后重试。');
+  });
   it('renders disabled libraries without document, chunk or search controls', () => {
     const input = props();
     input.catalog.selectedBaseStatus = 'DISABLED';

@@ -100,7 +100,7 @@ export function KnowledgeView({
                     {sourceMode === 'text' ? (
                       <><label htmlFor="document-text">正文</label><textarea id="document-text" value={documentText} onChange={(event) => onDocumentTextChange(event.target.value)} rows={8} required placeholder="在此粘贴资料正文" /></>
                     ) : (
-                      <><label htmlFor="document-file">TXT / JSON 文件，最多 1 MB</label><input id="document-file" ref={fileInputRef} type="file" accept=".txt,.json" onChange={(event) => onDocumentFileChange(event.target.files?.[0] ?? null)} required /></>
+                      <><label htmlFor="document-file">TXT / JSON 最多 1 MiB；PDF 最多 10 MiB</label><input id="document-file" ref={fileInputRef} type="file" accept=".txt,.json,.pdf" onChange={(event) => onDocumentFileChange(event.target.files?.[0] ?? null)} required /></>
                     )}
                     <button type="submit" disabled={documentSaving}>{documentSaving ? '提交中…' : '提交资料'}</button>
                   </form>
@@ -161,6 +161,7 @@ export function KnowledgeView({
 
 function friendlyDocumentError(message?: string | null): string {
   if (!message) return '处理失败，请检查资料格式后重试。';
+  if (/PDF.*无法解析/i.test(message)) return 'PDF 文件无法解析，请检查文件后重试。';
   if (/utf|编码|encoding/i.test(message)) return '文件编码无法识别，请转换为 UTF-8 后重试。';
   if (/empty|空|content/i.test(message)) return '资料内容为空，请补充内容后重试。';
   if (/size|大小|limit/i.test(message)) return '资料大小超过限制，请压缩后重试。';
