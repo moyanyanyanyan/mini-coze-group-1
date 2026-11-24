@@ -1,0 +1,2 @@
+# PDFs are test fixtures and must be stored byte-for-byte.
+*.pdf binary

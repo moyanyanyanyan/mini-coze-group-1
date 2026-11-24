@@ -13,7 +13,7 @@ describe('KnowledgeDocumentService.content', () => {
         }),
       },
     };
-    const service = new KnowledgeDocumentService(prisma as never, {} as never);
+  const service = new KnowledgeDocumentService(prisma as never, {} as never, {} as never);
 
     await expect(service.content('doc-1', 'ws-1')).resolves.toEqual({ documentId: 'doc-1', content: '第一段\n第二段' });
     expect(prisma.knowledgeDocument.findUnique).toHaveBeenCalledWith({
@@ -24,14 +24,14 @@ describe('KnowledgeDocumentService.content', () => {
 
   it('rejects documents outside the requested workspace', async () => {
     const prisma = { knowledgeDocument: { findUnique: jest.fn().mockResolvedValue({ id: 'doc-1', rawText: 'secret', knowledgeBase: { workspaceId: 'other' } }) } };
-    const service = new KnowledgeDocumentService(prisma as never, {} as never);
+  const service = new KnowledgeDocumentService(prisma as never, {} as never, {} as never);
 
     await expect(service.content('doc-1', 'ws-1')).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('returns an empty string when processing has not saved rawText yet', async () => {
     const prisma = { knowledgeDocument: { findUnique: jest.fn().mockResolvedValue({ id: 'doc-1', rawText: null, knowledgeBase: { workspaceId: 'ws-1' } }) } };
-    const service = new KnowledgeDocumentService(prisma as never, {} as never);
+  const service = new KnowledgeDocumentService(prisma as never, {} as never, {} as never);
 
     await expect(service.content('doc-1', 'ws-1')).resolves.toEqual({ documentId: 'doc-1', content: '' });
   });

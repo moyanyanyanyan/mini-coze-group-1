@@ -1,12 +1,13 @@
-import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, OnModuleInit, PayloadTooLargeException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { basename, extname } from 'node:path';
 import { PrismaService } from '../../../database/prisma.service';
 import { EmbeddingClient, EMBEDDING_DIMENSION, EmbeddingUnavailableError } from '../../../integrations/embedding.client';
-import { decodeUploadFilename, DocumentContentError, extractDocumentText, MAX_DOCUMENT_BYTES, MAX_PDF_DOCUMENT_BYTES, readDocumentTextPage, sourceTypeFromFilename } from './document-content';
+import { OcrWorkerClient, OcrWorkerError } from '../../../integrations/ocr-worker.client';
+import { decodeUploadFilename, DocumentContentError, extractDocumentText, MAX_DOCUMENT_BYTES, pdfMaxBytes, readDocumentTextPage, sourceTypeFromFilename } from './document-content';
 import { chunkDocument } from './chunk-document';
-import { extractPdfDocumentText } from './pdf-document-content';
+import { extractHybridPdfDocumentText } from './pdf-hybrid-document-content';
 import { CreateTextDocumentDto } from '../dto/create-text-document.dto';
 
 interface UploadedDocumentFile {
@@ -20,7 +21,7 @@ export class KnowledgeDocumentService implements OnModuleInit {
   private readonly logger = new Logger(KnowledgeDocumentService.name);
   private readonly running = new Set<string>();
 
-  constructor(private readonly prisma: PrismaService, private readonly embedding: EmbeddingClient) {}
+  constructor(private readonly prisma: PrismaService, private readonly embedding: EmbeddingClient, private readonly ocr: OcrWorkerClient) {}
 
   onModuleInit() {
     void this.prisma.knowledgeDocument.findMany({ where: { status: 'PROCESSING' }, select: { id: true } })
@@ -53,7 +54,7 @@ export class KnowledgeDocumentService implements OnModuleInit {
       throw new BadRequestException(error instanceof Error ? error.message : '文件类型不支持');
     }
     if (sourceType === 'PDF') {
-      if (file.size > MAX_PDF_DOCUMENT_BYTES) throw new BadRequestException('PDF 文件不能超过 10 MiB');
+      if (file.size > pdfMaxBytes()) throw new PayloadTooLargeException('PDF 文件超过上传大小限制');
     } else if (file.size > MAX_DOCUMENT_BYTES) {
       throw new BadRequestException('TXT 和 JSON 文件不能超过 1 MiB');
     }
@@ -140,7 +141,7 @@ export class KnowledgeDocumentService implements OnModuleInit {
       await this.prisma.knowledgeDocument.update({ where: { id }, data: { stage: 'EXTRACTING' } });
       const bytes = document.sourceBytes ?? new Uint8Array();
       const text = document.sourceType === 'PDF'
-        ? await extractPdfDocumentText(bytes)
+        ? (await extractHybridPdfDocumentText(bytes, document.originalFileName ?? 'document.pdf', this.ocr)).rawText
         : extractDocumentText(document.sourceType, bytes);
       await this.prisma.knowledgeDocument.update({ where: { id }, data: { rawText: text, stage: 'CHUNKING' } });
       const chunks = chunkDocument(text);
@@ -170,8 +171,10 @@ export class KnowledgeDocumentService implements OnModuleInit {
       }, { timeout: 120_000 });
     } catch (error) {
       const code = error instanceof DocumentContentError ? error.code
+        : error instanceof OcrWorkerError ? `OCR_${error.code}`
         : error instanceof EmbeddingUnavailableError ? 'EMBEDDING_UNAVAILABLE' : 'PROCESSING_FAILED';
       const message = error instanceof DocumentContentError ? error.message
+        : error instanceof OcrWorkerError ? error.message
         : error instanceof EmbeddingUnavailableError ? error.message : '文档处理失败，请稍后重试';
       this.logger.error(`文档 ${id} 处理失败：${code}`, error);
       await this.prisma.knowledgeDocument.update({ where: { id }, data: { status: 'FAILED', stage: 'FAILED', errorCode: code, errorMessage: message } });

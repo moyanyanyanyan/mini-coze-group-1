@@ -1,7 +1,7 @@
 import { extname } from 'node:path';
+export { MAX_PDF_DOCUMENT_BYTES, pdfMaxBytes } from '../../../config/upload-limits';
 
 export const MAX_DOCUMENT_BYTES = 1024 * 1024;
-export const MAX_PDF_DOCUMENT_BYTES = 10 * 1024 * 1024;
 
 export class DocumentContentError extends Error {
   constructor(public readonly code: string, message: string) {

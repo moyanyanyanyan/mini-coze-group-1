@@ -7,6 +7,14 @@ const required = {
 };
 
 describe('validateEnvironment', () => {
+  it('defaults PDF_MAX_BYTES to 64 MiB and accepts a positive byte override', () => {
+    expect(validateEnvironment(required)).toMatchObject({ PDF_MAX_BYTES: 64 * 1024 * 1024 });
+    expect(validateEnvironment({ ...required, PDF_MAX_BYTES: '33554432' })).toMatchObject({ PDF_MAX_BYTES: 33554432 });
+  });
+
+  it.each(['0', '-1', '1.5', 'invalid'])('rejects an invalid PDF byte limit: %s', (value) => {
+    expect(() => validateEnvironment({ ...required, PDF_MAX_BYTES: value })).toThrow();
+  });
   it('preserves model, internal authentication and OAuth configuration together', () => {
     const config = {
       ...required,
