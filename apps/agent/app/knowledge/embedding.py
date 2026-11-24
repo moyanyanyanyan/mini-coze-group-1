@@ -1,12 +1,14 @@
+import threading
 from functools import lru_cache
 
 from app.config import get_settings
 
 EMBEDDING_DIMENSION = 512
+_load_lock = threading.Lock()
 
 
 @lru_cache(maxsize=1)
-def load_model():
+def _create_model():
     from huggingface_hub import snapshot_download
     from huggingface_hub.errors import LocalEntryNotFoundError
     from sentence_transformers import SentenceTransformer
@@ -26,6 +28,11 @@ def load_model():
     if model.get_sentence_embedding_dimension() != EMBEDDING_DIMENSION:
         raise ValueError("Embedding model dimension must be 512")
     return model
+
+
+def load_model():
+    with _load_lock:
+        return _create_model()
 
 
 def embed_texts(texts: list[str]) -> dict:

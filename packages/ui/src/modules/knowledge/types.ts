@@ -7,10 +7,39 @@ export interface KnowledgeBaseItem {
   status: 'ACTIVE' | 'DISABLED';
 }
 
+export type KnowledgeDocumentSourceType =
+  | 'TEXT'
+  | 'TXT'
+  | 'JSON'
+  | 'MD'
+  | 'HTML'
+  | 'CSV'
+  | 'XLSX'
+  | 'DOCX'
+  | 'PPTX'
+  | 'PDF'
+  | 'IMAGE';
+
+export const KNOWLEDGE_FILE_ACCEPT = '.txt,.json,.md,.html,.htm,.csv,.xlsx,.docx,.pptx,.pdf,.png,.jpg,.jpeg,.webp';
+
+export const KNOWLEDGE_SOURCE_TYPE_LABELS: Record<KnowledgeDocumentSourceType, string> = {
+  TEXT: '文本',
+  TXT: 'TXT',
+  JSON: 'JSON',
+  MD: 'Markdown',
+  HTML: 'HTML',
+  CSV: 'CSV',
+  XLSX: 'Excel',
+  DOCX: 'Word',
+  PPTX: 'PowerPoint',
+  PDF: 'PDF',
+  IMAGE: '图片',
+};
+
 export interface KnowledgeDocumentItem {
   id: string;
   title: string;
-  sourceType: 'TEXT' | 'TXT' | 'JSON';
+  sourceType: KnowledgeDocumentSourceType;
   status: 'PROCESSING' | 'READY' | 'FAILED';
   stage: string;
   chunkCount: number;

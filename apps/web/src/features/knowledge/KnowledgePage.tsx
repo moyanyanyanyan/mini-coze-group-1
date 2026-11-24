@@ -150,7 +150,7 @@ export function KnowledgePage() {
       if (sourceMode === 'text') {
         await createTextDocument(selectedId, { workspaceId: workspaceId, title: documentTitle.trim(), text: documentText });
       } else {
-        if (!documentFile) throw new Error('请选择 TXT 或 JSON 文件');
+        if (!documentFile) throw new Error('请选择文件');
         await uploadDocumentFile(selectedId, { workspaceId: workspaceId, title: documentTitle, file: documentFile });
       }
       setDocuments(await listKnowledgeDocuments(selectedId, workspaceId));

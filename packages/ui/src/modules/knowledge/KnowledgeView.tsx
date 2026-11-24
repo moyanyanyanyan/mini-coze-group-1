@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { ActionMenu } from '../../components/ActionMenu';
-import type { KnowledgeViewProps } from './types';
+import { KNOWLEDGE_FILE_ACCEPT, KNOWLEDGE_SOURCE_TYPE_LABELS, type KnowledgeViewProps } from './types';
 import './knowledge.css';
 
 export function KnowledgeView({
@@ -93,7 +93,7 @@ export function KnowledgeView({
                     {sourceMode === 'text' ? (
                       <><label htmlFor="document-text">正文</label><textarea id="document-text" value={documentText} onChange={(event) => onDocumentTextChange(event.target.value)} rows={8} required placeholder="在此粘贴资料正文" /></>
                     ) : (
-                      <><label htmlFor="document-file">TXT / JSON 文件，最多 1 MB</label><input id="document-file" ref={fileInputRef} type="file" accept=".txt,.json" onChange={(event) => onDocumentFileChange(event.target.files?.[0] ?? null)} required /></>
+                      <><label htmlFor="document-file">支持 PDF、Word、Excel、PPT、Markdown、HTML、CSV 与图片，单文件最大 20 MB</label><input id="document-file" ref={fileInputRef} type="file" accept={KNOWLEDGE_FILE_ACCEPT} onChange={(event) => onDocumentFileChange(event.target.files?.[0] ?? null)} required /></>
                     )}
                     <button type="submit" disabled={documentSaving}>{documentSaving ? '提交中…' : '提交资料'}</button>
                   </form>
@@ -103,7 +103,7 @@ export function KnowledgeView({
                   ) : <ul>{documents.map((document) => (
                     <li key={document.id}>
                       <div><strong>{document.title}</strong><span className={`knowledge-document-status status-${document.status.toLowerCase()}`}>{document.status === 'PROCESSING' ? '处理中' : document.status === 'READY' ? '可检索' : '处理失败'}</span></div>
-                      <p>{document.sourceType} · {document.status === 'PROCESSING' ? document.stage : `片段数 ${document.chunkCount}`}</p>
+                      <p>{KNOWLEDGE_SOURCE_TYPE_LABELS[document.sourceType]} · {document.status === 'PROCESSING' ? document.stage : `片段数 ${document.chunkCount}`}</p>
                       {document.error && <p className="knowledge-document-error">{document.error.message}</p>}
                       {document.status === 'READY' && <button className="knowledge-retry" type="button" onClick={() => { onViewDocumentChunks(document.id); }}>查看切片</button>}
                       {document.status === 'FAILED' && <button className="knowledge-retry" type="button" onClick={() => void handleRetry(document.id)}>重新处理</button>}

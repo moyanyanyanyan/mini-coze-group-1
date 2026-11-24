@@ -35,7 +35,7 @@ describe('Knowledge deletion', () => {
         deleteMany: jest.fn(),
       },
     };
-    const service = new KnowledgeDocumentService(prisma as never, {} as never);
+    const service = new KnowledgeDocumentService(prisma as never, {} as never, {} as never);
     await expect(service.remove('doc-1', 'ws-local-demo')).rejects.toBeInstanceOf(ConflictException);
     expect(prisma.knowledgeDocument.deleteMany).not.toHaveBeenCalled();
   });

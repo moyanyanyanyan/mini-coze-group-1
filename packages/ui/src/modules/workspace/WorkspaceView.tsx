@@ -33,7 +33,7 @@ export function WorkspaceView({ recent, error, onRetry, createRoutes, LinkCompon
           : recent.length === 0 ? <>
             <h2>用自己的文档做一个问答助手</h2>
             <ol>
-              <li>创建知识库，上传 TXT 或 JSON 文档，等状态变为「可检索」。</li>
+              <li>创建知识库，上传文档、表格、演示或图片，等状态变为「可检索」。</li>
               <li>创建智能体，在知识库设置里绑定并启用这份知识库。</li>
               <li>回到工作台，点击智能体旁的「去对话」，问一个文档里有答案的问题。</li>
             </ol>

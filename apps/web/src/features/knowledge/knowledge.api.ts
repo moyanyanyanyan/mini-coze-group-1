@@ -1,3 +1,5 @@
+import type { KnowledgeDocumentSourceType } from '@minicoze/ui/knowledge';
+
 export interface KnowledgeBase {
   id: string;
   workspaceId: string;
@@ -12,7 +14,7 @@ export interface KnowledgeDocument {
   id: string;
   knowledgeBaseId: string;
   title: string;
-  sourceType: 'TEXT' | 'TXT' | 'JSON';
+  sourceType: KnowledgeDocumentSourceType;
   originalFileName: string | null;
   status: 'PROCESSING' | 'READY' | 'FAILED';
   stage: 'VALIDATING' | 'EXTRACTING' | 'CHUNKING' | 'EMBEDDING' | 'PERSISTING' | 'COMPLETED' | 'FAILED';

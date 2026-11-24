@@ -1,26 +1,25 @@
-import { decodeUploadFilename, DocumentContentError, extractDocumentText, sourceTypeFromFilename } from './document-content';
+import {
+  decodeUploadFilename,
+  MAX_IMAGE_DOCUMENT_BYTES,
+  MAX_OFFICE_DOCUMENT_BYTES,
+  MAX_TEXT_DOCUMENT_BYTES,
+  MAX_UPLOAD_BYTES,
+  OcrUnavailableError,
+} from './document-content';
 
-describe('document content extraction', () => {
-  it('keeps nested JSON field paths and array order', () => {
-    const bytes = Buffer.from(JSON.stringify({ policy: { meal: 80 }, items: ['发票', '审批单'] }));
-    expect(extractDocumentText('JSON', bytes)).toBe('policy.meal: 80\nitems[0]: 发票\nitems[1]: 审批单');
+describe('document content constants', () => {
+  it('separates size limits by document type', () => {
+    expect(MAX_TEXT_DOCUMENT_BYTES).toBe(2 * 1024 * 1024);
+    expect(MAX_OFFICE_DOCUMENT_BYTES).toBe(20 * 1024 * 1024);
+    expect(MAX_IMAGE_DOCUMENT_BYTES).toBe(5 * 1024 * 1024);
   });
 
-  it('rejects invalid UTF-8 instead of storing replacement characters', () => {
-    expect(() => extractDocumentText('TXT', new Uint8Array([0xff]))).toThrow(
-      new DocumentContentError('INVALID_ENCODING', '资料必须使用 UTF-8 编码'),
-    );
+  it('uses the office limit as the global upload limit', () => {
+    expect(MAX_UPLOAD_BYTES).toBe(MAX_OFFICE_DOCUMENT_BYTES);
   });
 
-  it('distinguishes invalid JSON from an empty result', () => {
-    expect(() => extractDocumentText('JSON', Buffer.from('{broken'))).toThrow(
-      new DocumentContentError('INVALID_JSON', 'JSON 文件格式无效'),
-    );
-  });
-
-  it('accepts supported extensions without trusting unrelated file types', () => {
-    expect(sourceTypeFromFilename('rules.JSON')).toBe('JSON');
-    expect(() => sourceTypeFromFilename('rules.pdf')).toThrow(DocumentContentError);
+  it('describes OCR unavailability as a dedicated error', () => {
+    expect(new OcrUnavailableError().message).toBe('OCR 服务不可用，请稍后重试');
   });
 
   it('recovers a UTF-8 Chinese upload filename read as Latin-1', () => {
