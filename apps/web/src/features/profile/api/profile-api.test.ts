@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../shared/api/http';
-import { changePassword, getProfile, saveDisplayName, uploadAvatar } from './profile-api';
+import { changePassword, getProfile, saveDisplayName, saveGlobalPrompt, uploadAvatar } from './profile-api';
 
 function envelope(status: number, data: unknown) {
   return new Response(JSON.stringify({ code: status, message: 'ok', data }), {
@@ -73,6 +73,25 @@ describe('profile API', () => {
     await changePassword({ currentPassword: '12345678', newPassword: 'newpass888' });
     const init = fetchMock.mock.calls[0][1] as RequestInit;
     expect(init.body).toBe(JSON.stringify({ currentPassword: '12345678', newPassword: 'newpass888' }));
+  });
+
+  it('saves the global prompt and returns the updated profile', async () => {
+    const fetchMock = stubFetch(() => envelope(200, {
+      id: 'user-1',
+      email: 'u@test.com',
+      displayName: '昵称',
+      avatarUrl: null,
+      googleLinked: false,
+      hasPassword: true,
+      globalPrompt: '我是初学者',
+    }));
+
+    const updated = await saveGlobalPrompt('我是初学者');
+    expect(updated.globalPrompt).toBe('我是初学者');
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(init.method).toBe('PATCH');
+    expect(init.body).toBe(JSON.stringify({ globalPrompt: '我是初学者' }));
   });
 
   it('uploads the avatar as multipart FormData', async () => {

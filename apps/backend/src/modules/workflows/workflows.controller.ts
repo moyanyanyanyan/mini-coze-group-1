@@ -9,6 +9,7 @@ import {
   Post,
   Put,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import {
   CreateWorkflowDto,
@@ -20,6 +21,9 @@ import {
   ValidateWorkflowDto,
 } from './workflows.dto';
 import { WorkflowsService } from './workflows.service';
+import { AuthGuard } from '@nestjs/passport';
+import type { CurrentUser as CurrentUserPayload } from '@minicoze/shared';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @Controller('workflows')
 export class WorkflowsController {
@@ -115,8 +119,13 @@ export class WorkflowsController {
    */
   @Post(':id/run')
   @HttpCode(200)
-  run(@Param('id') id: string, @Body() dto: RunWorkflowDto) {
-    return this.service.run(id, dto.input);
+  @UseGuards(AuthGuard('jwt'))
+  run(
+    @Param('id') id: string,
+    @Body() dto: RunWorkflowDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.service.run(id, dto.input, user.id);
   }
 
   /**

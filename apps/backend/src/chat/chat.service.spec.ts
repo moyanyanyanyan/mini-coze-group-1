@@ -21,6 +21,7 @@ it('passes the selected Agent configuration to Runtime and saves before completi
       conversation: { update: jest.fn().mockResolvedValue({}) },
     }),
     message: { findMany: jest.fn().mockResolvedValue([]), update },
+    user: { findUnique: jest.fn().mockResolvedValue({ globalPrompt: '我是初学者，请用简单语言' }) },
   } as unknown as PrismaService;
   const conversations = {
     assertOwned: jest.fn().mockResolvedValue({ agentId: config.id }),
@@ -71,6 +72,8 @@ it('passes the selected Agent configuration to Runtime and saves before completi
   expect(runtimeRequest?.agentConfig).toEqual(config);
   expect(runtimeRequest?.message).toBe('餐费多少？');
   expect(runtimeRequest?.history).toEqual([]);
+  expect(runtimeRequest?.actor).toEqual({ id: 'actor-1' });
+  expect(runtimeRequest?.globalPrompt).toBe('我是初学者，请用简单语言');
   expect(update).toHaveBeenCalledWith({
     where: { id: assistantMessage.id }, data: { content: '40 元', status: 'completed' },
   });

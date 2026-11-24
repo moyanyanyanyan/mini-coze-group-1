@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { logout } from '../auth/api/auth-api';
 import { ApiError } from '../../shared/api/http';
-import { getProfile, saveDisplayName, uploadAvatar, AVATAR_MIME_TYPES, MAX_AVATAR_BYTES } from './api/profile-api';
+import { getProfile, saveDisplayName, saveGlobalPrompt, uploadAvatar, AVATAR_MIME_TYPES, MAX_AVATAR_BYTES } from './api/profile-api';
 import { AccountSecurity } from './AccountSecurity';
 import type { ProfileUser } from './api/profile-api';
 import { navigate } from '../../shared/routing/navigation';
 import { setCurrentUser } from '../../shared/user/current-user';
 import './profile.css';
 
-type ProfileSection = 'profile' | 'security' | 'account';
+type ProfileSection = 'profile' | 'personalization' | 'security' | 'account';
 
 interface Feedback {
   type: 'ok' | 'error';
@@ -21,6 +21,7 @@ const profileSections: Array<{
   description: string;
 }> = [
   { id: 'profile', label: '个人资料', description: '头像与公开资料' },
+  { id: 'personalization', label: '个性化', description: '全局 Prompt 偏好' },
   { id: 'security', label: '账号安全', description: '密码与登录方式' },
   { id: 'account', label: '账户信息', description: '账号标识与时间' },
 ];
@@ -37,10 +38,14 @@ export function ProfilePage() {
   const [nameFeedback, setNameFeedback] = useState<Feedback | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarFeedback, setAvatarFeedback] = useState<Feedback | null>(null);
+  const [globalPrompt, setGlobalPrompt] = useState('');
+  const [savingPrompt, setSavingPrompt] = useState(false);
+  const [promptFeedback, setPromptFeedback] = useState<Feedback | null>(null);
 
   const applyUser = (profile: ProfileUser) => {
     setUser(profile);
     setDisplayName(profile.displayName);
+    setGlobalPrompt(profile.globalPrompt ?? '');
     setCurrentUser(profile);
   };
 
@@ -121,6 +126,24 @@ export function ProfilePage() {
     }
   };
 
+  const persistPrompt = async (value: string, successText: string) => {
+    if (!user || savingPrompt) return;
+    setSavingPrompt(true);
+    setPromptFeedback(null);
+    try {
+      const updated = await saveGlobalPrompt(value);
+      setUser(updated);
+      setCurrentUser(updated);
+      setGlobalPrompt(updated.globalPrompt ?? '');
+      setPromptFeedback({ type: 'ok', text: successText });
+    } catch (cause) {
+      // 失败时保留当前输入，避免用户内容丢失
+      setPromptFeedback({ type: 'error', text: errorText(cause, '保存失败，请稍后再试') });
+    } finally {
+      setSavingPrompt(false);
+    }
+  };
+
   const refreshProfile = () => {
     getProfile()
       .then(applyUser)
@@ -193,7 +216,20 @@ export function ProfilePage() {
                   onCopyUserId={() => void copyUserId()}
                 />
               )}
-              {activeSection === 'security' && (
+              {activeSection === 'personalization' && (
+                <PersonalizationSection
+                  prompt={globalPrompt}
+                  saving={savingPrompt}
+                  dirty={globalPrompt !== (user.globalPrompt ?? '')}
+                  feedback={promptFeedback}
+                  onChange={(value) => {
+                    setGlobalPrompt(value);
+                    setPromptFeedback(null);
+                  }}
+                  onSave={() => void persistPrompt(globalPrompt, '全局 Prompt 已保存')}
+                  onClear={() => void persistPrompt('', '全局 Prompt 已清空')}
+                />
+              )}              {activeSection === 'security' && (
                 <AccountSecurity
                   user={user}
                   loggingOut={loggingOut}
@@ -332,6 +368,75 @@ function ProfileDetails({
           ) : (
             <span>昵称长度 1–20 字。</span>
           )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const PROMPT_MAX_LENGTH = 4000;
+
+function PersonalizationSection({
+  prompt,
+  saving,
+  dirty,
+  feedback,
+  onChange,
+  onSave,
+  onClear,
+}: {
+  prompt: string;
+  saving: boolean;
+  dirty: boolean;
+  feedback: Feedback | null;
+  onChange: (value: string) => void;
+  onSave: () => void;
+  onClear: () => void;
+}) {
+  return (
+    <section className="profile-section" aria-labelledby="profile-personalization-title">
+      <div className="profile-section-heading">
+        <div>
+          <p>PERSONALIZATION</p>
+          <h2 id="profile-personalization-title">个性化</h2>
+        </div>
+      </div>
+
+      <div className="profile-security-card profile-security-card--stack">
+        <div>
+          <strong>全局 Prompt</strong>
+          <p>
+            全局 Prompt 是你对 AI 助手的长期偏好设置。保存后会在每次运行 Agent 时自动生效，
+            不会替代 Agent 自身的人设指令。
+          </p>
+        </div>
+        <label className="profile-prompt-field">
+          <span>你的偏好</span>
+          <textarea
+            className="profile-prompt-input"
+            rows={7}
+            maxLength={PROMPT_MAX_LENGTH}
+            placeholder="例如：我是初学者，请用简单易懂的语言回答。"
+            value={prompt}
+            disabled={saving}
+            onChange={(event) => onChange(event.target.value)}
+          />
+        </label>
+        <div className="profile-form-actions">
+          <button type="button" onClick={onSave} disabled={saving || !dirty}>
+            {saving ? '保存中…' : '保存'}
+          </button>
+          <button type="button" className="profile-prompt-clear" onClick={onClear} disabled={saving || !prompt}>
+            清空
+          </button>
+          <span className="profile-prompt-count">
+            {prompt.length} / {PROMPT_MAX_LENGTH}
+          </span>
+          {feedback ? (
+            <span className={`profile-form-message profile-form-message--${feedback.type}`} role="status">
+              {feedback.text}
+            </span>
+          ) : null}
         </div>
       </div>
     </section>

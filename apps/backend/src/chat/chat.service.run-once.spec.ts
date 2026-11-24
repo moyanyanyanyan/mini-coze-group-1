@@ -80,6 +80,7 @@ function createHarness() {
       findMany: messageFindMany,
       update: messageUpdate,
     },
+    user: { findUnique: jest.fn().mockResolvedValue({ globalPrompt: null }) },
   } as unknown as PrismaService;
   const conversations = {
     assertOwned: jest.fn().mockResolvedValue({
@@ -98,6 +99,7 @@ function createHarness() {
 
   return {
     service,
+    prisma,
     runtime,
     create,
     conversationUpdate,
@@ -214,5 +216,35 @@ describe('ChatService.runOnce', () => {
       agentConfig,
     })).rejects.toBeInstanceOf(ForbiddenException);
     expect(harness.runtime.run).not.toHaveBeenCalled();
+  });
+
+  it('skips the user global prompt when explicitly disabled (public API)', async () => {
+    const harness = createHarness();
+    let requestBody: RuntimeRequestBody | undefined;
+    harness.runtime.run.mockImplementation(async (request: RuntimeRequestBody): Promise<RuntimeResult> => {
+      requestBody = request;
+      return {
+        runId: request.runId,
+        conversationId: request.conversationId,
+        assistantMessageId: request.assistantMessageId,
+        status: 'completed',
+        content: '回答',
+        finishReason: 'stop',
+        citations: [],
+        toolResults: [],
+      };
+    });
+
+    await harness.service.runOnce({
+      conversationId: 'conversation-1',
+      userId: 'owner-1',
+      agentId: 'agent-public',
+      message: '当前问题',
+      agentConfig,
+      useGlobalPrompt: false,
+    });
+
+    expect(requestBody?.globalPrompt).toBeUndefined();
+    expect((harness.prisma as any).user.findUnique).not.toHaveBeenCalled();
   });
 });

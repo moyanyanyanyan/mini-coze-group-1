@@ -18,6 +18,7 @@ import {
   UpdateWorkflowDto,
 } from './workflows.dto';
 import { WorkflowsRepository } from './workflows.repository';
+import { UsersService } from '../users/users.service';
 
 const USER = 'workflow-dev-user';
 const WORKSPACE = 'workflow-dev-workspace';
@@ -47,6 +48,7 @@ export class WorkflowsService {
     private readonly repository: WorkflowsRepository,
     private readonly agent: WorkflowAgentClient,
     private readonly config: ConfigService,
+    private readonly users: UsersService,
   ) {}
 
   /**
@@ -244,8 +246,11 @@ export class WorkflowsService {
    * @throws ServiceUnavailableException 预校验阶段 Python 服务不可用（503）。
    * @remarks 创建记录后的执行故障转为 FAILED；数据库写入失败仍会向上传播。
    */
-  async run(id: string, input: Record<string, unknown>) {
+  async run(id: string, input: Record<string, unknown>, userId: string) {
     const row = await this.owned(id);
+    // 每轮只读一次，作为本轮所有 LLM 节点共用的快照
+    const user = await this.users.findById(userId);
+    const globalPrompt = user?.globalPrompt?.trim() || undefined;
     let validation;
     try {
       validation = await this.agent.validate(row.draftDefinition, input);
@@ -274,7 +279,10 @@ export class WorkflowsService {
     });
     let result: ExecutionResult;
     try {
-      result = await this.agent.run(row.draftDefinition, input);
+      result = await this.agent.run(row.draftDefinition, input, {
+        actorId: userId,
+        ...(globalPrompt ? { globalPrompt } : {}),
+      });
     } catch (error) {
       result = {
         status: 'FAILED',

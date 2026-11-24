@@ -11,6 +11,7 @@ interface Envelope<T> {
 export interface ProfileUser extends AuthUser {
   googleLinked: boolean;
   hasPassword: boolean;
+  globalPrompt: string | null;
 }
 
 export const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
@@ -31,6 +32,10 @@ export async function saveDisplayName(displayName: string): Promise<AuthUser> {
 
 export async function changePassword(input: ChangePasswordInput): Promise<void> {
   await patch<Envelope<null>>('/api/users/me/password', input);
+}
+
+export async function saveGlobalPrompt(globalPrompt: string): Promise<ProfileUser> {
+  return (await patch<Envelope<ProfileUser>>('/api/users/me', { globalPrompt })).data;
 }
 
 export async function uploadAvatar(file: File): Promise<AuthUser> {

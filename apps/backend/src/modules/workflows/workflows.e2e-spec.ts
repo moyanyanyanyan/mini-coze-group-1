@@ -6,6 +6,8 @@ import { HttpExceptionFilter } from '../../common/http-exception.filter';
 import { WorkflowsController } from './workflows.controller';
 import { WorkflowsService } from './workflows.service';
 import { WorkflowsRepository } from './workflows.repository';
+import { UsersService } from '../users/users.service';
+import { AuthGuard } from '@nestjs/passport';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -74,6 +76,14 @@ describe('Workflow HTTP contract', () => {
         { provide: WorkflowsRepository, useValue: repository },
         { provide: WorkflowAgentClient, useValue: agent },
         {
+          provide: UsersService,
+          useValue: {
+            findById: jest.fn().mockResolvedValue({
+              globalPrompt: '我是初学者，请用简单语言',
+            }),
+          },
+        },
+        {
           provide: ConfigService,
           useValue: {
             get: (key: string) =>
@@ -81,7 +91,15 @@ describe('Workflow HTTP contract', () => {
           },
         },
       ],
-    }).compile();
+    })
+      .overrideGuard(AuthGuard('jwt'))
+      .useValue({
+        canActivate: (context: { switchToHttp: () => { getRequest: () => { user?: unknown } } }) => {
+          context.switchToHttp().getRequest().user = { id: 'actor-9' };
+          return true;
+        },
+      })
+      .compile();
     app = module.createNestApplication();
     app.setGlobalPrefix('api');
     app.useGlobalPipes(
@@ -150,6 +168,11 @@ describe('Workflow HTTP contract', () => {
     });
     const result = await request('/wf/run', 'POST', { input: { query: 'hi' } });
     expect(result.status).toBe(200);
+    expect(agent.run).toHaveBeenCalledWith(
+      definition,
+      { query: 'hi' },
+      { actorId: 'actor-9', globalPrompt: '我是初学者，请用简单语言' },
+    );
     expect(result.body.runId).toBe('run');
     expect(
       (repository.startRun.mock.calls[0][0] as { definition: unknown })

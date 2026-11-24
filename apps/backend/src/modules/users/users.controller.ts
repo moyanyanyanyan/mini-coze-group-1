@@ -45,6 +45,48 @@ export class UsersController {
         message: "登录状态无效",
       });
     }
+    return this.toProfile(user);
+  }
+
+  @Patch("me")
+  async update(@CurrentUser() current: CurrentUserPayload, @Body() dto: UpdateProfileDto) {
+    if (dto.displayName === undefined && dto.globalPrompt === undefined) {
+      throw new BadRequestException("没有可更新的字段");
+    }
+
+    if (dto.displayName !== undefined) {
+      const displayName = dto.displayName.trim();
+      if (!displayName) {
+        throw new BadRequestException("昵称不能为空");
+      }
+      await this.users.updateDisplayName(current.id, displayName);
+    }
+
+    if (dto.globalPrompt !== undefined) {
+      const value = dto.globalPrompt.trim();
+      // 空串或纯空白统一清空
+      await this.users.updateGlobalPrompt(current.id, value === "" ? null : value);
+    }
+
+    const user = await this.users.findById(current.id);
+    if (!user) {
+      throw new UnauthorizedException({
+        code: ErrorCode.TOKEN_INVALID,
+        message: "登录状态无效",
+      });
+    }
+    return this.toProfile(user);
+  }
+
+  private toProfile(user: {
+    id: string;
+    email: string;
+    displayName: string;
+    avatarUrl: string | null;
+    googleId: string | null;
+    passwordHash: string | null;
+    globalPrompt: string | null;
+  }) {
     return {
       id: user.id,
       email: user.email,
@@ -53,17 +95,8 @@ export class UsersController {
       // 只暴露布尔值，不把 googleId 这种外部账号 ID 发给前端
       googleLinked: user.googleId !== null,
       hasPassword: user.passwordHash !== null,
+      globalPrompt: user.globalPrompt,
     };
-  }
-
-  @Patch("me")
-  async update(@CurrentUser() current: CurrentUserPayload, @Body() dto: UpdateProfileDto) {
-    const displayName = dto.displayName.trim();
-    if (!displayName) {
-      throw new BadRequestException("昵称不能为空");
-    }
-    const user = await this.users.updateDisplayName(current.id, displayName);
-    return this.users.toCurrentUser(user);
   }
 
   @Post("me/avatar")

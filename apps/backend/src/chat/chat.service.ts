@@ -43,6 +43,8 @@ export interface RunOnceInput {
   message: string;
   agentConfig: RuntimeAgentConfig;
   signal?: AbortSignal;
+  /** Web 调用默认注入用户全局 Prompt；公开 API 显式传 false */
+  useGlobalPrompt?: boolean;
 }
 
 @Injectable()
@@ -94,6 +96,7 @@ export class ChatService {
       agentId: input.agentId,
       content: input.message,
       agentConfig: input.agentConfig,
+      useGlobalPrompt: input.useGlobalPrompt,
     });
 
     try {
@@ -436,6 +439,7 @@ export class ChatService {
     agentId: string;
     content: string;
     agentConfig: RuntimeAgentConfig;
+    useGlobalPrompt?: boolean;
   }): Promise<{ request: RuntimeRequestBody }> {
     if (input.agentConfig.id !== input.agentId) {
       throw new HttpException('Agent 发布配置与当前 Agent 不一致', HttpStatus.INTERNAL_SERVER_ERROR);
@@ -486,6 +490,16 @@ export class ChatService {
       turn.assistantMessage.id,
     ]);
 
+    // Web 调用每轮只读一次并固定为快照；公开 API 显式关闭，不读用户个性化设置
+    let globalPrompt: string | undefined;
+    if (input.useGlobalPrompt !== false) {
+      const settings = await this.prisma.user.findUnique({
+        where: { id: input.userId },
+        select: { globalPrompt: true },
+      });
+      globalPrompt = settings?.globalPrompt?.trim() || undefined;
+    }
+
     return {
       request: {
         runId: randomUUID(),
@@ -496,6 +510,7 @@ export class ChatService {
         agentConfig: input.agentConfig,
         history,
         message: input.content,
+        ...(globalPrompt ? { globalPrompt } : {}),
       },
     };
   }

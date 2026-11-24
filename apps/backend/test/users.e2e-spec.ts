@@ -71,6 +71,7 @@ describe('Users (e2e)', () => {
         avatarUrl: null,
         googleLinked: false,
         hasPassword: true,
+        globalPrompt: null,
       });
       expect(res.body.data.passwordHash).toBeUndefined();
     });
@@ -237,6 +238,81 @@ describe('Users (e2e)', () => {
         .post('/api/users/me/avatar')
         .attach('file', png, { filename: 'avatar.png', contentType: 'image/png' })
         .expect(401);
+    });
+  });
+  describe('PATCH /api/users/me globalPrompt', () => {
+    it('保存、读取、清空全局 Prompt', async () => {
+      const { token } = await registerUser('Prompt 用户');
+
+      const saved = await request(app.getHttpServer())
+        .patch('/api/users/me')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ globalPrompt: '我是初学者，请用简单语言' })
+        .expect(200);
+      expect(saved.body.data.globalPrompt).toBe('我是初学者，请用简单语言');
+
+      const me = await request(app.getHttpServer())
+        .get('/api/users/me')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(me.body.data.globalPrompt).toBe('我是初学者，请用简单语言');
+
+      const cleared = await request(app.getHttpServer())
+        .patch('/api/users/me')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ globalPrompt: '   ' })
+        .expect(200);
+      expect(cleared.body.data.globalPrompt).toBeNull();
+    });
+
+    it('超过 4000 字符拒绝保存', async () => {
+      const { token } = await registerUser('长 Prompt 用户');
+
+      const res = await request(app.getHttpServer())
+        .patch('/api/users/me')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ globalPrompt: 'a'.repeat(4001) })
+        .expect(400);
+
+      expect(String(res.body.message)).toContain('4000');
+    });
+
+    it('两个用户的 Prompt 互相隔离', async () => {
+      const first = await registerUser('用户一');
+      const second = await registerUser('用户二');
+
+      await request(app.getHttpServer())
+        .patch('/api/users/me')
+        .set('Authorization', `Bearer ${first.token}`)
+        .send({ globalPrompt: '用户一的偏好' })
+        .expect(200);
+
+      const secondMe = await request(app.getHttpServer())
+        .get('/api/users/me')
+        .set('Authorization', `Bearer ${second.token}`)
+        .expect(200);
+      expect(secondMe.body.data.globalPrompt).toBeNull();
+    });
+
+    it('只改昵称时不会清空已保存的 Prompt', async () => {
+      const { token } = await registerUser('保留用户');
+
+      await request(app.getHttpServer())
+        .patch('/api/users/me')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ globalPrompt: '保留这段' })
+        .expect(200);
+      await request(app.getHttpServer())
+        .patch('/api/users/me')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ displayName: '改个昵称' })
+        .expect(200);
+
+      const me = await request(app.getHttpServer())
+        .get('/api/users/me')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(me.body.data.globalPrompt).toBe('保留这段');
     });
   });
   describe('未登录', () => {

@@ -99,6 +99,13 @@ export class UsersService{
         })
     }
 
+    async updateGlobalPrompt(userId:string,globalPrompt:string|null):Promise<User>{
+        return this.prisma.user.update({
+            where:{id:userId},
+            data:{globalPrompt},
+        })
+    }
+
     async updateAvatar(userId:string,avatarUrl:string):Promise<User>{
         return this.prisma.user.update({
             where:{id:userId},

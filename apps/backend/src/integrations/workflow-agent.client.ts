@@ -76,10 +76,16 @@ export class WorkflowAgentClient {
     }
     return value;
   }
-  async run(definition: unknown, input: unknown): Promise<ExecutionResult> {
+  async run(
+    definition: unknown,
+    input: unknown,
+    context: { actorId: string; globalPrompt?: string },
+  ): Promise<ExecutionResult> {
     const value = (await this.post('run', {
       definition,
       input,
+      actor: { id: context.actorId },
+      ...(context.globalPrompt ? { globalPrompt: context.globalPrompt } : {}),
     })) as ExecutionResult;
     if (
       !value ||

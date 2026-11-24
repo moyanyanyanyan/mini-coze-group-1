@@ -608,3 +608,52 @@
 .profile-avatar-input {
   display: none;
 }
+
+/* 全局 Prompt */
+.profile-prompt-field {
+  display: grid;
+  gap: 7px;
+}
+
+.profile-prompt-field > span {
+  color: var(--ink-700);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.profile-prompt-input {
+  width: 100%;
+  min-height: 150px;
+  padding: 10px 12px;
+  color: var(--ink-900);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.7;
+  resize: vertical;
+}
+
+.profile-prompt-input:focus {
+  border-color: var(--violet-400);
+  outline: 3px solid var(--focus-ring);
+}
+
+.profile-prompt-input:disabled {
+  color: var(--ink-500);
+  background: var(--surface-sunken);
+}
+
+.profile-prompt-count {
+  margin-left: auto;
+  color: var(--ink-500);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.profile-prompt-clear {
+  color: var(--danger-700);
+  border-color: var(--danger-200);
+  background: transparent;
+}
