@@ -12,7 +12,7 @@ from app.workflow.runtime_adapter import runtime_complete
 
 configure_logging()
 settings = get_settings()
-app = FastAPI(title="MiniCoze Agent Service", version="0.1.0")
+app = FastAPI(title="妙搭智能体服务", version="0.1.0")
 app.state.workflow_complete = runtime_complete
 app.add_exception_handler(ModelError, runtime_error)
 app.add_exception_handler(RequestValidationError, validation_error)

@@ -48,7 +48,7 @@ const encoder = new TextEncoder();
 function sseResponse(chunks: string[], status = 200): Response {
   return new Response(new ReadableStream<Uint8Array>({
     start(controller) {
-      for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+      for (const chunk of chunks) {controller.enqueue(encoder.encode(chunk));}
       controller.close();
     },
   }), { status });
@@ -89,10 +89,10 @@ function createClient() {
 afterEach(() => {
   jest.restoreAllMocks();
   jest.useRealTimers();
-  if (originalBaseUrl === undefined) delete process.env.AGENT_SERVICE_URL;
-  else process.env.AGENT_SERVICE_URL = originalBaseUrl;
-  if (originalToken === undefined) delete process.env.INTERNAL_SERVICE_TOKEN;
-  else process.env.INTERNAL_SERVICE_TOKEN = originalToken;
+  if (originalBaseUrl === undefined) {delete process.env.AGENT_SERVICE_URL;}
+  else {process.env.AGENT_SERVICE_URL = originalBaseUrl;}
+  if (originalToken === undefined) {delete process.env.INTERNAL_SERVICE_TOKEN;}
+  else {process.env.INTERNAL_SERVICE_TOKEN = originalToken;}
 });
 
 describe('RuntimeClientService.run', () => {
@@ -273,7 +273,7 @@ describe('RuntimeClientService.stream', () => {
     ]));
     const events: RuntimeSseEvent[] = [];
 
-    for await (const event of createClient().stream(request)) events.push(event);
+    for await (const event of createClient().stream(request)) {events.push(event);}
 
     expect(events.map((event) => event.type)).toEqual([
       'run.started',

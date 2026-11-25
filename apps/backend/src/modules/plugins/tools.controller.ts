@@ -18,6 +18,7 @@ import type {
 /**
  * 接口②：GET /api/tools?pluginIds=plugin_echo&pluginIds=plugin_time（Runtime 调用）
  * 接口③：POST /api/tools/execute（Runtime 调用）
+ * 接口⑥：POST /api/tools/test（后端预留测试调用，供运行管理模块；前端插件页不展示）
  *
  * 注意：全局前缀已经是 /api，这里 @Controller('tools') 实际路径是 /api/tools。
  */
@@ -45,6 +46,21 @@ export class ToolsController {
   ): Promise<void> {
     const serviceToken = (req.headers['x-plugin-service-token'] as string | undefined) ?? null;
     const result = await this.pluginsService.executeTool(body, serviceToken ?? undefined);
+    res.status(result.code).json(result);
+  }
+
+  /**
+   * POST /api/tools/test：后端预留的测试调用接口，返回调用结果、状态、耗时与错误信息，
+   * 供组长运行管理模块使用；插件前端不展示测试入口与测试结果。
+   */
+  @Post('test')
+  async test(
+    @Body() body: unknown,
+    @Req() req: Request,
+    @Res() res: Response,
+  ): Promise<void> {
+    const serviceToken = (req.headers['x-plugin-service-token'] as string | undefined) ?? null;
+    const result = await this.pluginsService.testTool(body, serviceToken ?? undefined);
     res.status(result.code).json(result);
   }
 }

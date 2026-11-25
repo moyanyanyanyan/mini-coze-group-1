@@ -1,11 +1,12 @@
-.knowledge-page { padding: 34px clamp(20px, 4vw, 64px); }
+.knowledge-page { padding: 34px clamp(20px, 4vw, 64px); background: radial-gradient(circle at 85% 4%, rgba(95,201,195,.07), transparent 25rem); }
 .knowledge-content { max-width: 1500px; margin: 0 auto; }
 .knowledge-heading { margin-bottom: 22px; }
 .knowledge-heading h1 { margin: 0; font-size: clamp(24px, 2vw, 32px); letter-spacing: -.035em; }
 .knowledge-shell { display: grid; grid-template-columns: clamp(180px, 19%, 236px) minmax(0, 1fr); align-items: start; gap: 24px; }
 .knowledge-sidebar { position: sticky; top: 20px; display: grid; gap: 14px; max-height: calc(100vh - 40px); overflow: auto; }
 .knowledge-workbench { min-width: 0; }
-.knowledge-card, .knowledge-workbench-heading { padding: 24px; background: #fff; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 8px 30px rgba(43, 30, 83, .035); }
+.knowledge-card, .knowledge-workbench-heading { position: relative; padding: 24px; background: #fff; border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 10px 30px rgba(43, 30, 83, .045); }
+.knowledge-card::before { content: ''; position: absolute; top: 0; left: 22px; width: 52px; height: 5px; border-radius: 0 0 6px 6px; background: var(--block-cyan); }
 .knowledge-card h2 { margin: 0 0 18px; font-size: 19px; }
 .knowledge-list-heading, .knowledge-panel-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
 .knowledge-list-heading span, .knowledge-panel-heading > span { color: var(--ink-500); font-size: 13px; white-space: nowrap; }
@@ -15,7 +16,7 @@
 .knowledge-catalog ul { max-height: 50vh; overflow-y: auto; margin: 12px -6px 14px; }
 .knowledge-catalog li + li { margin-top: 4px; }
 .knowledge-catalog-item { display: grid; gap: 6px; width: 100%; padding: 12px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--ink-900); font: inherit; text-align: left; cursor: pointer; }
-.knowledge-catalog-item:hover, .knowledge-catalog-item.is-selected { background: var(--violet-50); border-color: var(--violet-300); }
+.knowledge-catalog-item:hover, .knowledge-catalog-item.is-selected { background: linear-gradient(90deg,rgba(95,201,195,.1),var(--violet-50)); border-color: var(--violet-300); box-shadow: inset 4px 0 0 var(--block-cyan); }
 .knowledge-catalog-item:disabled { cursor: wait; }
 .knowledge-catalog-item > span { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .knowledge-catalog-item strong { font-size: 14px; overflow-wrap: anywhere; }

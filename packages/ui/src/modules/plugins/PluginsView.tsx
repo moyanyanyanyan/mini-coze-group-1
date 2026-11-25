@@ -1,4 +1,6 @@
-import { CATEGORY_META, CATEGORY_ORDER, PluginCard, type MarketPlugin, type PluginCategory } from './PluginCard';
+import { CATEGORY_META, CATEGORY_ORDER, PluginCard } from './PluginCard';
+import type { MarketPlugin, PluginCategory } from './types';
+import { LinkIcon } from './plugin-icons';
 import './plugins.css';
 
 export interface PluginsViewProps {
@@ -11,19 +13,37 @@ export interface PluginsViewProps {
   onCategoryChange: (value: PluginCategory | 'all') => void;
   onRetry: () => void;
   onClearFilters: () => void;
+  /** MCP：打开「通过 URL 添加插件」弹窗；不传则不渲染该入口 */
+  onOpenAdd?: () => void;
+  /** 保存插件等操作后的轻提示 */
+  toast?: string | null;
 }
 
 export function PluginsView({
   loading, error, query, category, filteredMarket, onQueryChange, onCategoryChange, onRetry, onClearFilters,
+  onOpenAdd, toast,
 }: PluginsViewProps) {
   return (
     <section className="feature-page plugins-page" aria-label="插件市场">
       <header className="pm-header">
         <div className="pm-header-inner">
           <div>
-            <h1>插件</h1>
-            <p>浏览内置能力，在智能体编辑页选择并绑定使用。</p>
+            <span className="pm-eyebrow">TOOL BLOCKS</span>
+            <h1>工具积木</h1>
+            <p>挑选现成能力，像拼积木一样装到你的智能体上。</p>
           </div>
+          {onOpenAdd ? (
+            <div className="pm-header-actions">
+              <button
+                type="button"
+                className="pm-button pm-button-primary pm-button-header"
+                onClick={onOpenAdd}
+              >
+                <LinkIcon />
+                通过 URL 添加插件
+              </button>
+            </div>
+          ) : null}
         </div>
       </header>
 
@@ -79,6 +99,7 @@ export function PluginsView({
             )}
       </main>
 
+      {toast ? <div className="pm-toast" role="status">{toast}</div> : null}
     </section>
   );
 }

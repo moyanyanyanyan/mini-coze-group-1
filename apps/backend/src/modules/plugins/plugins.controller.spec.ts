@@ -3,10 +3,11 @@ import request from 'supertest';
 import { PluginsController } from './plugins.controller';
 import { PluginsService } from './plugins.service';
 
-it('MVP 保留目录接口，但 POST 不能创建插件', async () => {
+it('目录、创建插件与 MCP 探测接口均挂在控制器上', async () => {
   const service = {
     listCatalog: jest.fn(() => ({ code: 200, message: 'ok', data: [] })),
-    createPlugin: jest.fn(),
+    createPlugin: jest.fn(() => ({ code: 200, message: 'ok', data: {} })),
+    connectMcp: jest.fn(() => ({ code: 200, message: 'ok', data: { tools: [] } })),
   };
   const module = await Test.createTestingModule({
     controllers: [PluginsController],
@@ -17,9 +18,23 @@ it('MVP 保留目录接口，但 POST 不能创建插件', async () => {
   await app.init();
   try {
     await request(app.getHttpServer()).get('/api/plugins').expect(200);
-    await request(app.getHttpServer()).post('/api/plugins')
-      .send({ pluginId: 'custom_test', title: 'test' }).expect(404);
-    expect(service.createPlugin).not.toHaveBeenCalled();
+
+    await request(app.getHttpServer())
+      .post('/api/plugins')
+      .send({ pluginId: 'custom_test', title: 'test' })
+      .expect(200);
+    expect(service.createPlugin).toHaveBeenCalledWith({
+      pluginId: 'custom_test',
+      title: 'test',
+    });
+
+    await request(app.getHttpServer())
+      .post('/api/plugins/mcp/connect')
+      .send({ endpoint: 'https://example.com/mcp' })
+      .expect(200);
+    expect(service.connectMcp).toHaveBeenCalledWith({
+      endpoint: 'https://example.com/mcp',
+    });
   } finally {
     await app.close();
   }

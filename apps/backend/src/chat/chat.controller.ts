@@ -98,6 +98,8 @@ export class ChatController {
       throw new BadRequestException('请先选择智能体');
     }
     await this.agents.getAgentConfig(conversation.agentId, user.id);
+    // 附件不合法要在写 SSE 头之前拦下来，否则只能以事件帧报错
+    await this.chat.assertAttachments(id, dto.attachmentIds);
     this.chat.acquire(id);
     res.writeHead(200, {
       'Content-Type': 'text/event-stream; charset=utf-8',
@@ -119,6 +121,7 @@ export class ChatController {
         conversationId: id,
         userId: user.id,
         content: dto.content,
+        attachmentIds: dto.attachmentIds,
         signal: controller.signal,
       })) {
         lastEvent = event;

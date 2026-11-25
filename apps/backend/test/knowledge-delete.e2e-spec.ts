@@ -11,12 +11,12 @@ describe('Knowledge deletion cascade (e2e)', () => {
   let knowledgeBaseId: string | undefined;
 
   afterAll(async () => {
-    if (knowledgeBaseId) await prisma.knowledgeBase.deleteMany({ where: { id: knowledgeBaseId } });
+    if (knowledgeBaseId) {await prisma.knowledgeBase.deleteMany({ where: { id: knowledgeBaseId } });}
     if (agentId) {
       await prisma.knowledgeBaseAgentBinding.deleteMany({ where: { agentId } });
       await prisma.agent.delete({ where: { id: agentId } });
     }
-    if (remainingBaseId) await prisma.knowledgeBase.deleteMany({ where: { id: remainingBaseId } });
+    if (remainingBaseId) {await prisma.knowledgeBase.deleteMany({ where: { id: remainingBaseId } });}
     await prisma.$disconnect();
   });
 

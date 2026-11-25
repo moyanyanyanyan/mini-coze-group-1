@@ -41,7 +41,7 @@ export class KnowledgeDocumentController {
   @Post('documents/:id/retry')
   @HttpCode(202)
   async retry(@Req() request: Request, @Param('id') id: string, @Body() body: { workspaceId?: string }) {
-    if (typeof body.workspaceId !== 'string') throw new BadRequestException('workspaceId 不能为空');
+    if (typeof body.workspaceId !== 'string') {throw new BadRequestException('workspaceId 不能为空');}
     return { code: 202, message: 'accepted', data: await this.documents.retry(id, resolveKnowledgeWorkspace(request, body.workspaceId)) };
   }
 

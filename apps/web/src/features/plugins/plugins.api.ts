@@ -1,13 +1,21 @@
 /**
- * 插件市场前端 API 封装。
+ * 插件市场前端 API 封装（页面编排层）。
  *
  * 与后端契约一致：
- * - GET  /api/plugins              → 插件目录（含 tools 定义）
- * - POST /api/tools/execute        → 直接测试执行（前端测试态使用 mock 身份字段）
+ * - GET  /api/plugins              → 插件目录（含 tools 定义、连接状态、鉴权信息）
+ * - POST /api/plugins/mcp/connect  → 探测远程 MCP 服务，返回候选工具（不落库）
+ * - POST /api/plugins              → 保存插件（内置之外的 HTTP / MCP 插件）
+ *
+ * 测试调用由后端实现并预留接口（POST /api/tools/test），供运行管理模块使用；
+ * 插件前端不展示测试入口与测试结果，因此这里不再封装直连执行。
  */
 
 const API_BASE: string =
   import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api';
+
+export type PluginAuthType = 'none' | 'bearer' | 'api_key';
+export type PluginKind = 'builtin' | 'http' | 'mcp';
+export type PluginConnectionStatus = 'unknown' | 'connected' | 'error';
 
 export interface PluginToolDefinition {
   pluginId: string;
@@ -30,27 +38,12 @@ export interface PluginCatalogItem {
   tags?: string[];
   configSchema?: Record<string, unknown>;
   tools: PluginToolDefinition[];
+  kind?: PluginKind;
+  authType?: PluginAuthType;
+  endpoint?: string | null;
+  connectionStatus?: PluginConnectionStatus;
+  lastError?: string | null;
 }
-
-export type ToolErrorCode =
-  | 'TOOL_NOT_FOUND'
-  | 'INVALID_ARGUMENTS'
-  | 'TOOL_EXEC_ERROR'
-  | 'TIMEOUT';
-
-export type PluginToolResult =
-  | {
-      toolCallId: string;
-      toolName: string;
-      status: 'succeeded';
-      output: Record<string, unknown>;
-    }
-  | {
-      toolCallId: string;
-      toolName: string;
-      status: 'failed';
-      error: { code: ToolErrorCode; message: string };
-    };
 
 interface ApiEnvelope<T> {
   code: number;
@@ -76,32 +69,77 @@ export async function fetchPluginCatalog(): Promise<PluginCatalogItem[]> {
   return body.data;
 }
 
-export interface ExecuteToolInput {
-  toolName: string;
-  arguments: Record<string, unknown>;
+/** 探测远程 MCP 服务返回的候选工具 */
+export interface ProbedMcpTool {
+  name: string;
+  description: string;
+  parameters: PluginToolDefinition['parameters'];
 }
 
-export async function executeToolDirect(
-  input: ExecuteToolInput,
-): Promise<PluginToolResult> {
-  // 前端直接测试态：用本地 mock 身份字段；真实 Runtime 调用由后端到后端完成。
-  const payload = {
-    runId: `ui_test_${Date.now()}`,
-    actorId: 'ui_tester',
-    agentId: 'ui_tester',
-    toolCallId: `call_${Date.now()}`,
-    toolName: input.toolName,
-    arguments: input.arguments,
-  };
+export interface ConnectMcpInput {
+  endpoint: string;
+  authType: PluginAuthType;
+  authCredential?: string;
+  title?: string;
+}
 
-  const res = await fetch(`${API_BASE}/tools/execute`, {
+export interface ConnectMcpResult {
+  endpoint: string;
+  title: string;
+  serverName: string | null;
+  authType: PluginAuthType;
+  tools: ProbedMcpTool[];
+}
+
+export async function connectMcpPlugin(input: ConnectMcpInput): Promise<ConnectMcpResult> {
+  const res = await fetch(`${API_BASE}/plugins/mcp/connect`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(input),
   });
-  const body = (await parseJsonOrThrow(res)) as ApiEnvelope<PluginToolResult>;
+  const body = (await parseJsonOrThrow(res)) as ApiEnvelope<ConnectMcpResult>;
   if (!res.ok || body.code !== 200 || body.data == null) {
-    throw new Error(body.message ?? `工具调用失败（HTTP ${res.status}）`);
+    throw new Error(body.message ?? `连接 MCP 服务失败（HTTP ${res.status}）`);
   }
   return body.data;
+}
+
+/** 保存插件请求体（当前前端仅接入远程 MCP 插件） */
+export interface SavePluginInput {
+  pluginId: string;
+  title: string;
+  content?: string;
+  tags?: string[];
+  kind: 'mcp';
+  endpoint: string;
+  authType: PluginAuthType;
+  authCredential?: string;
+  tools: Array<{
+    name: string;
+    description: string;
+    parameters: PluginToolDefinition['parameters'];
+  }>;
+}
+
+export async function savePlugin(input: SavePluginInput): Promise<PluginCatalogItem> {
+  const res = await fetch(`${API_BASE}/plugins`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  const body = (await parseJsonOrThrow(res)) as ApiEnvelope<PluginCatalogItem>;
+  if (!res.ok || body.code !== 200 || body.data == null) {
+    throw new Error(body.message ?? `保存插件失败（HTTP ${res.status}）`);
+  }
+  return body.data;
+}
+
+/** 由标题生成插件 ID slug：小写字母开头，仅小写字母/数字/下划线。 */
+export function slugifyPluginId(title: string): string {
+  const base = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  const withPrefix = /^[a-z]/.test(base) ? base : `plugin_${base}`;
+  return withPrefix.slice(0, 63) || `plugin_${Date.now().toString(36)}`;
 }

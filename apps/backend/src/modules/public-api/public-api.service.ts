@@ -179,7 +179,7 @@ export class PublicApiService {
       };
     }
 
-    if (event.type !== 'run.failed') return event;
+    if (event.type !== 'run.failed') {return event;}
 
     const rawCode = typeof event.data.code === 'string' ? event.data.code : '';
     const code = RUNTIME_ERROR_HTTP_STATUS[rawCode] ? rawCode : 'INTERNAL_ERROR';

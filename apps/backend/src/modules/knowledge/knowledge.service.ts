@@ -9,7 +9,7 @@ export class KnowledgeService {
   // Internal catalog lookup for Agent binding validation. The caller decides
   // whether the returned KBs may be bound by its authenticated user/Agent.
   async findByIds(ids: string[]) {
-    if (ids.length === 0) return [];
+    if (ids.length === 0) {return [];}
     return this.prisma.knowledgeBase.findMany({
       where: { id: { in: ids } },
       select: { id: true, name: true, status: true, workspaceId: true },
@@ -45,7 +45,7 @@ export class KnowledgeService {
     const updated = await this.prisma.knowledgeBase.updateMany({
       where: { id, workspaceId }, data: { status },
     });
-    if (updated.count === 0) throw new NotFoundException('知识库不存在');
+    if (updated.count === 0) {throw new NotFoundException('知识库不存在');}
     return this.prisma.knowledgeBase.findUniqueOrThrow({ where: { id } });
   }
 
@@ -66,7 +66,7 @@ export class KnowledgeService {
     });
     if (deleted.count === 0) {
       const base = await this.prisma.knowledgeBase.findUnique({ where: { id }, select: { workspaceId: true } });
-      if (!base || base.workspaceId !== workspaceId) throw new NotFoundException('知识库不存在');
+      if (!base || base.workspaceId !== workspaceId) {throw new NotFoundException('知识库不存在');}
       throw new ConflictException('知识库中有正在处理的文档，请等待处理完成后删除');
     }
     return { id };

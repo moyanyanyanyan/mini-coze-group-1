@@ -86,7 +86,7 @@ async function ensureBase(token: string, workspaceId: string, name: string): Pro
   const matches = bases.filter((base) => base.name === name);
   if (matches.length > 1) throw new Error(`发现多个同名知识库：${name}`);
   const base = matches[0] ?? await data<KnowledgeBase>('knowledge-bases', token, {
-    method: 'POST', body: { workspaceId, name, description: '仅用于 MiniCoze RAG 联调的合成数据' },
+    method: 'POST', body: { workspaceId, name, description: '仅用于妙搭 RAG 联调的合成数据' },
   });
   if (base.workspaceId !== workspaceId || base.status !== 'ACTIVE') throw new Error(`知识库 ${name} 不属于测试用户或已停用`);
   return base;
@@ -143,7 +143,7 @@ async function ensureAgent(token: string, name: string, knowledgeBaseIds: string
   const existing = await findAgent(token, name);
   const agent = existing ?? await data<Agent>('agents', token, {
     method: 'POST', body: {
-      name, description: '仅用于 MiniCoze RAG 联调',
+      name, description: '仅用于妙搭 RAG 联调',
       systemPrompt: '只依据知识库资料回答；没有依据时说明未找到。',
       ...(expectedModel ? { model: expectedModel } : {}),
     },

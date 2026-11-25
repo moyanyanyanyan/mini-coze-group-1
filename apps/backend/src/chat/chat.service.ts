@@ -6,12 +6,21 @@ import {
   Logger,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import type { Prisma } from '@prisma/client';
 import { ErrorCode } from '../common/errors/error-codes';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConversationsService } from '../modules/conversations/conversations.service';
 import { MessagesService } from '../modules/conversations/messages.service';
 import type { RuntimeAgentConfig } from '../modules/agents/types';
 import { AgentsService } from '../modules/agents/agents.service';
+import {
+  attachmentHistorySummary,
+  buildAttachmentMessage,
+  buildRecentAttachmentBlock,
+  MAX_TOTAL_RECENT_ATTACHMENT_CHARS,
+  MAX_TOTAL_SUMMARY_CHARS,
+  RECENT_ATTACHMENT_TURNS,
+} from './attachment-context';
 import {
   RuntimeClientService,
   RuntimeCallError,
@@ -27,20 +36,35 @@ const MAX_HISTORY_TURNS = 10;
 const MAX_HISTORY_CONTENT = 8000;
 
 function historyExcerpt(content: string): string {
-  if (content.length <= MAX_HISTORY_CONTENT) return content;
+  if (content.length <= MAX_HISTORY_CONTENT) {return content;}
   // Runtime 按 Unicode 码点计数，避免截断表情的代理对。数据库保留完整原文。
   const chars = Array.from(content);
-  if (chars.length <= MAX_HISTORY_CONTENT) return content;
+  if (chars.length <= MAX_HISTORY_CONTENT) {return content;}
   const marker = '…（中间已省略）…';
   const available = MAX_HISTORY_CONTENT - marker.length;
   const head = Math.ceil(available / 2);
   return chars.slice(0, head).join('') + marker + chars.slice(-(available - head)).join('');
 }
 
+interface HistoryAttachmentRow {
+  fileName: string;
+  sourceType: string;
+  extractedText: string | null;
+  status: string;
+}
+
+interface HistoryRow {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  attachments: HistoryAttachmentRow[];
+}
+
 export interface RunChatInput {
   conversationId: string;
   userId: string;
   content: string;
+  attachmentIds?: string[];
   /** 前端「停止生成」断开连接时，NestJS 会触发它，一路 abort 到 Runtime（C4） */
   signal: AbortSignal;
   /** 公开 API 使用已发布 Snapshot；网页端省略并在内部读取当前配置。 */
@@ -86,6 +110,31 @@ export class ChatService {
 
   release(conversationId: string): void {
     this.busy.delete(conversationId);
+  }
+
+  /**
+   * SSE 头一旦写出去就没法再返回 JSON 错误，所以发送前先做一次附件预检；
+   * 真正的绑定仍在 prepareRun 的事务里重做一遍，避免并发抢绑。
+   */
+  async assertAttachments(conversationId: string, ids?: string[]): Promise<void> {
+    if (!ids || ids.length === 0) {return;}
+    const uniqueIds = Array.from(new Set(ids));
+    const rows = await this.prisma.messageAttachment.findMany({
+      where: { id: { in: uniqueIds }, conversationId, messageId: null },
+      select: { id: true, status: true },
+    });
+    if (rows.length !== uniqueIds.length) {
+      throw new HttpException(
+        { code: ErrorCode.ATTACHMENT_INVALID, message: '附件不存在或已被其他消息使用' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    if (rows.some((row) => row.status !== 'READY')) {
+      throw new HttpException(
+        { code: ErrorCode.ATTACHMENT_NOT_READY, message: '附件尚未解析完成，请移除后再试' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
   }
 
   async runOnce(input: RunOnceInput): Promise<RuntimeResult> {
@@ -183,6 +232,7 @@ export class ChatService {
       userId: input.userId,
       agentId,
       content: input.content,
+      attachmentIds: input.attachmentIds,
       agentConfig,
     });
     const request = run.request;
@@ -327,7 +377,7 @@ export class ChatService {
           persistContext,
         );
         finalized = true;
-        if (!started) throw runtimeError;
+        if (!started) {throw runtimeError;}
         if (!saved) {
           yield this.failedEnvelope(
             request,
@@ -361,7 +411,7 @@ export class ChatService {
           'Runtime 流在终态前中断',
           { kind: 'http' },
         );
-        if (!started) throw interrupted;
+        if (!started) {throw interrupted;}
         yield this.failedEnvelope(
           request,
           saved ? interrupted.code : 'PERSISTENCE_FAILED',
@@ -447,6 +497,7 @@ export class ChatService {
     userId: string;
     agentId: string;
     content: string;
+    attachmentIds?: string[];
     agentConfig: RuntimeAgentConfig;
   }): Promise<{ request: RuntimeRequestBody }> {
     if (input.agentConfig.id !== input.agentId) {
@@ -454,6 +505,13 @@ export class ChatService {
     }
 
     const turn = await this.prisma.$transaction(async (tx) => {
+      // 先校验附件再落消息：校验失败时事务回滚，附件保持未绑定，可重试
+      const attachments = await this.resolveAttachments(
+        tx,
+        input.conversationId,
+        input.attachmentIds,
+      );
+
       const last = await tx.message.findFirst({
         where: { conversationId: input.conversationId },
         orderBy: { seq: 'desc' },
@@ -473,6 +531,24 @@ export class ChatService {
         },
       });
 
+      if (attachments.length > 0) {
+        const bound = await tx.messageAttachment.updateMany({
+          where: {
+            id: { in: attachments.map((attachment) => attachment.id) },
+            conversationId: input.conversationId,
+            messageId: null,
+          },
+          data: { messageId: userMessage.id },
+        });
+        // 并发下可能被另一条消息抢先绑定，count 不一致就整轮回滚
+        if (bound.count !== attachments.length) {
+          throw new HttpException(
+            { code: ErrorCode.ATTACHMENT_INVALID, message: '附件已被其他消息使用' },
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+      }
+
       const assistantMessage = await tx.message.create({
         data: {
           conversationId: input.conversationId,
@@ -490,10 +566,11 @@ export class ChatService {
           : { updatedAt: new Date() },
       });
 
-      return { userMessage, assistantMessage };
+      return { userMessage, assistantMessage, attachments };
     });
 
-    const { contextLimit = MAX_HISTORY_TURNS, ...runtimeConfig } = input.agentConfig;
+    const { contextLimit = MAX_HISTORY_TURNS, model, ...runtimeRest } = input.agentConfig;
+    const runtimeConfig = { ...runtimeRest, model };
     const history = await this.buildHistory(input.conversationId, contextLimit, [
       turn.userMessage.id,
       turn.assistantMessage.id,
@@ -508,9 +585,59 @@ export class ChatService {
         assistantMessageId: turn.assistantMessage.id,
         agentConfig: runtimeConfig,
         history,
-        message: input.content,
+        message: buildAttachmentMessage(input.content, turn.attachments),
       },
     };
+  }
+
+  /**
+   * 校验附件归属、状态与未绑定，并按请求顺序返回。
+   * 任何不合法都返回 400，不进入 Runtime。
+   */
+  private async resolveAttachments(
+    tx: Prisma.TransactionClient,
+    conversationId: string,
+    ids: string[] | undefined,
+  ): Promise<Array<{
+    id: string;
+    fileName: string;
+    sourceType: string;
+    extractedText: string | null;
+  }>> {
+    if (!ids || ids.length === 0) {return [];}
+    const uniqueIds = Array.from(new Set(ids));
+    const rows = await tx.messageAttachment.findMany({
+      where: { id: { in: uniqueIds }, conversationId, messageId: null },
+      select: {
+        id: true,
+        fileName: true,
+        sourceType: true,
+        status: true,
+        extractedText: true,
+      },
+    });
+    if (rows.length !== uniqueIds.length) {
+      throw new HttpException(
+        { code: ErrorCode.ATTACHMENT_INVALID, message: '附件不存在或已被其他消息使用' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    if (rows.some((row) => row.status !== 'READY')) {
+      throw new HttpException(
+        { code: ErrorCode.ATTACHMENT_NOT_READY, message: '附件尚未解析完成，请移除后再试' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    return uniqueIds.map((id) => {
+      const row = byId.get(id)!;
+      return {
+        id: row.id,
+        fileName: row.fileName,
+        sourceType: row.sourceType,
+        extractedText: row.extractedText,
+      };
+    });
   }
 
   /**
@@ -526,7 +653,7 @@ export class ChatService {
     contextLimit: number,
     excludeIds: string[],
   ): Promise<RuntimeHistoryMessage[]> {
-    if (contextLimit === 0) return [];
+    if (contextLimit === 0) {return [];}
     const rows = await this.prisma.message.findMany({
       where: {
         conversationId,
@@ -534,31 +661,101 @@ export class ChatService {
         status: { in: ['completed'] },
       },
       orderBy: { seq: 'asc' },
+      include: {
+        attachments: {
+          select: {
+            fileName: true,
+            sourceType: true,
+            extractedText: true,
+            status: true,
+          },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
     });
 
     const excluded = new Set(excludeIds);
     // 存放已经配对成功的历史记录
-    const pairs: RuntimeHistoryMessage[] = [];
+    const pairs: HistoryRow[] = [];
     // 临时保存一条未找到助手回复的用户消息
-    let pendingUser: RuntimeHistoryMessage | null = null;
+    let pendingUser: HistoryRow | null = null;
 
     for (const row of rows) {
       if (excluded.has(row.id)) {
         continue;
       }
       if (row.role === 'user') {
-        pendingUser = { id: row.id, role: 'user', content: row.content };
+        pendingUser = {
+          id: row.id,
+          role: 'user',
+          content: row.content,
+          attachments: row.attachments,
+        };
         continue;
       }
-    //   配对成功并且清空pendingUser
       if (pendingUser) {
-        pairs.push(pendingUser, { id: row.id, role: 'assistant', content: row.content });
+        pairs.push(pendingUser, {
+          id: row.id,
+          role: 'assistant',
+          content: row.content,
+          attachments: [],
+        });
         pendingUser = null;
       }
     }
 
     const turns = Math.min(contextLimit, MAX_HISTORY_TURNS);
-    return pairs.slice(-2 * turns).map((message) => ({
+    const selected = pairs.slice(-2 * turns);
+    // 从最新一轮往回数：最近 RECENT_ATTACHMENT_TURNS 轮注入全文，其余降级为摘要
+    const userPositions = selected
+      .map((row, index) => (row.role === 'user' ? index : -1))
+      .filter((index) => index >= 0);
+    const distance = new Map<number, number>();
+    userPositions.forEach((rowIndex, order) => {
+      distance.set(rowIndex, userPositions.length - 1 - order);
+    });
+
+    let fullBudget = MAX_TOTAL_RECENT_ATTACHMENT_CHARS;
+    let summaryBudget = MAX_TOTAL_SUMMARY_CHARS;
+    let fullTurns = 0;
+    let summaryTurns = 0;
+    let attachmentChars = 0;
+
+    const history = selected.map((row, index) => {
+      if (row.role !== 'user') {
+        return { id: row.id, role: 'assistant' as const, content: row.content };
+      }
+      // 单条历史有 8000 字符硬上限，先预留用户原文，避免 historyExcerpt 截掉附件中段
+      const room = MAX_HISTORY_CONTENT - row.content.length - 2;
+      const isRecent = (distance.get(index) ?? Number.MAX_SAFE_INTEGER) < RECENT_ATTACHMENT_TURNS;
+      let extra = '';
+      if (isRecent && room > 0 && fullBudget > 0) {
+        const block = buildRecentAttachmentBlock(row.attachments, Math.min(fullBudget, room));
+        if (block.used > 0) {
+          extra = `\n\n${block.text}`;
+          fullBudget -= block.used;
+          fullTurns += 1;
+          attachmentChars += block.used;
+        }
+      }
+      if (!extra && room > 0 && summaryBudget > 0) {
+        const summary = attachmentHistorySummary(row.attachments, {
+          total: Math.min(summaryBudget, room),
+        });
+        if (summary) {
+          extra = summary;
+          summaryBudget -= summary.length;
+          summaryTurns += 1;
+          attachmentChars += summary.length;
+        }
+      }
+      return { id: row.id, role: 'user' as const, content: row.content + extra };
+    });
+
+    this.logger.debug(
+      `history attachments fullTurns=${fullTurns} summaryTurns=${summaryTurns} chars=${attachmentChars}`,
+    );
+    return history.map((message) => ({
       ...message, content: historyExcerpt(message.content),
     }));
   }
