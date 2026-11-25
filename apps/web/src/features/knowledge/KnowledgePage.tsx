@@ -176,7 +176,7 @@ function KnowledgeDetailPage({ knowledgeBaseId }: { knowledgeBaseId: string }) {
       if (sourceMode === 'text') {
         await createTextDocument(selectedId, { workspaceId: workspaceId, title: documentTitle.trim(), text: documentText });
       } else {
-        if (!documentFile) throw new Error('请选择 TXT、JSON、PDF、DOCX、PPTX 或图片文件');
+        if (!documentFile) throw new Error('请选择 TXT、JSON、MD、HTML、PDF、DOCX、PPTX 或图片文件');
         const uploadError = knowledgeUploadError(documentFile);
         if (uploadError) throw new Error(uploadError);
         await uploadDocumentFile(selectedId, { workspaceId: workspaceId, title: documentTitle, file: documentFile });

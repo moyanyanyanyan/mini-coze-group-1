@@ -36,6 +36,10 @@ describe('document content extraction', () => {
   it('accepts supported extensions without trusting unrelated file types', () => {
     expect(sourceTypeFromFilename('rules.txt')).toBe('TXT');
     expect(sourceTypeFromFilename('rules.JSON')).toBe('JSON');
+    expect(sourceTypeFromFilename('rules.md')).toBe('MARKDOWN');
+    expect(sourceTypeFromFilename('rules.markdown')).toBe('MARKDOWN');
+    expect(sourceTypeFromFilename('rules.html')).toBe('HTML');
+    expect(sourceTypeFromFilename('rules.htm')).toBe('HTML');
     expect(sourceTypeFromFilename('rules.PDF')).toBe('PDF');
     expect(sourceTypeFromFilename('manual.docx')).toBe('DOCX');
     expect(sourceTypeFromFilename('manual.DOCX')).toBe('DOCX');

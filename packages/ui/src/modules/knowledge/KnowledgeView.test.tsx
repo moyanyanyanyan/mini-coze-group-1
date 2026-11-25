@@ -51,7 +51,7 @@ describe('knowledge view', () => {
     input.documentState.selectedDocument = input.documentState.documents[0];
     input.documentContentState.content = 'Extracted PDF text';
     const html = renderToStaticMarkup(<KnowledgeView {...input} />);
-    expect(html).toContain('accept=".txt,.json,.pdf,.docx,.pptx,.png,.jpg,.jpeg"');
+    expect(html).toContain('accept=".txt,.json,.md,.markdown,.html,.htm,.pdf,.docx,.pptx,.png,.jpg,.jpeg"');
     expect(html).toContain('PDF 最多 64 MiB');
     expect(html).toContain('<td>PDF</td>');
     expect(html).toContain('Extracted PDF text');

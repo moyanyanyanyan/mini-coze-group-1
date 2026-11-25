@@ -5,18 +5,21 @@ import { basename, extname } from 'node:path';
 import { PrismaService } from '../../../database/prisma.service';
 import { EmbeddingClient, EMBEDDING_DIMENSION, EmbeddingUnavailableError } from '../../../integrations/embedding.client';
 import { OcrWorkerClient, OcrWorkerError } from '../../../integrations/ocr-worker.client';
-import { decodeUploadFilename, DocumentContentError, extractDocumentText, assertOfficeUpload, MAX_DOCUMENT_BYTES, pdfMaxBytes, readDocumentTextPage, sourceTypeFromFilename, type DocumentSourceType } from './document-content';
+import { decodeUploadFilename, DocumentContentError, assertOfficeUpload, MAX_DOCUMENT_BYTES, pdfMaxBytes, readDocumentTextPage, sourceTypeFromFilename, type DocumentSourceType } from './document-content';
 import { assertImageUpload, extractImageDocumentText } from './image-document-content';
 import { imageMaxBytes, officeMaxBytes } from '../../../config/upload-limits';
 import { chunkDocument } from './chunk-document';
 import { extractHybridPdfDocumentText } from './pdf-hybrid-document-content';
 import { extractOfficeDocument } from './office-document-content';
 import type { OfficeTextSegment } from './office-ast-converter';
-import { mapChunkSourceRanges } from './chunk-source';
+import { mapChunkSourceRanges } from './office-chunk-source';
+import { validateChunkSources } from './chunk-source';
+import { parseNormalizedDocument, plainTextDocument } from './parse-document';
+import { assertNormalizedDocument, type NormalizedDocument } from './normalized-document';
 import { CreateTextDocumentDto } from '../dto/create-text-document.dto';
 
 interface ExtractedDocumentText {
-  text: string;
+  normalized: NormalizedDocument;
   segments?: OfficeTextSegment[];
 }
 
@@ -56,7 +59,7 @@ export class KnowledgeDocumentService implements OnModuleInit {
 
   async createFile(knowledgeBaseId: string, workspaceId: string, title: string | undefined, file: UploadedDocumentFile | undefined) {
     await this.assertKnowledgeBase(knowledgeBaseId, workspaceId);
-    if (!file) throw new BadRequestException('请选择 TXT、JSON、PDF、DOCX、PPTX、PNG 或 JPEG 文件');
+    if (!file) throw new BadRequestException('请选择 TXT、JSON、MD、HTML、PDF、DOCX、PPTX、PNG 或 JPEG 文件');
     const filename = decodeUploadFilename(file.originalname);
     let sourceType: DocumentSourceType;
     try {
@@ -83,7 +86,7 @@ export class KnowledgeDocumentService implements OnModuleInit {
         throw new BadRequestException(error instanceof Error ? error.message : 'Office 文件格式无效');
       }
     } else if (file.size > MAX_DOCUMENT_BYTES) {
-      throw new BadRequestException('TXT 和 JSON 文件不能超过 1 MiB');
+      throw new BadRequestException('TXT / JSON / MD / HTML 文件不能超过 1 MiB');
     }
     const documentTitle = (title?.trim() || basename(filename, extname(filename))).trim();
     if (!documentTitle || documentTitle.length > 100) throw new BadRequestException('文档标题长度必须为 1～100 字符');
@@ -170,10 +173,11 @@ export class KnowledgeDocumentService implements OnModuleInit {
       const document = await this.prisma.knowledgeDocument.findUniqueOrThrow({ where: { id } });
       await this.prisma.knowledgeDocument.update({ where: { id }, data: { stage: 'EXTRACTING' } });
       const extracted = await this.extractText(document);
-      const text = extracted.text;
+      const text = extracted.normalized.rawText;
       await this.prisma.knowledgeDocument.update({ where: { id }, data: { rawText: text, stage: 'CHUNKING' } });
       const chunks = chunkDocument(text);
       if (chunks.length === 0) throw new DocumentContentError('EMPTY_CONTENT', '资料无法生成可检索片段');
+      validateChunkSources(text, chunks, extracted.normalized.segments);
       const chunkSources = extracted.segments
         ? mapChunkSourceRanges(chunks, extracted.segments)
         : null;
@@ -223,13 +227,15 @@ export class KnowledgeDocumentService implements OnModuleInit {
     const bytes = document.sourceBytes ?? new Uint8Array();
     switch (document.sourceType) {
       case 'IMAGE':
-        return { text: await extractImageDocumentText(bytes, document.originalFileName, this.ocr) };
+        return { normalized: plainTextDocument('IMAGE', await extractImageDocumentText(bytes, document.originalFileName, this.ocr)) };
       case 'PDF':
-        return { text: (await extractHybridPdfDocumentText(bytes, document.originalFileName ?? 'document.pdf', this.ocr)).rawText };
+        return { normalized: plainTextDocument('PDF', (await extractHybridPdfDocumentText(bytes, document.originalFileName ?? 'document.pdf', this.ocr)).rawText) };
       case 'TEXT':
       case 'TXT':
       case 'JSON':
-        return { text: extractDocumentText(document.sourceType, bytes) };
+      case 'MARKDOWN':
+      case 'HTML':
+        return { normalized: parseNormalizedDocument(document.sourceType, bytes) };
       case 'DOCX':
       case 'PPTX': {
         const result = await extractOfficeDocument(
@@ -237,7 +243,22 @@ export class KnowledgeDocumentService implements OnModuleInit {
           document.originalFileName ?? `document.${document.sourceType.toLowerCase()}`,
           this.ocr,
         );
-        return { text: result.document.rawText, segments: result.document.segments };
+        const normalized: NormalizedDocument = {
+          format: document.sourceType,
+          title: null,
+          rawText: result.document.rawText,
+          segments: result.document.segments.map((segment) => ({
+            kind: segment.kind === 'heading' ? 'heading'
+              : segment.kind === 'listItem' ? 'list'
+              : segment.kind === 'tableCell' ? 'table' : 'paragraph',
+            text: segment.text,
+            startOffset: segment.startOffset,
+            endOffset: segment.endOffset,
+            ...(segment.headingLevel === undefined ? {} : { level: segment.headingLevel }),
+          })),
+        };
+        assertNormalizedDocument(normalized);
+        return { normalized, segments: result.document.segments };
       }
       default:
         throw new DocumentContentError('UNSUPPORTED_FILE', '文件类型不支持');

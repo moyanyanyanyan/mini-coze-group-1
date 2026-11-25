@@ -20,17 +20,21 @@ export function decodeUploadFilename(filename: string): string {
   }
 }
 
-export type DocumentSourceType = 'TXT' | 'JSON' | 'PDF' | 'IMAGE' | 'DOCX' | 'PPTX';
+export type DocumentSourceType = 'TXT' | 'JSON' | 'PDF' | 'IMAGE' | 'DOCX' | 'PPTX' | 'MARKDOWN' | 'HTML';
+
+export type FileDocumentSourceType = DocumentSourceType;
 
 export function sourceTypeFromFilename(filename: string): DocumentSourceType {
   const extension = extname(filename).toLowerCase();
   if (extension === '.txt') return 'TXT';
   if (extension === '.json') return 'JSON';
+  if (extension === '.md' || extension === '.markdown') return 'MARKDOWN';
+  if (extension === '.html' || extension === '.htm') return 'HTML';
   if (extension === '.pdf') return 'PDF';
   if (extension === '.docx') return 'DOCX';
   if (extension === '.pptx') return 'PPTX';
   if (extension === '.png' || extension === '.jpg' || extension === '.jpeg') return 'IMAGE';
-  throw new DocumentContentError('UNSUPPORTED_FILE', '只支持 .txt、.json、.pdf、.docx、.pptx、.png、.jpg 和 .jpeg 文件');
+  throw new DocumentContentError('UNSUPPORTED_FILE', '只支持 .txt、.json、.md、.html、.pdf、.docx、.pptx、.png、.jpg 和 .jpeg 文件');
 }
 
 const ZIP_LOCAL_FILE_HEADER = [0x50, 0x4b, 0x03, 0x04];
@@ -90,16 +94,19 @@ export function readDocumentTextPage(text: string, cursor?: string, requestedLim
   };
 }
 
-export function extractDocumentText(sourceType: 'TEXT' | 'TXT' | 'JSON', bytes: Uint8Array): string {
+export function decodeDocumentBytes(bytes: Uint8Array): string {
   if (bytes.byteLength === 0) throw new DocumentContentError('EMPTY_CONTENT', '资料内容不能为空');
   if (bytes.byteLength > MAX_DOCUMENT_BYTES) throw new DocumentContentError('FILE_TOO_LARGE', '资料不能超过 1 MB');
 
-  let decoded: string;
   try {
-    decoded = new TextDecoder('utf-8', { fatal: true }).decode(bytes).replace(/^\uFEFF/, '');
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes).replace(/^\uFEFF/, '');
   } catch {
     throw new DocumentContentError('INVALID_ENCODING', '资料必须使用 UTF-8 编码');
   }
+}
+
+export function extractDocumentText(sourceType: 'TEXT' | 'TXT' | 'JSON', bytes: Uint8Array): string {
+  const decoded = decodeDocumentBytes(bytes);
 
   if (sourceType !== 'JSON') {
     const text = decoded.replace(/\r\n?/g, '\n').trim();

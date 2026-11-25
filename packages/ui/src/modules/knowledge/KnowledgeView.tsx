@@ -103,7 +103,7 @@ export function KnowledgeView({
                     {sourceMode === 'text' ? (
                       <><label htmlFor="document-text">正文</label><textarea id="document-text" value={documentText} onChange={(event) => onDocumentTextChange(event.target.value)} rows={8} required placeholder="在此粘贴资料正文" /></>
                     ) : (
-                      <><label htmlFor="document-file">TXT / JSON 最多 1 MiB；PDF 最多 64 MiB；DOCX / PPTX 最多 32 MiB；PNG / JPG / JPEG 图片最多 10 MiB</label><input id="document-file" ref={fileInputRef} type="file" accept=".txt,.json,.pdf,.docx,.pptx,.png,.jpg,.jpeg" onChange={(event) => onDocumentFileChange(event.target.files?.[0] ?? null)} required /></>
+                      <><label htmlFor="document-file">TXT / JSON / MD / HTML 最多 1 MiB；PDF 最多 64 MiB；DOCX / PPTX 最多 32 MiB；PNG / JPG / JPEG 图片最多 10 MiB</label><input id="document-file" ref={fileInputRef} type="file" accept=".txt,.json,.md,.markdown,.html,.htm,.pdf,.docx,.pptx,.png,.jpg,.jpeg" onChange={(event) => onDocumentFileChange(event.target.files?.[0] ?? null)} required /></>
                     )}
                     <button type="submit" disabled={documentSaving}>{documentSaving ? '提交中…' : '提交资料'}</button>
                   </form>

@@ -5,7 +5,7 @@ import { EmbeddingClient, EmbeddingUnavailableError } from '../../../integration
 import {
   parseChunkSourceRanges,
   type ChunkSourceRanges,
-} from '../documents/chunk-source';
+} from '../documents/office-chunk-source';
 
 export interface KnowledgeHit {
   chunkId: string;

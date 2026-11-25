@@ -21,7 +21,9 @@ from ocr_worker.main import (
 )
 
 REPOSITORY = Path(__file__).resolve().parents[3]
-PDF_FIXTURE = REPOSITORY / "apps/backend/test/pdf-parser-experiment/two-pages.pdf"
+# Tracked two-page, US Letter fixture shared with the real PDF parser regression.
+# Do not depend on an untracked local experiment directory.
+PDF_FIXTURE = REPOSITORY / "apps/backend/test/fixtures/pdf-detach-regression.pdf"
 EXPERIMENT_DIR = Path.home() / "AppData/Local/Temp/minicoze-paddleocr-experiment/t65-translation"
 REAL_IMAGE = Path.home() / "AppData/Local/minicoze-paddleocr-output/original_image.png"
 RENDERED_PAGE = EXPERIMENT_DIR / "translation-page-096-200dpi.png"

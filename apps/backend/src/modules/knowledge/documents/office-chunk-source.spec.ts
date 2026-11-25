@@ -1,5 +1,5 @@
 import { chunkDocument } from './chunk-document';
-import { mapChunkSourceRanges, parseChunkSourceRanges } from './chunk-source';
+import { mapChunkSourceRanges, parseChunkSourceRanges } from './office-chunk-source';
 import type { OfficeTextSegment } from './office-ast-converter';
 
 function segment(

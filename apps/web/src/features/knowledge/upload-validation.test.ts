@@ -5,8 +5,8 @@ const MIB = 1024 * 1024;
 
 describe('knowledge upload validation', () => {
   it('accepts every supported extension', () => {
-    expect(KNOWLEDGE_FILE_ACCEPT).toBe('.txt,.json,.pdf,.docx,.pptx,.png,.jpg,.jpeg');
-    for (const name of ['note.txt', 'data.JSON', 'manual.PDF', 'manual.docx', 'deck.pptx', 'scan.png', 'photo.jpg', 'photo.JPEG']) {
+    expect(KNOWLEDGE_FILE_ACCEPT).toBe('.txt,.json,.md,.markdown,.html,.htm,.pdf,.docx,.pptx,.png,.jpg,.jpeg');
+    for (const name of ['note.txt', 'note.md', 'note.markdown', 'page.html', 'page.htm', 'data.JSON', 'manual.PDF', 'manual.docx', 'deck.pptx', 'scan.png', 'photo.jpg', 'photo.JPEG']) {
       expect(knowledgeUploadError({ name, size: 1024 })).toBeNull();
     }
   });
@@ -19,7 +19,10 @@ describe('knowledge upload validation', () => {
 
   it('applies the per-type size hints', () => {
     expect(knowledgeUploadError({ name: 'note.txt', size: MIB + 1 })).toContain('1 MiB');
-    expect(knowledgeUploadError({ name: 'data.json', size: MIB + 1 })).toContain('1 MiB');
+    for (const name of ['data.json', 'note.md', 'note.markdown', 'page.html', 'page.htm']) {
+      expect(knowledgeUploadError({ name, size: MIB + 1 })).toContain('1 MiB');
+      expect(knowledgeUploadError({ name, size: MIB })).toBeNull();
+    }
     expect(knowledgeUploadError({ name: 'manual.pdf', size: 64 * MIB + 1 })).toContain('64 MiB');
     expect(knowledgeUploadError({ name: 'manual.docx', size: 32 * MIB + 1 })).toContain('32 MiB');
     expect(knowledgeUploadError({ name: 'deck.pptx', size: 32 * MIB + 1 })).toContain('32 MiB');

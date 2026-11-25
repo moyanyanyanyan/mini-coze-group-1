@@ -18,6 +18,12 @@ MiniCoze MVP 的多人协作 Monorepo。当前包含应用骨架、领域目录�
 - 运行 Python 测试时设置 `PYTHONUTF8=1`，避免中文夹具按系统 GBK 解码
 - Docker Desktop（用于 PostgreSQL/pgvector）
 
+本机已按解析分支的 GitHub 最新说明安装 Node 26.13.1 和 pnpm 12.9.1。
+在本仓库的新 PowerShell 终端运行 `. ./scripts/use-project-env.ps1`，为当前终端加载固定版本并设置 `PYTHONUTF8=1`。
+该脚本使用 `%LOCALAPPDATA%/minicoze-tools` 中的本机工具，不修改系统 PATH；其他机器可按 `.nvmrc` 和 `packageManager` 安装相同版本。
+脚本还会为 Windows esbuild 配置专用临时目录及其完整性标签，避免大文件转换时无法删除交接文件；不更改仓库或工具程序的完整性标签。
+安装来源和合并差异见 [本次合并记录](docs/parsing-merge-2026-11-25.md)，迁移、真实 OCR 上传与构建结果见 [恢复验收记录](docs/parsing-upload-acceptance-2026-11-25.md)。
+
 ## 首次安装（Windows PowerShell）
 
 ```powershell

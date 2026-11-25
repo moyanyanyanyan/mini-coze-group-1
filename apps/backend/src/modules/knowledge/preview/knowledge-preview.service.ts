@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { KnowledgeRetrievalService } from '../retrieval/knowledge-retrieval.service';
-import { parseChunkSourceRanges } from '../documents/chunk-source';
+import { parseChunkSourceRanges } from '../documents/office-chunk-source';
 
 const PAGE_SIZE = 20;
 

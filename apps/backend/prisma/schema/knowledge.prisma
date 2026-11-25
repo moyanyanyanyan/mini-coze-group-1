@@ -26,6 +26,8 @@ enum KnowledgeDocumentSourceType {
   IMAGE
   DOCX
   PPTX
+  MARKDOWN
+  HTML
 }
 
 enum KnowledgeDocumentStatus {

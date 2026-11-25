@@ -2,7 +2,7 @@
 
 > 本文记录早期 `ws-local-demo` 开发自测流程，后文关于 Auth/Agent 尚未接入的描述是当时状态。当前需要真实用户、Agent 绑定和实际资源 ID 的联调数据，请使用 [RAG 联调数据准备](rag-integration-fixture.md)。
 
-本地处理链路：NestJS 解码 TXT/JSON 或文本 → 按字符固定切片（基础片段最多 500 字符，后续片段加前片约 50 字符重叠）→ FastAPI 使用 `BAAI/bge-small-zh-v1.5` 生成 512 维向量 → NestJS 在同一数据库事务中保存片段、向量并将文档置为 `READY`。解析、模型或数据库失败时置为 `FAILED`，不留下已提交的半套索引。
+本地处理链路：NestJS 解码 TXT/JSON 或文本；Markdown/HTML 分别经各自的 AST 转换器归一化为统一的 `rawText + segments` → 按字符固定切片（基础片段最多 500 字符，后续片段加前片约 50 字符重叠）→ FastAPI 使用 `BAAI/bge-small-zh-v1.5` 生成 512 维向量 → NestJS 在同一数据库事务中保存片段、向量并将文档置为 `READY`。解析、模型或数据库失败时置为 `FAILED`，不留下已提交的半套索引。
 
 ## 首次准备
 
@@ -36,7 +36,7 @@ pnpm dev:agent
 
 运行根目录 `pnpm dev:agent` 前先激活 `.venv`。也可进入 `apps/agent`，直接用仓库根目录 `.venv\Scripts\python.exe -m app.main` 启动。
 
-打开 `http://localhost:5173/workspace/knowledge`，导入一段含明确事实的文本或 TXT/JSON。提交接口先返回 `202 + documentId`；页面轮询直到 `READY` 或 `FAILED`。`READY` 的 `chunkCount` 必须大于 0，且每个 Chunk 都有 512 维向量。此前因 `INDEXING_NOT_READY` 失败的文档可在页面点击“重新处理”。
+打开 `http://localhost:5173/workspace/knowledge`，导入一段含明确事实的文本，或 TXT/JSON/Markdown/HTML 文件。提交接口先返回 `202 + documentId`；页面轮询直到 `READY` 或 `FAILED`。`READY` 的 `chunkCount` 必须大于 0，且每个 Chunk 都有 512 维向量。此前因 `INDEXING_NOT_READY` 失败的文档可在页面点击“重新处理”。
 
 当前页面使用本地演示工作空间 `ws-local-demo`，尚未接入登录和 workspace 鉴权。后台处理为 NestJS 进程内调度，并在重启时恢复 `PROCESSING` 文档；正式队列、多实例抢占和向量索引迁移仍需后续处理。
 
