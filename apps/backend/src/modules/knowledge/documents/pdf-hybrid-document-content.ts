@@ -32,16 +32,60 @@ function pageEdges(lines: readonly string[]): Set<string> {
   return new Set([first, last].filter((line): line is string => line !== undefined));
 }
 
-/** Uses only structural evidence; a short but valid body is not assumed to be a scan. */
+function hasCorruptNativeText(text: string): boolean {
+  return /[\uFFFD\u0000-\u0008\u000B\u000C\u000E-\u001F]/u.test(text);
+}
+
+/**
+ * A page whose selectable text is only a heading or caption can still hide an image-only body,
+ * which is the shape this selects for OCR. Text-rich pages are left alone: the same image there
+ * is normally a figure, and OCR-ing every illustrated page would exhaust the worker budget on
+ * large native PDFs.
+ */
+const MIN_NATIVE_TEXT_BEFORE_SKIPPING_OCR = 400;
+
+/**
+ * Uses only structural evidence — corrupt text, an embedded image on a sparsely written page, or
+ * a page whose text is just repeated edges and page numbers. A short but valid body without any
+ * image is still not assumed to be a scan.
+ */
 export function selectPdfOcrPages(pages: readonly NativePdfPage[]): number[] {
   const repeatedEdges = edgeLines(pages);
   return pages.filter((page) => {
-    if (/[\uFFFD\u0000-\u0008\u000B\u000C\u000E-\u001F]/u.test(page.text)) return true;
+    if (hasCorruptNativeText(page.text)) {
+      return true;
+    }
     const lines = page.text.split('\n').map((line) => line.trim()).filter(Boolean);
     const edges = pageEdges(lines);
     const meaningful = lines.filter((line) => !isPageNumber(line) && !(edges.has(line) && repeatedEdges.has(line)));
-    return meaningful.length === 0;
+    if (meaningful.length === 0) {
+      return true;
+    }
+    return Boolean(page.hasEmbeddedImage) && meaningful.join('').length < MIN_NATIVE_TEXT_BEFORE_SKIPPING_OCR;
   }).map((page) => page.pdfPageNumber);
+}
+
+function mergeNativeAndOcrText(nativeText: string, ocrText: string): string {
+  if (!nativeText) {
+    return ocrText;
+  }
+  if (!ocrText) {
+    return nativeText;
+  }
+  const nativeLines = nativeText.split('\n').map((line) => line.trim()).filter(Boolean);
+  const seen = new Set(nativeLines.map((line) => line.replace(/\s+/gu, ' ').toLocaleLowerCase()));
+  const additional = ocrText.split('\n').map((line) => line.trim()).filter((line) => {
+    if (!line) {
+      return false;
+    }
+    const key = line.replace(/\s+/gu, ' ').toLocaleLowerCase();
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+  return [...nativeLines, ...additional].join('\n');
 }
 
 export async function extractHybridPdfDocumentText(
@@ -66,7 +110,9 @@ export async function extractHybridPdfDocumentText(
   const pages: PdfDocumentPage[] = nativePages.map((page) => ({
     pdfPageNumber: page.pdfPageNumber,
     method: recognized.has(page.pdfPageNumber) ? 'ocr' : 'native',
-    text: recognized.get(page.pdfPageNumber) ?? page.text,
+    text: recognized.has(page.pdfPageNumber) && page.hasEmbeddedImage && !hasCorruptNativeText(page.text)
+      ? mergeNativeAndOcrText(page.text, recognized.get(page.pdfPageNumber) ?? '')
+      : recognized.get(page.pdfPageNumber) ?? page.text,
   }));
   const rawText = pages.map((page) => page.text).filter(Boolean).join('\n\n');
   if (!rawText) throw new DocumentContentError('EMPTY_CONTENT', 'PDF 文件没有可识别的文本');

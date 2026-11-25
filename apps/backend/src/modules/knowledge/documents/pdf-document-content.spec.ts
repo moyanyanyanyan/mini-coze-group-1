@@ -5,6 +5,7 @@ import { extractPdfDocumentPages, extractPdfDocumentText } from './pdf-document-
 jest.mock('pdf-parse', () => ({ PDFParse: jest.fn() }));
 
 const getText = jest.fn();
+const getImage = jest.fn();
 const destroy = jest.fn<Promise<void>, []>();
 const parserConstructor = PDFParse as jest.MockedClass<typeof PDFParse>;
 
@@ -18,7 +19,8 @@ function bytesWithReportedLength(length: number): Uint8Array {
 beforeEach(() => {
   jest.clearAllMocks();
   destroy.mockResolvedValue(undefined);
-  parserConstructor.mockImplementation(() => ({ getText, destroy }) as unknown as PDFParse);
+  getImage.mockResolvedValue({ pages: [] });
+  parserConstructor.mockImplementation(() => ({ getText, getImage, destroy }) as unknown as PDFParse);
 });
 
 describe('PDF document content', () => {
@@ -45,6 +47,19 @@ describe('PDF document content', () => {
       { pdfPageNumber: 3, text: 'third' },
     ]);
     expect(destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks pages with embedded images even when native text is present', async () => {
+    getText.mockResolvedValue({ total: 2, pages: [
+      { num: 1, text: 'Contract terms' }, { num: 2, text: 'Native only' },
+    ] });
+    getImage.mockResolvedValue({ pages: [{ pageNumber: 1, images: [{ width: 1200, height: 1600 }] }] });
+
+    await expect(extractPdfDocumentPages(new Uint8Array([1]))).resolves.toEqual([
+      { pdfPageNumber: 1, text: 'Contract terms', hasEmbeddedImage: true },
+      { pdfPageNumber: 2, text: 'Native only' },
+    ]);
+    expect(getImage).toHaveBeenCalledWith({ partial: [1, 2], imageThreshold: 0, imageBuffer: false, imageDataUrl: false });
   });
 
   it('rejects empty bytes before creating a parser', async () => {

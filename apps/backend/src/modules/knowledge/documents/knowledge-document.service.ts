@@ -175,7 +175,13 @@ export class KnowledgeDocumentService implements OnModuleInit {
       const extracted = await this.extractText(document);
       const text = extracted.normalized.rawText;
       await this.prisma.knowledgeDocument.update({ where: { id }, data: { rawText: text, stage: 'CHUNKING' } });
-      const chunks = chunkDocument(text);
+      const leadingWhitespace = text.length - text.trimStart().length;
+      const chunks = chunkDocument(text).map((chunk) => ({
+        ...chunk,
+        startOffset: chunk.startOffset + leadingWhitespace,
+        endOffset: chunk.endOffset + leadingWhitespace,
+        bodyStartOffset: chunk.bodyStartOffset + leadingWhitespace,
+      }));
       if (chunks.length === 0) throw new DocumentContentError('EMPTY_CONTENT', '资料无法生成可检索片段');
       validateChunkSources(text, chunks, extracted.normalized.segments);
       const chunkSources = extracted.segments

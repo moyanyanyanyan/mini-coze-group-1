@@ -4,6 +4,7 @@ import { DocumentContentError, pdfMaxBytes } from './document-content';
 export interface NativePdfPage {
   pdfPageNumber: number;
   text: string;
+  hasEmbeddedImage?: boolean;
 }
 
 export async function extractPdfDocumentPages(bytes: Uint8Array): Promise<NativePdfPage[]> {
@@ -31,7 +32,33 @@ export async function extractPdfDocumentPages(bytes: Uint8Array): Promise<Native
     if (!Number.isSafeInteger(total) || total < 1 || [...pages.keys()].some((number) => number > total)) {
       throw new DocumentContentError('INVALID_PDF', 'PDF 文件页数无效');
     }
-    return Array.from({ length: total }, (_, index) => ({ pdfPageNumber: index + 1, text: pages.get(index + 1) ?? '' }));
+    const nativePages: NativePdfPage[] = Array.from({ length: total }, (_, index) => ({
+      pdfPageNumber: index + 1,
+      text: pages.get(index + 1) ?? '',
+    }));
+    const pagesWithNativeText = nativePages.filter((page) => page.text).map((page) => page.pdfPageNumber);
+    if (pagesWithNativeText.length > 0) {
+      // Inspect image presence without retaining image buffers or data URLs.
+      // A page can contain a selectable title over an image-only body.
+      let images: Awaited<ReturnType<PDFParse['getImage']>>;
+      try {
+        images = await parser.getImage({
+          partial: pagesWithNativeText,
+          imageThreshold: 0,
+          imageBuffer: false,
+          imageDataUrl: false,
+        });
+      } catch {
+        throw new DocumentContentError('INVALID_PDF', 'PDF 图片结构无法解析');
+      }
+      const imagePages = new Set(images.pages.filter((page) => page.images.length > 0).map((page) => page.pageNumber));
+      nativePages.forEach((page) => {
+        if (imagePages.has(page.pdfPageNumber)) {
+          page.hasEmbeddedImage = true;
+        }
+      });
+    }
+    return nativePages;
   } finally {
     await parser.destroy();
   }

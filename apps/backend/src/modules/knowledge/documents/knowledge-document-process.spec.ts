@@ -475,6 +475,32 @@ function officeFixture(name: string): Buffer {
 }
 
 describe('KnowledgeDocumentService Office integration', () => {
+  it('keeps chunk offsets aligned when a real Office table starts with an empty cell', async () => {
+    // Real DOCX whose first table cell is empty, so the Office converter keeps a leading tab:
+    // rawText is "\tImportant body". chunkDocument() trims before chunking, so a chunk offset
+    // measured on the trimmed text no longer indexes rawText.
+    const filename = 'office-empty-first-cell.docx';
+    const bytes = officeFixture(filename);
+    const { service, ocr, embedding, tx, updates } = setup('DOCX', bytes, filename);
+    (service as unknown as { schedule(id: string): void }).schedule = jest.fn();
+    ocr.recognizeImage.mockResolvedValue({ status: 'ok', pages: [] });
+    const text = 'Important body';
+    const startOffset = 1;
+
+    await process(service);
+
+    expect(updates).toContainEqual({ rawText: `\t${text}`, stage: 'CHUNKING' });
+    expect(embedding.embed).toHaveBeenCalledWith([text]);
+    const rows = tx.knowledgeChunk.createMany.mock.calls[0][0].data;
+    expect(rows[0]).toMatchObject({ content: text, startOffset, endOffset: startOffset + text.length });
+    expect(rows[0].sourceRanges.ranges[0]).toMatchObject({
+      kind: 'tableCell', startOffset, endOffset: startOffset + text.length,
+    });
+    expect(tx.knowledgeDocument.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: 'READY' }),
+    }));
+  });
+
   it.each([
     ['DOCX', 't8.docx'],
     ['PPTX', 't8.pptx'],
