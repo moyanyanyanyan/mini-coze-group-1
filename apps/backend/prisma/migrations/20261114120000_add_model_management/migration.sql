@@ -15,6 +15,20 @@ CREATE TABLE "ModelProvider" (
     CONSTRAINT "ModelProvider_pkey" PRIMARY KEY ("id")
 );
 
+-- 兼容旧版模型配置表：20261112120000 已创建同名旧结构表，先改名保留数据，再建模型管理版本
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'ModelConfig'
+    ) THEN
+        ALTER TABLE "ModelConfig" RENAME TO "ModelConfigLegacy";
+        ALTER INDEX IF EXISTS "ModelConfig_pkey" RENAME TO "ModelConfigLegacy_pkey";
+        ALTER INDEX IF EXISTS "ModelConfig_key_key" RENAME TO "ModelConfigLegacy_key_key";
+        ALTER INDEX IF EXISTS "ModelConfig_enabled_sortOrder_idx" RENAME TO "ModelConfigLegacy_enabled_sortOrder_idx";
+    END IF;
+END $$;
+
 CREATE TABLE "ModelConfig" (
     "id" TEXT NOT NULL,
     "ownerId" UUID NOT NULL,
