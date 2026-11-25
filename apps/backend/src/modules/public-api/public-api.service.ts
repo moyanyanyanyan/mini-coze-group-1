@@ -83,6 +83,8 @@ export class PublicApiService {
         agentId: agent.agentId,
         message: dto.message,
         agentConfig: agent.config,
+        // 公开 API 不继承用户的全局 Prompt（第一阶段仅 Web 生效）
+        useGlobalPrompt: false,
       });
     } catch (error) {
       throw this.toHttpError(error);
@@ -116,6 +118,7 @@ export class PublicApiService {
         signal,
         agentId: plan.agentId,
         agentConfig: plan.agentConfig,
+        useGlobalPrompt: false,
       })) {
         yield this.projectPublicEvent(event);
       }

@@ -35,6 +35,7 @@ function createHarness() {
       conversation: { update: jest.fn().mockResolvedValue({}) },
     }),
     message: { findMany: jest.fn().mockResolvedValue([]), update },
+    user: { findUnique: jest.fn().mockResolvedValue({ globalPrompt: null }) },
   } as unknown as PrismaService;
   const conversations = {
     assertOwned: jest.fn().mockResolvedValue({
@@ -55,7 +56,7 @@ function createHarness() {
     runtime as unknown as RuntimeClientService,
     agents,
   );
-  return { service, runtime, update, agents };
+  return { service, runtime, update, agents, prisma };
 }
 
 function event(
@@ -360,4 +361,20 @@ describe('ChatService stream persistence', () => {
     expect(logged).not.toContain('敏感半截内容');
     errorSpy.mockRestore();
   });
+});
+
+
+it('omits global prompt and skips settings lookup for public streams', async () => {
+  const { service, runtime, prisma } = createHarness();
+  runtime.stream.mockImplementation(async function* (request: RuntimeRequestBody) {
+    expect(request.globalPrompt).toBeUndefined();
+    yield event(request, 1, 'run.started', { assistantMessageId: request.assistantMessageId });
+    yield event(request, 2, 'run.failed', { code: 'MODEL_ERROR', message: 'test', retryable: false });
+  });
+  for await (const _ of service.run({
+    conversationId: 'conversation-1', userId: 'owner-1', content: 'hi',
+    signal: new AbortController().signal, agentId: 'agent-1', agentConfig,
+    ...{ useGlobalPrompt: false },
+  })) {}
+  expect(prisma.user.findUnique).not.toHaveBeenCalled();
 });

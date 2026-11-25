@@ -18,6 +18,7 @@ export function Icon({ name, ...props }: IconProps) {
     arrowDown: <path d="M12 4v16m-6-6 6 6 6-6" />,
     play: <path d="m8 4 12 8-12 8Z" />,
     repeat: <><path d="M4 9a8 8 0 0 1 14-4l2 2M20 15a8 8 0 0 1-14 4l-2-2" /><path d="M20 3v4h-4M4 21v-4h4" /></>,
+    user: <><circle cx="12" cy="8" r="4" /><path d="M4 21v-2a8 8 0 0 1 16 0v2" /></>,
     home: <><path d="m3 11 9-8 9 8" /><path d="M5 10v10h14V10" /><path d="M9 20v-6h6v6" /></>,
     edit: <><path d="M4 20h4l11-11-4-4L4 16v4Z" /><path d="m13 7 4 4" /></>,
     chat: <><path d="M21 12a8 8 0 0 1-8 8H7l-4 2 1.4-4.2A8.5 8.5 0 1 1 21 12Z" /><path d="M8 12h.01M12 12h.01M16 12h.01" /></>,

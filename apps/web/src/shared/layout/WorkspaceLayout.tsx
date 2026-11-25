@@ -1,22 +1,21 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { WorkspaceLayoutView } from '@minicoze/ui/layouts';
 import { workspaceNavigation } from '../../app/feature-registry';
 import { getMe, logout } from '../../features/auth/api/auth-api';
-import type { AuthUser } from '../../features/auth/types';
+import { getCurrentUser, setCurrentUser, useCurrentUser } from '../user/current-user';
 import { ApiError } from '../api/http';
 import { AppLink } from '../routing/AppLink';
 import { navigate } from '../routing/navigation';
 
 export function WorkspaceLayout({ pathname, children }: { pathname: string; children: ReactNode }) {
-  const [me, setMe] = useState<AuthUser | null>(null);
+  const me = useCurrentUser();
 
   useEffect(() => {
+    if (getCurrentUser()) return;
     let alive = true;
     getMe()
       .then((user) => {
-        if (alive) {
-          setMe(user);
-        }
+        if (alive) setCurrentUser(user);
       })
       .catch((caught) => {
         if (caught instanceof ApiError && caught.status === 401) {

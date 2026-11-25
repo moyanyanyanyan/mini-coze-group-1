@@ -102,7 +102,7 @@ describe('Workflow HTTP contract', () => {
         {
           provide: UsersService,
           useValue: {
-            findById: jest.fn(async (id: string) => ({ id })),
+            findById: jest.fn(async (id: string) => ({ id, globalPrompt: '我是初学者，请用简单语言' })),
             toCurrentUser: (user: { id: string }) => user,
           },
         },
@@ -113,7 +113,8 @@ describe('Workflow HTTP contract', () => {
           },
         },
       ],
-    }).compile();
+    })
+      .compile();
     app = module.createNestApplication();
     app.use(cookieParser());
     app.setGlobalPrefix('api');
@@ -255,6 +256,11 @@ describe('Workflow HTTP contract', () => {
     });
     const result = await request('/wf/run', 'POST', { input: { query: 'hi' } });
     expect(result.status).toBe(200);
+    expect(agent.run).toHaveBeenCalledWith(
+      definition,
+      { query: 'hi' },
+      { actorId: 'alice', globalPrompt: '我是初学者，请用简单语言' },
+    );
     expect(result.body.runId).toBe('run');
     expect(repository.startRun).toHaveBeenCalledWith(
       expect.objectContaining({ userId: 'alice' }),

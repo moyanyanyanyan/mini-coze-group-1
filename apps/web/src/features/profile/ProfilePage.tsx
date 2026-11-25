@@ -1,0 +1,491 @@
+import { useEffect, useRef, useState } from 'react';
+import { logout } from '../auth/api/auth-api';
+import { ApiError } from '../../shared/api/http';
+import { getProfile, saveDisplayName, saveGlobalPrompt, uploadAvatar, AVATAR_MIME_TYPES, MAX_AVATAR_BYTES } from './api/profile-api';
+import { AccountSecurity } from './AccountSecurity';
+import type { ProfileUser } from './api/profile-api';
+import { navigate } from '../../shared/routing/navigation';
+import { setCurrentUser } from '../../shared/user/current-user';
+import './profile.css';
+
+type ProfileSection = 'profile' | 'personalization' | 'security' | 'account';
+
+interface Feedback {
+  type: 'ok' | 'error';
+  text: string;
+}
+
+const profileSections: Array<{
+  id: ProfileSection;
+  label: string;
+  description: string;
+}> = [
+  { id: 'profile', label: '个人资料', description: '头像与公开资料' },
+  { id: 'personalization', label: '个性化', description: '全局 Prompt 偏好' },
+  { id: 'security', label: '账号安全', description: '密码与登录方式' },
+  { id: 'account', label: '账户信息', description: '账号标识与时间' },
+];
+
+export function ProfilePage() {
+  const [activeSection, setActiveSection] = useState<ProfileSection>('profile');
+  const [user, setUser] = useState<ProfileUser | null>(null);
+  const [displayName, setDisplayName] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [copyLabel, setCopyLabel] = useState('复制');
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [savingName, setSavingName] = useState(false);
+  const [nameFeedback, setNameFeedback] = useState<Feedback | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarFeedback, setAvatarFeedback] = useState<Feedback | null>(null);
+  const [globalPrompt, setGlobalPrompt] = useState('');
+  const [savingPrompt, setSavingPrompt] = useState(false);
+  const [promptFeedback, setPromptFeedback] = useState<Feedback | null>(null);
+
+  const applyUser = (profile: ProfileUser) => {
+    setUser(profile);
+    setDisplayName(profile.displayName);
+    setGlobalPrompt(profile.globalPrompt ?? '');
+    setCurrentUser(profile);
+  };
+
+  useEffect(() => {
+    let alive = true;
+    getProfile()
+      .then((profile) => {
+        if (alive) applyUser(profile);
+      })
+      .catch((cause: unknown) => {
+        if (alive) setLoadError(errorText(cause, '无法加载账户信息，请确认登录状态后重试。'));
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const copyUserId = async () => {
+    if (!user) return;
+    try {
+      await navigator.clipboard.writeText(user.id);
+      setCopyLabel('已复制');
+    } catch {
+      setCopyLabel('复制失败');
+    }
+  };
+
+  const handleSaveName = async () => {
+    if (!user || savingName) return;
+    const next = displayName.trim();
+    if (!next) {
+      setNameFeedback({ type: 'error', text: '昵称不能为空' });
+      return;
+    }
+    setSavingName(true);
+    setNameFeedback(null);
+    try {
+      const updated = await saveDisplayName(next);
+      // 页面数据以接口响应为准，同时写回全局用户快照（左下角、下拉菜单一起更新）
+      const merged = { ...user, ...updated };
+      setUser(merged);
+      setCurrentUser(merged);
+      setDisplayName(updated.displayName);
+      setNameFeedback({ type: 'ok', text: '昵称已保存' });
+    } catch (cause) {
+      setNameFeedback({ type: 'error', text: errorText(cause, '保存失败，请稍后再试') });
+    } finally {
+      setSavingName(false);
+    }
+  };
+
+  const handleAvatarFile = async (file: File) => {
+    if (!user || avatarUploading) return;
+    if (!AVATAR_MIME_TYPES.includes(file.type as (typeof AVATAR_MIME_TYPES)[number])) {
+      setAvatarFeedback({ type: 'error', text: '仅支持 JPG、PNG、WebP 格式的图片' });
+      return;
+    }
+    if (file.size > MAX_AVATAR_BYTES) {
+      setAvatarFeedback({ type: 'error', text: '头像大小不能超过 5MB' });
+      return;
+    }
+    setAvatarUploading(true);
+    setAvatarFeedback(null);
+    try {
+      const updated = await uploadAvatar(file);
+      // 上传失败时不会走到这里，原头像保持不变
+      const merged = { ...user, ...updated };
+      setUser(merged);
+      setCurrentUser(merged);
+      setAvatarFeedback({ type: 'ok', text: '头像已更新' });
+    } catch (cause) {
+      setAvatarFeedback({ type: 'error', text: errorText(cause, '头像上传失败，请稍后再试') });
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  const persistPrompt = async (value: string, successText: string) => {
+    if (!user || savingPrompt) return;
+    setSavingPrompt(true);
+    setPromptFeedback(null);
+    try {
+      const updated = await saveGlobalPrompt(value);
+      setUser(updated);
+      setCurrentUser(updated);
+      setGlobalPrompt(updated.globalPrompt ?? '');
+      setPromptFeedback({ type: 'ok', text: successText });
+    } catch (cause) {
+      // 失败时保留当前输入，避免用户内容丢失
+      setPromptFeedback({ type: 'error', text: errorText(cause, '保存失败，请稍后再试') });
+    } finally {
+      setSavingPrompt(false);
+    }
+  };
+
+  const refreshProfile = () => {
+    getProfile()
+      .then(applyUser)
+      .catch(() => {
+        // 密码已改成功，刷新资料失败不覆盖成功提示
+      });
+  };
+
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await logout();
+    } finally {
+      navigate('/login');
+    }
+  };
+
+  return (
+    <section className="feature-page profile-page" aria-labelledby="profile-title">
+      <header className="profile-header">
+        <p>Account / Profile</p>
+        <h1 id="profile-title">个人中心</h1>
+        <span>管理你的 MiniCoze 账户资料与安全设置。</span>
+      </header>
+
+      <div className="profile-layout">
+        <nav className="profile-nav" aria-label="个人中心分类">
+          {profileSections.map((section) => (
+            <button
+              type="button"
+              className={activeSection === section.id ? 'is-active' : ''}
+              aria-current={activeSection === section.id ? 'page' : undefined}
+              onClick={() => setActiveSection(section.id)}
+              key={section.id}
+            >
+              <span>{section.label}</span>
+              <small>{section.description}</small>
+            </button>
+          ))}
+        </nav>
+
+        <div className="profile-panel">
+          {loading ? (
+            <div className="profile-state">正在加载账户信息…</div>
+          ) : loadError || !user ? (
+            <div className="profile-state profile-state--error">
+              <strong>账户信息不可用</strong>
+              <p>{loadError || '请重新登录后再试。'}</p>
+              <button type="button" onClick={() => navigate('/login')}>前往登录</button>
+            </div>
+          ) : (
+            <>
+              {activeSection === 'profile' && (
+                <ProfileDetails
+                  user={user}
+                  displayName={displayName}
+                  onDisplayNameChange={(value) => {
+                    setDisplayName(value);
+                    setNameFeedback(null);
+                  }}
+                  onSave={() => void handleSaveName()}
+                  saving={savingName}
+                  dirty={displayName.trim() !== user.displayName}
+                  feedback={nameFeedback}
+                  avatarUploading={avatarUploading}
+                  avatarFeedback={avatarFeedback}
+                  onAvatarFile={(file) => void handleAvatarFile(file)}
+                  copyLabel={copyLabel}
+                  onCopyUserId={() => void copyUserId()}
+                />
+              )}
+              {activeSection === 'personalization' && (
+                <PersonalizationSection
+                  prompt={globalPrompt}
+                  saving={savingPrompt}
+                  dirty={globalPrompt !== (user.globalPrompt ?? '')}
+                  feedback={promptFeedback}
+                  onChange={(value) => {
+                    setGlobalPrompt(value);
+                    setPromptFeedback(null);
+                  }}
+                  onSave={() => void persistPrompt(globalPrompt, '全局 Prompt 已保存')}
+                  onClear={() => void persistPrompt('', '全局 Prompt 已清空')}
+                />
+              )}              {activeSection === 'security' && (
+                <AccountSecurity
+                  user={user}
+                  loggingOut={loggingOut}
+                  onLogout={() => void handleLogout()}
+                  onPasswordChanged={refreshProfile}
+                />
+              )}
+              {activeSection === 'account' && (
+                <AccountInformation
+                  user={user}
+                  copyLabel={copyLabel}
+                  onCopyUserId={() => void copyUserId()}
+                />
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ProfileDetails({
+  user,
+  displayName,
+  onDisplayNameChange,
+  onSave,
+  saving,
+  dirty,
+  feedback,
+  avatarUploading,
+  avatarFeedback,
+  onAvatarFile,
+  copyLabel,
+  onCopyUserId,
+}: {
+  user: ProfileUser;
+  displayName: string;
+  onDisplayNameChange: (value: string) => void;
+  onSave: () => void;
+  saving: boolean;
+  dirty: boolean;
+  feedback: Feedback | null;
+  avatarUploading: boolean;
+  avatarFeedback: Feedback | null;
+  onAvatarFile: (file: File) => void;
+  copyLabel: string;
+  onCopyUserId: () => void;
+}) {
+  const initial = (displayName || user.email).trim().charAt(0).toUpperCase() || '?';
+  const avatarInput = useRef<HTMLInputElement>(null);
+  const openAvatarPicker = () => {
+    if (!avatarUploading) avatarInput.current?.click();
+  };
+  return (
+    <section className="profile-section" aria-labelledby="profile-details-title">
+      <div className="profile-section-heading">
+        <div>
+          <p>PROFILE</p>
+          <h2 id="profile-details-title">个人资料</h2>
+        </div>
+      </div>
+
+      <div className="profile-identity">
+        <input
+          ref={avatarInput}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          className="profile-avatar-input"
+          disabled={avatarUploading}
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            // 清空 value，保证连续选择同一张图也会触发 onChange
+            event.target.value = '';
+            if (file) onAvatarFile(file);
+          }}
+        />
+        <div
+          className={`profile-avatar${avatarUploading ? ' is-uploading' : ''}`}
+          role="button"
+          tabIndex={0}
+          aria-label="更换头像"
+          title="点击更换头像"
+          onClick={openAvatarPicker}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              openAvatarPicker();
+            }
+          }}
+        >
+          {user.avatarUrl ? <img src={user.avatarUrl} alt="用户头像" /> : initial}
+        </div>
+        <div className="profile-identity-copy">
+          <strong>{displayName || user.email}</strong>
+          <span>{user.email}</span>
+        </div>
+        <button type="button" onClick={openAvatarPicker} disabled={avatarUploading}>
+          {avatarUploading ? '上传中…' : '更换头像'}
+        </button>
+      </div>
+      {avatarFeedback ? (
+        <p className={`profile-form-message profile-form-message--${avatarFeedback.type}`} role="status">
+          {avatarFeedback.text}
+        </p>
+      ) : null}
+
+      <div className="profile-form">
+        <label>
+          <span>昵称</span>
+          <input
+            value={displayName}
+            maxLength={20}
+            onChange={(event) => onDisplayNameChange(event.target.value)}
+          />
+        </label>
+        <label>
+          <span>邮箱</span>
+          <input value={user.email} readOnly />
+        </label>
+        <label>
+          <span>用户 ID</span>
+          <div className="profile-copy-row">
+            <input value={user.id} readOnly />
+            <button type="button" onClick={onCopyUserId}>{copyLabel}</button>
+          </div>
+        </label>
+        <div className="profile-form-actions">
+          <button type="button" onClick={onSave} disabled={saving || !dirty}>
+            {saving ? '保存中…' : '保存资料'}
+          </button>
+          {feedback ? (
+            <span className={`profile-form-message profile-form-message--${feedback.type}`} role="status">
+              {feedback.text}
+            </span>
+          ) : (
+            <span>昵称长度 1–20 字。</span>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const PROMPT_MAX_LENGTH = 4000;
+
+function PersonalizationSection({
+  prompt,
+  saving,
+  dirty,
+  feedback,
+  onChange,
+  onSave,
+  onClear,
+}: {
+  prompt: string;
+  saving: boolean;
+  dirty: boolean;
+  feedback: Feedback | null;
+  onChange: (value: string) => void;
+  onSave: () => void;
+  onClear: () => void;
+}) {
+  return (
+    <section className="profile-section" aria-labelledby="profile-personalization-title">
+      <div className="profile-section-heading">
+        <div>
+          <p>PERSONALIZATION</p>
+          <h2 id="profile-personalization-title">个性化</h2>
+        </div>
+      </div>
+
+      <div className="profile-security-card profile-security-card--stack">
+        <div>
+          <strong>全局 Prompt</strong>
+          <p>
+            全局 Prompt 是你对 AI 助手的长期偏好设置。保存后会在每次运行 Agent 时自动生效，
+            不会替代 Agent 自身的人设指令。
+          </p>
+        </div>
+        <label className="profile-prompt-field">
+          <span>你的偏好</span>
+          <textarea
+            className="profile-prompt-input"
+            rows={7}
+            maxLength={PROMPT_MAX_LENGTH}
+            placeholder="例如：我是初学者，请用简单易懂的语言回答。"
+            value={prompt}
+            disabled={saving}
+            onChange={(event) => onChange(event.target.value)}
+          />
+        </label>
+        <div className="profile-form-actions">
+          <button type="button" onClick={onSave} disabled={saving || !dirty}>
+            {saving ? '保存中…' : '保存'}
+          </button>
+          <button type="button" className="profile-prompt-clear" onClick={onClear} disabled={saving || !prompt}>
+            清空
+          </button>
+          <span className="profile-prompt-count">
+            {prompt.length} / {PROMPT_MAX_LENGTH}
+          </span>
+          {feedback ? (
+            <span className={`profile-form-message profile-form-message--${feedback.type}`} role="status">
+              {feedback.text}
+            </span>
+          ) : null}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AccountInformation({
+  user,
+  copyLabel,
+  onCopyUserId,
+}: {
+  user: ProfileUser;
+  copyLabel: string;
+  onCopyUserId: () => void;
+}) {
+  return (
+    <section className="profile-section" aria-labelledby="profile-account-title">
+      <div className="profile-section-heading">
+        <div>
+          <p>ACCOUNT</p>
+          <h2 id="profile-account-title">账户信息</h2>
+        </div>
+      </div>
+
+      <dl className="profile-info-list">
+        <div>
+          <dt>邮箱</dt>
+          <dd>{user.email}</dd>
+        </div>
+        <div>
+          <dt>用户 ID</dt>
+          <dd className="profile-info-id">
+            <code>{user.id}</code>
+            <button type="button" onClick={onCopyUserId}>{copyLabel}</button>
+          </dd>
+        </div>
+        <div>
+          <dt>登录方式</dt>
+          <dd>{user.hasPassword ? (user.googleLinked ? '邮箱密码 + Google' : '邮箱密码') : 'Google'}</dd>
+        </div>
+      </dl>
+    </section>
+  );
+}
+
+function errorText(cause: unknown, fallback: string) {
+  if (cause instanceof ApiError) {
+    if (cause.status === 401) return '登录状态已失效，请重新登录。';
+    return cause.message || fallback;
+  }
+  return fallback;
+}

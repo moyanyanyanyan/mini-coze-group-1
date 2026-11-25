@@ -39,6 +39,8 @@ export interface RuntimeRequestBody {
   agentConfig: RuntimeAgentConfig;
   history: RuntimeHistoryMessage[];
   message: string;
+  /** 用户级全局 Prompt 的本轮快照；空值不传 */
+  globalPrompt?: string;
 }
 
 // Runtime返回的事件

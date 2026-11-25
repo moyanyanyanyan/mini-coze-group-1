@@ -117,4 +117,32 @@ describe('PublicApiService Runtime error mapping', () => {
     expect(error).toBeInstanceOf(HttpException);
     expect((error as HttpException).getStatus()).toBe(500);
   });
+
+  it('runs without the user global prompt', async () => {
+    const { service, chat } = createService();
+    chat.runOnce.mockResolvedValue({
+      runId: 'run-1',
+      conversationId: 'conversation-1',
+      assistantMessageId: 'assistant-1',
+      status: 'completed',
+      content: '回答',
+      finishReason: 'stop',
+      citations: [],
+      toolResults: [],
+    });
+
+    await service.run({ message: '你好' }, principal);
+
+    expect(chat.runOnce).toHaveBeenCalledWith(
+      expect.objectContaining({ useGlobalPrompt: false }),
+    );
+  });
+});
+
+it('streams without reading or injecting the user global prompt', async () => {
+  const { service, chat } = createService();
+  chat.run.mockImplementation(async function* () {});
+  const plan = await service.prepareStream({ message: 'hi' }, principal);
+  for await (const _ of service.stream(plan, 'hi', new AbortController().signal)) {}
+  expect(chat.run).toHaveBeenCalledWith(expect.objectContaining({ useGlobalPrompt: false }));
 });
