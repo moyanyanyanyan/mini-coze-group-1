@@ -13,7 +13,7 @@ export class KnowledgePreviewService {
     const document = await this.prisma.knowledgeDocument.findFirst({
       where: { id: documentId, knowledgeBaseId }, select: { id: true },
     });
-    if (!document) throw new NotFoundException('文档不存在');
+    if (!document) {throw new NotFoundException('文档不存在');}
     const where = { documentId, knowledgeBaseId };
     const [total, chunks] = await this.prisma.$transaction([
       this.prisma.knowledgeChunk.count({ where }),
@@ -32,6 +32,6 @@ export class KnowledgePreviewService {
 
   private async assertBase(id: string, workspaceId: string) {
     const base = await this.prisma.knowledgeBase.findUnique({ where: { id }, select: { workspaceId: true, status: true } });
-    if (!base || base.workspaceId !== workspaceId || base.status !== 'ACTIVE') throw new NotFoundException('知识库不存在或不可用');
+    if (!base || base.workspaceId !== workspaceId || base.status !== 'ACTIVE') {throw new NotFoundException('知识库不存在或不可用');}
   }
 }

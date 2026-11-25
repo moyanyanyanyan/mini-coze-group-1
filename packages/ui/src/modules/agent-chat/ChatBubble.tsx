@@ -31,7 +31,26 @@ export function ChatBubble({ message, agentName, avatarUrl }: ChatBubbleProps) {
         ) : (
           message.content || '未收到回复，请重试。'
         )}
+        {isUser && message.attachments?.length ? (
+          <div className={styles.bubbleAttachments}>
+            {message.attachments.map((attachment) => (
+              <span
+                key={attachment.id}
+                className={`${styles.bubbleAttachment}${attachment.status === 'FAILED' ? ` ${styles.bubbleAttachmentFailed}` : ''}`}
+                title={attachment.status === 'FAILED' ? attachment.errorCode ?? '解析失败' : attachment.fileName}
+              >
+                {attachment.fileName} · {formatFileSize(attachment.byteSize)}
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
     </div>
   );
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }

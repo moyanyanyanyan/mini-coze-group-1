@@ -78,7 +78,7 @@ describe('新增插件服务入口', () => {
   it('已经取得工具定义后全局停用，旧请求也不能执行', async () => {
     expect(service.listTools(['plugin_echo'], 'test').data).toHaveLength(1);
     const row = await registry.getRow('plugin_echo');
-    if (!row) throw new Error('测试插件不存在');
+    if (!row) {throw new Error('测试插件不存在');}
     jest.spyOn(registry, 'getRow').mockResolvedValue({ ...row, enabled: false });
     const execute = jest.spyOn(BUILTIN_PLUGINS[0].executors[0], 'execute');
     try {

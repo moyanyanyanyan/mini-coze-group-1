@@ -64,6 +64,16 @@ export interface ConversationSummary {
   updatedAt: string;
 }
 
+/** 消息附件元信息。历史接口只回元信息，不回解析文本 */
+export interface ChatMessageAttachment {
+  id: string;
+  fileName: string;
+  sourceType: string;
+  byteSize: number;
+  status: 'READY' | 'FAILED';
+  errorCode?: string | null;
+}
+
 /** 单条消息。历史拉取与实时推送都用这一个结构 */
 export interface ChatMessage {
   id: string;
@@ -74,6 +84,8 @@ export interface ChatMessage {
   seq: number;
   content: string;
   createdAt: string;
+  /** 只有用户消息可能带附件 */
+  attachments?: ChatMessageAttachment[];
 }
 
 /**

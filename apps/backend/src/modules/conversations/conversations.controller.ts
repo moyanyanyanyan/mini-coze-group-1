@@ -76,6 +76,6 @@ export class ConversationsController {
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<SendMessageResult> {
     await this.conversations.assertOwned(id, user.id);
-    return this.messages.send(id, dto.content);
+    return this.messages.send(id, dto.content, dto.attachmentIds);
   }
 }

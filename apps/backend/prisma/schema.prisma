@@ -208,6 +208,7 @@ model Conversation {
 
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages Message[]
+  attachments MessageAttachment[]
 
   @@index([userId, updatedAt])
 }
@@ -221,7 +222,8 @@ model Message {
   content        String
   createdAt      DateTime @default(now())
 
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversation Conversation        @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  attachments  MessageAttachment[]
 
   @@index([conversationId, seq])
 }

@@ -155,6 +155,11 @@ describe('ChatService.runOnce', () => {
     expect(harness.messageFindMany).toHaveBeenCalledWith({
       where: { conversationId: 'conversation-1', status: { in: ['completed'] } },
       orderBy: { seq: 'asc' },
+      include: {
+        attachments: {
+          select: { fileName: true, extractedText: true, status: true },
+        },
+      },
     });
     expect(requestBody).toMatchObject({
       actor: { id: 'owner-1' },

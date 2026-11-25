@@ -130,9 +130,9 @@ export class AgentsService {
         workflowBindings: true,
       },
     });
-    if (!agent) throw new NotFoundException('Agent 不存在');
-    if (agent.status === 'ARCHIVED') throw new NotFoundException('Agent 已归档');
-    if (agent.ownerId !== userId) throw new ForbiddenException('无权访问此 Agent');
+    if (!agent) {throw new NotFoundException('Agent 不存在');}
+    if (agent.status === 'ARCHIVED') {throw new NotFoundException('Agent 已归档');}
+    if (agent.ownerId !== userId) {throw new ForbiddenException('无权访问此 Agent');}
     if (!agent.modelConfigId) {
       throw new BadRequestException({
         code: ErrorCode.MODEL_NOT_BOUND,
