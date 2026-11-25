@@ -15,9 +15,11 @@ export interface WorkspaceLayoutViewProps {
   LinkComponent: LinkComponentType;
   onLogout: () => void;
   onOpenWorkspace: () => void;
+  /** 额外菜单项，追加在「工作台首页」之后（如个人中心） */
+  menuItems?: readonly { label: string; onClick: () => void }[];
 }
 
-export function WorkspaceLayoutView({ pathname, children, navigation, user: me, LinkComponent, onLogout, onOpenWorkspace }: WorkspaceLayoutViewProps) {
+export function WorkspaceLayoutView({ pathname, children, navigation, user: me, LinkComponent, onLogout, onOpenWorkspace, menuItems = [] }: WorkspaceLayoutViewProps) {
   const editorMode = pathname.includes('/workflows') || pathname.includes('/chat');
   const [navPreference, setNavPreference] = useState<boolean | null>(() => {
     const stored = sessionStorage.getItem('workspace-nav-collapsed');
@@ -132,7 +134,17 @@ export function WorkspaceLayoutView({ pathname, children, navigation, user: me, 
                 >
                   工作台首页
                 </button>
-                <button
+                {menuItems.map((item) => (
+                  <button
+                    key={item.label}
+                    type="button"
+                    role="menuitem"
+                    className="workspace-user-menu-item"
+                    onClick={() => { setMenuOpen(false); item.onClick(); }}
+                  >
+                    {item.label}
+                  </button>
+                ))}                <button
                   type="button"
                   role="menuitem"
                   className="workspace-user-menu-item"

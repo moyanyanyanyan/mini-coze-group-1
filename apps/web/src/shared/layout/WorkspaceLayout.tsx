@@ -44,6 +44,9 @@ export function WorkspaceLayout({ pathname, children }: { pathname: string; chil
       LinkComponent={AppLink}
       onLogout={handleLogout}
       onOpenWorkspace={() => navigate('/workspace')}
+      menuItems={[
+        { label: '个人中心', onClick: () => navigate('/workspace/profile') },
+      ]}
     >
       {children}
     </WorkspaceLayoutView>
