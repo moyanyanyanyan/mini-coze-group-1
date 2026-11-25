@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { KnowledgeView } from '@minicoze/ui/knowledge';
+import { KnowledgeView, documentFormat } from '@minicoze/ui/knowledge';
 import { useConfirm } from '@minicoze/ui/hooks';
 import { KnowledgeCenterPage } from './KnowledgeCenterPage';
 import { createKnowledgeBase, createTextDocument, getKnowledgeDocument, getKnowledgeDocumentContent, getKnowledgeDocumentContentPage, getKnowledgeWorkspaceId, deleteKnowledgeBase, deleteKnowledgeDocument, listKnowledgeBases, listKnowledgeDocuments, previewKnowledgeSearch, retryKnowledgeDocument, updateKnowledgeBase, updateKnowledgeBaseStatus, uploadDocumentFile, type KnowledgeBase, type KnowledgeDocument, type KnowledgeSearchResult } from './knowledge.api';
 import { navigate, usePathname } from '../../shared/routing/navigation';
+import { knowledgeUploadError } from './upload-validation';
 
 
 
@@ -172,7 +173,9 @@ function KnowledgeDetailPage({ knowledgeBaseId }: { knowledgeBaseId: string }) {
       if (sourceMode === 'text') {
         await createTextDocument(selectedId, { workspaceId: workspaceId, title: documentTitle.trim(), text: documentText });
       } else {
-        if (!documentFile) throw new Error('请选择 TXT、JSON 或 PDF 文件');
+        if (!documentFile) throw new Error('请选择 TXT、JSON、PDF 或图片文件');
+        const uploadError = knowledgeUploadError(documentFile);
+        if (uploadError) throw new Error(uploadError);
         await uploadDocumentFile(selectedId, { workspaceId: workspaceId, title: documentTitle, file: documentFile });
       }
       setDocuments(await listKnowledgeDocuments(selectedId, workspaceId));
@@ -185,6 +188,11 @@ function KnowledgeDetailPage({ knowledgeBaseId }: { knowledgeBaseId: string }) {
     } finally {
       setDocumentSaving(false);
     }
+  }
+
+  function handleDocumentFileChange(file: File | null) {
+    setDocumentFile(file);
+    setDocumentError(file ? (knowledgeUploadError(file) ?? '') : '');
   }
 
   async function handleRetry(documentId: string) {
@@ -350,7 +358,7 @@ function KnowledgeDetailPage({ knowledgeBaseId }: { knowledgeBaseId: string }) {
         onSourceModeChange: setSourceMode,
         onDocumentTitleChange: setDocumentTitle,
         onDocumentTextChange: setDocumentText,
-        onDocumentFileChange: setDocumentFile,
+        onDocumentFileChange: handleDocumentFileChange,
         handleDocumentSubmit,
         handleRetry,
         onViewDocumentChunks: (id) => { setSelectedDocumentId(id); setDocumentDrawerOpen(true); },
@@ -424,7 +432,7 @@ function KnowledgeDocumentReaderPage({ knowledgeBaseId, documentId }: { knowledg
     <div className="knowledge-reading-content">
       <button type="button" className="knowledge-reading-back" onClick={() => navigate(`/workspace/knowledge/${encodeURIComponent(knowledgeBaseId)}`)}>← 返回知识库详情</button>
       {loading ? <p className="knowledge-empty">正在加载识别内容…</p> : error && !document ? <div className="knowledge-error" role="alert">{error}</div> : document && <>
-        <header className="knowledge-reading-header"><h1>{document.title}</h1><p>{document.sourceType} · {totalLength?.toLocaleString('zh-CN') ?? '—'} 字 · {document.status === 'READY' ? '可检索' : document.status === 'PROCESSING' ? '处理中' : '处理失败'}</p></header>
+        <header className="knowledge-reading-header"><h1>{document.title}</h1><p>{documentFormat(document)} · {totalLength?.toLocaleString('zh-CN') ?? '—'} 字 · {document.status === 'READY' ? '可检索' : document.status === 'PROCESSING' ? '处理中' : '处理失败'}</p></header>
         {error && <p className="knowledge-error" role="alert">{error}</p>}
         {content ? <div className="knowledge-reading-body">{content}</div> : <p className="knowledge-empty">这份资料没有可展示的识别内容。</p>}
         {nextCursor && <button type="button" className="knowledge-reading-load-more" onClick={() => void loadMore()} disabled={loadingMore}>{loadingMore ? '加载中…' : '加载更多内容'}</button>}

@@ -1,0 +1,27 @@
+export const KNOWLEDGE_FILE_ACCEPT = '.txt,.json,.pdf,.png,.jpg,.jpeg';
+
+const MIB = 1024 * 1024;
+
+export interface KnowledgeUploadCandidate {
+  name: string;
+  size: number;
+}
+
+/**
+ * Mirrors the Backend per-type limits so the browser can reject an obviously invalid
+ * file before uploading it. The Backend remains the authoritative validator.
+ */
+export function knowledgeUploadError(file: KnowledgeUploadCandidate): string | null {
+  const dot = file.name.lastIndexOf('.');
+  const extension = dot >= 0 ? file.name.slice(dot).toLowerCase() : '';
+  if (extension === '.txt' || extension === '.json') {
+    return file.size > MIB ? 'TXT 和 JSON 文件不能超过 1 MiB' : null;
+  }
+  if (extension === '.pdf') {
+    return file.size > 64 * MIB ? 'PDF 文件不能超过 64 MiB' : null;
+  }
+  if (extension === '.png' || extension === '.jpg' || extension === '.jpeg') {
+    return file.size > 10 * MIB ? 'PNG / JPG / JPEG 图片不能超过 10 MiB' : null;
+  }
+  return '只支持 TXT、JSON、PDF、PNG、JPG、JPEG 文件';
+}

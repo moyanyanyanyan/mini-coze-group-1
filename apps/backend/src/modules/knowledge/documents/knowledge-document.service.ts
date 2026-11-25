@@ -6,6 +6,8 @@ import { PrismaService } from '../../../database/prisma.service';
 import { EmbeddingClient, EMBEDDING_DIMENSION, EmbeddingUnavailableError } from '../../../integrations/embedding.client';
 import { OcrWorkerClient, OcrWorkerError } from '../../../integrations/ocr-worker.client';
 import { decodeUploadFilename, DocumentContentError, extractDocumentText, MAX_DOCUMENT_BYTES, pdfMaxBytes, readDocumentTextPage, sourceTypeFromFilename } from './document-content';
+import { assertImageUpload, extractImageDocumentText } from './image-document-content';
+import { imageMaxBytes } from '../../../config/upload-limits';
 import { chunkDocument } from './chunk-document';
 import { extractHybridPdfDocumentText } from './pdf-hybrid-document-content';
 import { CreateTextDocumentDto } from '../dto/create-text-document.dto';
@@ -14,6 +16,7 @@ interface UploadedDocumentFile {
   originalname: string;
   buffer: Buffer;
   size: number;
+  mimetype?: string;
 }
 
 @Injectable()
@@ -45,9 +48,9 @@ export class KnowledgeDocumentService implements OnModuleInit {
 
   async createFile(knowledgeBaseId: string, workspaceId: string, title: string | undefined, file: UploadedDocumentFile | undefined) {
     await this.assertKnowledgeBase(knowledgeBaseId, workspaceId);
-    if (!file) throw new BadRequestException('请选择 TXT、JSON 或 PDF 文件');
+    if (!file) throw new BadRequestException('请选择 TXT、JSON、PDF、PNG 或 JPEG 文件');
     const filename = decodeUploadFilename(file.originalname);
-    let sourceType: 'TXT' | 'JSON' | 'PDF';
+    let sourceType: 'TXT' | 'JSON' | 'PDF' | 'IMAGE';
     try {
       sourceType = sourceTypeFromFilename(filename);
     } catch (error) {
@@ -55,6 +58,13 @@ export class KnowledgeDocumentService implements OnModuleInit {
     }
     if (sourceType === 'PDF') {
       if (file.size > pdfMaxBytes()) throw new PayloadTooLargeException('PDF 文件超过上传大小限制');
+    } else if (sourceType === 'IMAGE') {
+      if (file.size > imageMaxBytes()) throw new PayloadTooLargeException('图片文件超过上传大小限制');
+      try {
+        assertImageUpload(filename, file.mimetype, file.buffer);
+      } catch (error) {
+        throw new BadRequestException(error instanceof Error ? error.message : '图片文件格式无效');
+      }
     } else if (file.size > MAX_DOCUMENT_BYTES) {
       throw new BadRequestException('TXT 和 JSON 文件不能超过 1 MiB');
     }
@@ -62,7 +72,10 @@ export class KnowledgeDocumentService implements OnModuleInit {
     if (!documentTitle || documentTitle.length > 100) throw new BadRequestException('文档标题长度必须为 1～100 字符');
 
     const document = await this.prisma.knowledgeDocument.create({
-      data: { knowledgeBaseId, title: documentTitle, sourceType, originalFileName: filename, sourceBytes: new Uint8Array(file.buffer) },
+      data: {
+        knowledgeBaseId, title: documentTitle,
+        sourceType, originalFileName: filename, sourceBytes: new Uint8Array(file.buffer),
+      },
     });
     this.schedule(document.id);
     return this.publicDocument(document);
@@ -140,9 +153,11 @@ export class KnowledgeDocumentService implements OnModuleInit {
       const document = await this.prisma.knowledgeDocument.findUniqueOrThrow({ where: { id } });
       await this.prisma.knowledgeDocument.update({ where: { id }, data: { stage: 'EXTRACTING' } });
       const bytes = document.sourceBytes ?? new Uint8Array();
-      const text = document.sourceType === 'PDF'
-        ? (await extractHybridPdfDocumentText(bytes, document.originalFileName ?? 'document.pdf', this.ocr)).rawText
-        : extractDocumentText(document.sourceType, bytes);
+      const text = document.sourceType === 'IMAGE'
+        ? await extractImageDocumentText(bytes, document.originalFileName, this.ocr)
+        : document.sourceType === 'PDF'
+          ? (await extractHybridPdfDocumentText(bytes, document.originalFileName ?? 'document.pdf', this.ocr)).rawText
+          : extractDocumentText(document.sourceType, bytes);
       await this.prisma.knowledgeDocument.update({ where: { id }, data: { rawText: text, stage: 'CHUNKING' } });
       const chunks = chunkDocument(text);
       if (chunks.length === 0) throw new DocumentContentError('EMPTY_CONTENT', '资料无法生成可检索片段');

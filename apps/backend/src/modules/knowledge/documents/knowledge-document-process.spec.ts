@@ -2,6 +2,7 @@ import { KnowledgeDocumentService } from './knowledge-document.service';
 import { DocumentContentError, MAX_DOCUMENT_BYTES, MAX_PDF_DOCUMENT_BYTES } from './document-content';
 import { extractPdfDocumentPages } from './pdf-document-content';
 import { OcrWorkerError } from '../../../integrations/ocr-worker.client';
+import { imageMaxBytes } from '../../../config/upload-limits';
 
 jest.mock('./pdf-document-content', () => ({ extractPdfDocumentPages: jest.fn() }));
 
@@ -15,7 +16,7 @@ function ocrPage(pageNumber: number, text: string) {
   return { pageNumber, text, method: 'ocr' as const, regions: [], elapsedMs: 1, renderDpi: 200, width: 100, height: 100 };
 }
 
-function setup(sourceType: 'PDF' | 'TXT' | 'JSON', sourceBytes: Uint8Array) {
+function setup(sourceType: 'PDF' | 'TXT' | 'JSON' | 'TEXT' | 'IMAGE', sourceBytes: Uint8Array, originalFileName: string | null = null) {
   const updates: Array<Record<string, unknown>> = [];
   const tx = {
     knowledgeChunk: { deleteMany: jest.fn().mockResolvedValue({}), createMany: jest.fn().mockResolvedValue({}) },
@@ -25,7 +26,7 @@ function setup(sourceType: 'PDF' | 'TXT' | 'JSON', sourceBytes: Uint8Array) {
   const prisma = {
     knowledgeBase: { findUnique: jest.fn().mockResolvedValue({ id: 'kb', workspaceId: 'ws', status: 'ACTIVE' }) },
     knowledgeDocument: {
-      findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'doc', knowledgeBaseId: 'kb', sourceType, sourceBytes }),
+      findUniqueOrThrow: jest.fn().mockResolvedValue({ id: 'doc', knowledgeBaseId: 'kb', sourceType, sourceBytes, originalFileName }),
       update: jest.fn().mockImplementation(async ({ data }: { data: Record<string, unknown> }) => {
         updates.push(data);
         return {};
@@ -41,7 +42,7 @@ function setup(sourceType: 'PDF' | 'TXT' | 'JSON', sourceBytes: Uint8Array) {
   const embedding = { embed: jest.fn().mockImplementation(async (contents: string[]) => ({
     model: 'test-model', vectors: contents.map(() => [0.1]),
   })) };
-  const ocr = { recognizePdfPages: jest.fn() };
+  const ocr = { recognizePdfPages: jest.fn(), recognizeImage: jest.fn() };
   const service = new KnowledgeDocumentService(prisma as never, embedding as never, ocr as never);
   return { service, prisma, embedding, ocr, tx, updates };
 }
@@ -260,5 +261,207 @@ describe('KnowledgeDocumentService PDF integration', () => {
     expect(updates).toContainEqual({ rawText: expected, stage: 'CHUNKING' });
     expect(embedding.embed).toHaveBeenCalledWith([expected]);
     expect(tx.knowledgeDocument.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'READY' }) }));
+  });
+});
+
+const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00]);
+const JPEG_BYTES = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x00]);
+
+function imageOcrPage(text: string) {
+  return {
+    pageNumber: 1, method: 'ocr' as const, text, regions: [], elapsedMs: 1,
+    renderDpi: null, width: null, height: null,
+  };
+}
+
+describe('KnowledgeDocumentService image integration', () => {
+  it.each([
+    ['scan.png', 'image/png', PNG_BYTES],
+    ['photo.jpg', 'image/jpeg', JPEG_BYTES],
+    ['photo.JPEG', 'image/jpeg', JPEG_BYTES],
+  ] as const)('accepts a %s image upload and schedules processing', async (filename, mimetype, bytes) => {
+    const { service, prisma, ocr } = setup('TEXT', new Uint8Array());
+    const schedule = jest.fn();
+    (service as unknown as { schedule(id: string): void }).schedule = schedule;
+
+    const result = await service.createFile('kb', 'ws', undefined, {
+      originalname: filename, buffer: bytes, size: bytes.length, mimetype,
+    });
+
+    expect(result).toMatchObject({ sourceType: 'IMAGE', originalFileName: filename, status: 'PROCESSING' });
+    expect(prisma.knowledgeDocument.create).toHaveBeenCalledWith({ data: expect.objectContaining({
+      knowledgeBaseId: 'kb', sourceType: 'IMAGE', originalFileName: filename, sourceBytes: new Uint8Array(bytes),
+    }) });
+    expect(schedule).toHaveBeenCalledWith('doc');
+    expect(ocr.recognizeImage).not.toHaveBeenCalled();
+  });
+
+  it('enforces the OCR Worker image size limit before saving', async () => {
+    const { service, prisma } = setup('TEXT', new Uint8Array());
+    const schedule = jest.fn();
+    (service as unknown as { schedule(id: string): void }).schedule = schedule;
+
+    await expect(service.createFile('kb', 'ws', undefined, {
+      originalname: 'scan.png', buffer: PNG_BYTES, size: imageMaxBytes(), mimetype: 'image/png',
+    })).resolves.toMatchObject({ sourceType: 'IMAGE' });
+    expect(prisma.knowledgeDocument.create).toHaveBeenCalledTimes(1);
+
+    await expect(service.createFile('kb', 'ws', undefined, {
+      originalname: 'scan.png', buffer: PNG_BYTES, size: imageMaxBytes() + 1, mimetype: 'image/png',
+    })).rejects.toMatchObject({ status: 413 });
+    expect(prisma.knowledgeDocument.create).toHaveBeenCalledTimes(1);
+    expect(schedule).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects an extension and MIME mismatch before saving', async () => {
+    const { service, prisma } = setup('TEXT', new Uint8Array());
+    await expect(service.createFile('kb', 'ws', undefined, {
+      originalname: 'scan.png', buffer: PNG_BYTES, size: PNG_BYTES.length, mimetype: 'image/jpeg',
+    })).rejects.toThrow(/MIME 类型不一致/);
+    expect(prisma.knowledgeDocument.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a renamed file whose content is not the declared image format', async () => {
+    const { service, prisma } = setup('TEXT', new Uint8Array());
+    await expect(service.createFile('kb', 'ws', undefined, {
+      originalname: 'scan.png', buffer: JPEG_BYTES, size: JPEG_BYTES.length, mimetype: 'image/png',
+    })).rejects.toThrow(/内容与扩展名不一致/);
+    expect(prisma.knowledgeDocument.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects unsupported image extensions such as .gif', async () => {
+    const { service, prisma } = setup('TEXT', new Uint8Array());
+    await expect(service.createFile('kb', 'ws', undefined, {
+      originalname: 'animation.gif', buffer: Buffer.from('GIF89a'), size: 6, mimetype: 'image/gif',
+    })).rejects.toThrow(/只支持/);
+    expect(prisma.knowledgeDocument.create).not.toHaveBeenCalled();
+  });
+
+  it('calls recognizeImage and keeps the shared Chunk, Embedding and Vector transaction', async () => {
+    const { service, ocr, embedding, tx, updates } = setup('IMAGE', PNG_BYTES, 'scan.png');
+    ocr.recognizeImage.mockResolvedValue({ status: 'ok', pages: [imageOcrPage('  发票金额 100 元  ')] });
+
+    await process(service);
+
+    expect(ocr.recognizeImage).toHaveBeenCalledWith(Buffer.from(PNG_BYTES), 'scan.png', 'image/png');
+    expect(pdfExtractor).not.toHaveBeenCalled();
+    expect(ocr.recognizePdfPages).not.toHaveBeenCalled();
+    expect(updates).toContainEqual({ rawText: '发票金额 100 元', stage: 'CHUNKING' });
+    expect(embedding.embed).toHaveBeenCalledWith(['发票金额 100 元']);
+    expect(tx.knowledgeChunk.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ content: '发票金额 100 元' })],
+    });
+    expect(tx.$executeRaw).toHaveBeenCalled();
+    expect(tx.knowledgeDocument.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: 'READY', stage: 'COMPLETED' }),
+    }));
+  });
+
+  it.each([
+    ['photo.jpg', 'image/jpeg', JPEG_BYTES],
+    ['photo.JPEG', 'image/jpeg', JPEG_BYTES],
+  ] as const)('uses image/jpeg for %s and normalizes CRLF OCR text', async (filename, mimeType, bytes) => {
+    const { service, ocr, updates } = setup('IMAGE', bytes, filename);
+    ocr.recognizeImage.mockResolvedValue({ status: 'ok', pages: [imageOcrPage('第一行\r\n第二行')] });
+
+    await process(service);
+
+    expect(ocr.recognizeImage).toHaveBeenCalledWith(Buffer.from(bytes), filename, mimeType);
+    expect(updates).toContainEqual({ rawText: '第一行\n第二行', stage: 'CHUNKING' });
+  });
+
+  it('fails with EMPTY_CONTENT when OCR succeeds without recognized text', async () => {
+    const { service, ocr, embedding, tx, updates } = setup('IMAGE', PNG_BYTES, 'blank.png');
+    ocr.recognizeImage.mockResolvedValue({ status: 'ok', pages: [imageOcrPage(' \r\n ')] });
+
+    await process(service);
+
+    expect(updates).toContainEqual({
+      status: 'FAILED', stage: 'FAILED', errorCode: 'EMPTY_CONTENT', errorMessage: '图片中没有识别到有效文本',
+    });
+    expect(updates).not.toContainEqual(expect.objectContaining({ stage: 'CHUNKING' }));
+    expect(embedding.embed).not.toHaveBeenCalled();
+    expect(tx.knowledgeChunk.createMany).not.toHaveBeenCalled();
+    expect(tx.knowledgeDocument.update).not.toHaveBeenCalled();
+  });
+
+  it('records OCR Worker unavailability as OCR_UNAVAILABLE', async () => {
+    const { service, ocr, embedding, updates } = setup('IMAGE', PNG_BYTES, 'scan.png');
+    ocr.recognizeImage.mockRejectedValue(new OcrWorkerError('UNAVAILABLE', 'OCR Worker 无法连接'));
+
+    await process(service);
+
+    expect(updates).toContainEqual({
+      status: 'FAILED', stage: 'FAILED', errorCode: 'OCR_UNAVAILABLE', errorMessage: 'OCR Worker 无法连接',
+    });
+    expect(embedding.embed).not.toHaveBeenCalled();
+  });
+
+  it('maps OCR Worker authentication failure to OCR_WORKER_AUTH_FAILED', async () => {
+    const { service, ocr, updates } = setup('IMAGE', PNG_BYTES, 'scan.png');
+    ocr.recognizeImage.mockRejectedValue(new OcrWorkerError('WORKER_AUTH_FAILED', 'OCR Worker 内部认证失败', 401));
+
+    await process(service);
+
+    expect(updates).toContainEqual(expect.objectContaining({
+      status: 'FAILED', errorCode: 'OCR_WORKER_AUTH_FAILED', errorMessage: 'OCR Worker 内部认证失败',
+    }));
+  });
+
+  it('records OCR timeouts as OCR_TIMEOUT', async () => {
+    const { service, ocr, embedding, updates } = setup('IMAGE', PNG_BYTES, 'scan.png');
+    ocr.recognizeImage.mockRejectedValue(new OcrWorkerError('TIMEOUT', 'OCR Worker 请求超时'));
+
+    await process(service);
+
+    expect(updates).toContainEqual(expect.objectContaining({ status: 'FAILED', errorCode: 'OCR_TIMEOUT' }));
+    expect(embedding.embed).not.toHaveBeenCalled();
+  });
+
+  it('rejects an OCR response with a wrong page number before saving rawText', async () => {
+    const { service, ocr, embedding, updates } = setup('IMAGE', PNG_BYTES, 'scan.png');
+    ocr.recognizeImage.mockResolvedValue({ status: 'ok', pages: [imageOcrPage('text'), imageOcrPage('extra')] });
+
+    await process(service);
+
+    expect(updates).toContainEqual(expect.objectContaining({ status: 'FAILED', errorCode: 'OCR_INVALID_RESPONSE' }));
+    expect(updates).not.toContainEqual(expect.objectContaining({ stage: 'CHUNKING' }));
+    expect(embedding.embed).not.toHaveBeenCalled();
+  });
+
+  it('does not route image documents through the PDF or TXT extractors', async () => {
+    const { service, ocr, updates } = setup('IMAGE', PNG_BYTES, 'scan.png');
+    ocr.recognizeImage.mockResolvedValue({ status: 'ok', pages: [imageOcrPage('image body')] });
+
+    await process(service);
+
+    expect(pdfExtractor).not.toHaveBeenCalled();
+    expect(updates).toContainEqual({ rawText: 'image body', stage: 'CHUNKING' });
+  });
+
+  it('does not OCR a TEXT document even when its file name looks like an image', async () => {
+    const { service, ocr, embedding, updates } = setup('TEXT', PNG_BYTES, 'scan.png');
+
+    await process(service);
+
+    expect(ocr.recognizeImage).not.toHaveBeenCalled();
+    expect(ocr.recognizePdfPages).not.toHaveBeenCalled();
+    expect(updates).toContainEqual(expect.objectContaining({ status: 'FAILED', errorCode: 'INVALID_ENCODING' }));
+    expect(embedding.embed).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['missing', null],
+    ['not an image', 'scan.txt'],
+  ] as const)('fails an IMAGE document with a %s original file name', async (_label, filename) => {
+    const { service, ocr, embedding, updates } = setup('IMAGE', PNG_BYTES, filename);
+
+    await process(service);
+
+    expect(ocr.recognizeImage).not.toHaveBeenCalled();
+    expect(updates).toContainEqual({
+      status: 'FAILED', stage: 'FAILED', errorCode: 'UNSUPPORTED_FILE', errorMessage: '图片文档缺少有效的原始文件名',
+    });
+    expect(embedding.embed).not.toHaveBeenCalled();
   });
 });

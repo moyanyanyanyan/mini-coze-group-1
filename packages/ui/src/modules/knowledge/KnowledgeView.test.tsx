@@ -48,10 +48,47 @@ describe('knowledge view', () => {
     input.documentState.selectedDocument = input.documentState.documents[0];
     input.documentContentState.content = 'Extracted PDF text';
     const html = renderToStaticMarkup(<KnowledgeView {...input} />);
-    expect(html).toContain('accept=".txt,.json,.pdf"');
+    expect(html).toContain('accept=".txt,.json,.pdf,.png,.jpg,.jpeg"');
     expect(html).toContain('PDF 最多 64 MiB');
     expect(html).toContain('<td>PDF</td>');
     expect(html).toContain('Extracted PDF text');
+  });
+
+  it('offers PNG and JPEG uploads and displays the real image format in the list and drawer', () => {
+    const input = props();
+    input.documentState.addingDocument = true;
+    input.documentState.sourceMode = 'file';
+    input.documentState.documents = [{ ...document, sourceType: 'IMAGE', originalFileName: 'scan.PNG' }];
+    input.documentState.documentDrawerOpen = true;
+    input.documentState.selectedDocument = input.documentState.documents[0];
+    const html = renderToStaticMarkup(<KnowledgeView {...input} />);
+    expect(html).toContain('PNG / JPG / JPEG 图片最多 10 MiB');
+    expect(html).toContain('<td>PNG</td>');
+    expect(html).toContain('<dd>PNG</dd>');
+    expect(html).not.toContain('<td>TEXT</td>');
+
+    input.documentState.documents = [{ ...document, id: 'document-2', sourceType: 'IMAGE', originalFileName: 'photo.JPEG' }];
+    input.documentState.selectedDocument = input.documentState.documents[0];
+    const jpegHtml = renderToStaticMarkup(<KnowledgeView {...input} />);
+    expect(jpegHtml).toContain('<td>JPEG</td>');
+    expect(jpegHtml).toContain('<dd>JPEG</dd>');
+  });
+
+  it('shows 图片 for an IMAGE document without a usable file name', () => {
+    const input = props();
+    input.documentState.documents = [{ ...document, sourceType: 'IMAGE', originalFileName: null }];
+    input.documentState.documentDrawerOpen = true;
+    input.documentState.selectedDocument = input.documentState.documents[0];
+    const html = renderToStaticMarkup(<KnowledgeView {...input} />);
+    expect(html).toContain('<td>图片</td>');
+    expect(html).toContain('<dd>图片</dd>');
+  });
+
+  it('shows the image OCR failure hint', () => {
+    const input = props();
+    input.documentState.documents = [{ ...document, sourceType: 'IMAGE', originalFileName: 'scan.png', status: 'FAILED', error: { message: '图片中没有识别到有效文本' } }];
+    const html = renderToStaticMarkup(<KnowledgeView {...input} />);
+    expect(html).toContain('图片文字识别失败，请检查图片清晰度后重试。');
   });
 
   it('shows a useful message for an unreadable PDF', () => {

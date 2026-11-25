@@ -17,7 +17,12 @@ import { KnowledgeWorkspaceGuard } from './knowledge-workspace.guard';
 @Module({
   imports: [MulterModule.registerAsync({
     inject: [ConfigService],
-    useFactory: (config: ConfigService) => ({ limits: { fileSize: config.getOrThrow<number>('PDF_MAX_BYTES') } }),
+    useFactory: (config: ConfigService) => ({
+      limits: {
+        // Multer only applies the transport ceiling; per-type limits stay in the service.
+        fileSize: Math.max(config.getOrThrow<number>('PDF_MAX_BYTES'), config.getOrThrow<number>('OCR_IMAGE_MAX_BYTES')),
+      },
+    }),
   })],
   controllers: [KnowledgeController, KnowledgeDocumentController, KnowledgeRetrievalController, KnowledgePreviewController],
   providers: [KnowledgeService, KnowledgeDocumentService, KnowledgeRetrievalService, KnowledgeRetrievalAccess, KnowledgePreviewService, KnowledgeWorkspaceGuard, EmbeddingClient, OcrWorkerClient],

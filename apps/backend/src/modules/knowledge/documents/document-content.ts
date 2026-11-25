@@ -20,12 +20,13 @@ export function decodeUploadFilename(filename: string): string {
   }
 }
 
-export function sourceTypeFromFilename(filename: string): 'TXT' | 'JSON' | 'PDF' {
+export function sourceTypeFromFilename(filename: string): 'TXT' | 'JSON' | 'PDF' | 'IMAGE' {
   const extension = extname(filename).toLowerCase();
   if (extension === '.txt') return 'TXT';
   if (extension === '.json') return 'JSON';
   if (extension === '.pdf') return 'PDF';
-  throw new DocumentContentError('UNSUPPORTED_FILE', '只支持 .txt、.json 和 .pdf 文件');
+  if (extension === '.png' || extension === '.jpg' || extension === '.jpeg') return 'IMAGE';
+  throw new DocumentContentError('UNSUPPORTED_FILE', '只支持 .txt、.json、.pdf、.png、.jpg 和 .jpeg 文件');
 }
 
 export interface DocumentTextPage {

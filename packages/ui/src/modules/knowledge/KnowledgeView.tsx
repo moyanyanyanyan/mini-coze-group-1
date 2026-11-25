@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActionMenu } from '../../components/ActionMenu';
 import type { KnowledgeViewProps } from './types';
 import { groupSearchResults } from './search-results';
+import { documentFormat } from './document-format';
 import './knowledge.css';
 
 export function KnowledgeView({
@@ -100,7 +101,7 @@ export function KnowledgeView({
                     {sourceMode === 'text' ? (
                       <><label htmlFor="document-text">正文</label><textarea id="document-text" value={documentText} onChange={(event) => onDocumentTextChange(event.target.value)} rows={8} required placeholder="在此粘贴资料正文" /></>
                     ) : (
-                      <><label htmlFor="document-file">TXT / JSON 最多 1 MiB；PDF 最多 64 MiB</label><input id="document-file" ref={fileInputRef} type="file" accept=".txt,.json,.pdf" onChange={(event) => onDocumentFileChange(event.target.files?.[0] ?? null)} required /></>
+                      <><label htmlFor="document-file">TXT / JSON 最多 1 MiB；PDF 最多 64 MiB；PNG / JPG / JPEG 图片最多 10 MiB</label><input id="document-file" ref={fileInputRef} type="file" accept=".txt,.json,.pdf,.png,.jpg,.jpeg" onChange={(event) => onDocumentFileChange(event.target.files?.[0] ?? null)} required /></>
                     )}
                     <button type="submit" disabled={documentSaving}>{documentSaving ? '提交中…' : '提交资料'}</button>
                   </form>
@@ -110,7 +111,7 @@ export function KnowledgeView({
                   ) : visibleDocuments.length === 0 ? <p className="knowledge-empty">没有符合条件的资料。</p> : <div className="knowledge-document-table-wrap"><table className="knowledge-document-table"><thead><tr><th>资料名称</th><th>格式</th><th>状态</th><th>添加时间</th><th>操作</th></tr></thead><tbody>{visibleDocuments.map((document) => (
                     <tr key={document.id} onClick={() => onViewDocumentChunks(document.id)}>
                       <td><button type="button" className="knowledge-document-link" onClick={() => onViewDocumentChunks(document.id)}>{document.title}</button></td>
-                      <td>{document.sourceType}</td>
+                      <td>{documentFormat(document)}</td>
                       <td><span className={`knowledge-document-status status-${document.status.toLowerCase()}`}>{document.status === 'PROCESSING' ? `处理中` : document.status === 'READY' ? '可检索' : '处理失败'}</span>{document.error && <small className="knowledge-document-error">{friendlyDocumentError(document.error.message)}</small>}</td>
                       <td>{new Date(document.createdAt).toLocaleString('zh-CN')}</td>
                       <td className="knowledge-row-actions"><button type="button" onClick={(event) => { event.stopPropagation(); onViewDocumentChunks(document.id); }}>查看</button>{document.status === 'FAILED' && <button type="button" onClick={(event) => { event.stopPropagation(); void handleRetry(document.id); }}>重新处理</button>}<button type="button" className="knowledge-delete" disabled={document.status === 'PROCESSING' || deletingDocumentId !== null} title={document.status === 'PROCESSING' ? '请等待资料处理完成' : undefined} onClick={(event) => { event.stopPropagation(); void handleDeleteDocument(document.id); }}>{deletingDocumentId === document.id ? '删除中…' : '删除'}</button></td>
@@ -143,7 +144,7 @@ export function KnowledgeView({
                   <header className="knowledge-drawer-header"><div><span>资料详情</span><h2>{selectedDocument.title}</h2></div><button type="button" aria-label="关闭" onClick={onCloseDocumentDrawer}>×</button></header>
                   <div className="knowledge-drawer-body">
                     <div className="knowledge-drawer-status-row"><span className={`knowledge-document-status status-${selectedDocument.status.toLowerCase()}`}>{selectedDocument.status === 'READY' ? '可检索' : selectedDocument.status === 'PROCESSING' ? '处理中' : '处理失败'}</span>{selectedDocument.status === 'PROCESSING' && <span className="knowledge-stage">当前步骤：{selectedDocument.stage}</span>}</div>
-                    <section className="knowledge-detail-section"><h3>资料信息</h3><dl className="knowledge-detail-grid"><div><dt>资料格式</dt><dd>{selectedDocument.sourceType}</dd></div><div><dt>添加时间</dt><dd>{new Date(selectedDocument.createdAt).toLocaleString('zh-CN')}</dd></div><div><dt>原始文件名</dt><dd>{selectedDocument.originalFileName || selectedDocument.title}</dd></div><div><dt>处理状态</dt><dd>{selectedDocument.status === 'READY' ? '处理完成' : selectedDocument.status === 'PROCESSING' ? '正在处理' : '处理失败'}</dd></div>{documentContentTotalLength !== undefined && <div><dt>内容长度</dt><dd>{documentContentTotalLength.toLocaleString('zh-CN')} 字</dd></div>}</dl></section>
+                    <section className="knowledge-detail-section"><h3>资料信息</h3><dl className="knowledge-detail-grid"><div><dt>资料格式</dt><dd>{documentFormat(selectedDocument)}</dd></div><div><dt>添加时间</dt><dd>{new Date(selectedDocument.createdAt).toLocaleString('zh-CN')}</dd></div><div><dt>原始文件名</dt><dd>{selectedDocument.originalFileName || selectedDocument.title}</dd></div><div><dt>处理状态</dt><dd>{selectedDocument.status === 'READY' ? '处理完成' : selectedDocument.status === 'PROCESSING' ? '正在处理' : '处理失败'}</dd></div>{documentContentTotalLength !== undefined && <div><dt>内容长度</dt><dd>{documentContentTotalLength.toLocaleString('zh-CN')} 字</dd></div>}</dl></section>
                     {selectedDocument.status === 'PROCESSING' && <section className="knowledge-processing-panel"><strong>正在处理这份资料</strong><p>处理完成后，资料会自动变为可检索状态。请稍候。</p></section>}
                     {selectedDocument.status === 'FAILED' && <section className="knowledge-failed-panel"><strong>这份资料暂时无法处理</strong><p>{friendlyDocumentError(selectedDocument.error?.message)}</p><button type="button" className="knowledge-primary-button" disabled={deletingDocumentId !== null} onClick={() => void handleRetry(selectedDocument.id)}>重新处理</button></section>}
                     {selectedDocument.status === 'READY' && <section className="knowledge-detail-section"><div className="knowledge-panel-heading"><div><h3>识别内容</h3><p>以下内容为资料处理后识别出的连续文本。</p></div></div>{documentContentError && <p className="knowledge-error" role="alert">{documentContentError}</p>}{documentContentLoading ? <p className="knowledge-empty">正在加载识别内容…</p> : documentContent === null ? null : documentContent ? <><div className="knowledge-document-content">{documentContent}</div>{documentContentHasMore && <button type="button" className="knowledge-primary-button knowledge-read-more" onClick={() => onReadDocument(selectedDocument.id)}>阅读全文</button>}</> : <p className="knowledge-empty">这份资料没有可展示的识别内容。</p>}</section>}
@@ -162,6 +163,7 @@ export function KnowledgeView({
 function friendlyDocumentError(message?: string | null): string {
   if (!message) return '处理失败，请检查资料格式后重试。';
   if (/PDF.*无法解析/i.test(message)) return 'PDF 文件无法解析，请检查文件后重试。';
+  if (/图片|OCR|识别/i.test(message)) return '图片文字识别失败，请检查图片清晰度后重试。';
   if (/utf|编码|encoding/i.test(message)) return '文件编码无法识别，请转换为 UTF-8 后重试。';
   if (/empty|空|content/i.test(message)) return '资料内容为空，请补充内容后重试。';
   if (/size|大小|limit/i.test(message)) return '资料大小超过限制，请压缩后重试。';

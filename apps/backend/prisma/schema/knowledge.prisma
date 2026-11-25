@@ -23,6 +23,7 @@ enum KnowledgeDocumentSourceType {
   TXT
   JSON
   PDF
+  IMAGE
 }
 
 enum KnowledgeDocumentStatus {

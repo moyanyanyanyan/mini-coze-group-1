@@ -37,7 +37,12 @@ describe('document content extraction', () => {
     expect(sourceTypeFromFilename('rules.txt')).toBe('TXT');
     expect(sourceTypeFromFilename('rules.JSON')).toBe('JSON');
     expect(sourceTypeFromFilename('rules.PDF')).toBe('PDF');
-    expect(() => sourceTypeFromFilename('rules.png')).toThrow(DocumentContentError);
+    expect(sourceTypeFromFilename('scan.png')).toBe('IMAGE');
+    expect(sourceTypeFromFilename('scan.PNG')).toBe('IMAGE');
+    expect(sourceTypeFromFilename('photo.jpg')).toBe('IMAGE');
+    expect(sourceTypeFromFilename('photo.JPEG')).toBe('IMAGE');
+    expect(() => sourceTypeFromFilename('animation.gif')).toThrow(DocumentContentError);
+    expect(() => sourceTypeFromFilename('vector.svg')).toThrow(DocumentContentError);
   });
 
   it('recovers a UTF-8 Chinese upload filename read as Latin-1', () => {

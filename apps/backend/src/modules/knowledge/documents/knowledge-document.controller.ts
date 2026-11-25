@@ -54,7 +54,7 @@ export class KnowledgeDocumentController {
   @Post('knowledge-bases/:id/documents/files')
   @HttpCode(202)
   @UseInterceptors(FileInterceptor('file'))
-  async createFile(@Req() request: Request, @Param('id') id: string, @Body() body: { workspaceId?: string; title?: string }, @UploadedFile() file?: { originalname: string; buffer: Buffer; size: number }) {
+  async createFile(@Req() request: Request, @Param('id') id: string, @Body() body: { workspaceId?: string; title?: string }, @UploadedFile() file?: { originalname: string; buffer: Buffer; size: number; mimetype?: string }) {
     if (typeof body.workspaceId !== 'string' || (body.title !== undefined && typeof body.title !== 'string')) {
       throw new BadRequestException('上传字段格式无效');
     }
