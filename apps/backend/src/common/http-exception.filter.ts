@@ -76,8 +76,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
       return;
     }
 
-    // 业务显式给出的字符串 code 优先（如 MODEL_NOT_AVAILABLE），其余接口保持数字 code。
-    const explicitCode = isErrorCode(rawCode) ? rawCode : undefined;
+    // 业务显式给出的字符串 code 优先（如 MODEL_NOT_AVAILABLE）；附件接口的
+    // multer 413/415/422 没有业务 code，这里按状态兜底成稳定错误码，其余接口保持数字 code。
+    const attachmentFallback = status === HttpStatus.PAYLOAD_TOO_LARGE
+      ? ErrorCode.FILE_TOO_LARGE
+      : status === HttpStatus.UNSUPPORTED_MEDIA_TYPE
+        ? ErrorCode.UNSUPPORTED_FILE
+        : status === HttpStatus.UNPROCESSABLE_ENTITY
+          ? ErrorCode.CORRUPT_FILE
+          : undefined;
+    const explicitCode = isErrorCode(rawCode) ? rawCode : attachmentFallback;
     response.status(status).json({
       code: explicitCode ?? status,
       message: Array.isArray(message) ? message.join('; ') : message,

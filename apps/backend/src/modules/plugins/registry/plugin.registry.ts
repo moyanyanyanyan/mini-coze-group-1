@@ -192,23 +192,23 @@ export class PluginRegistry implements OnModuleInit {
   /** 仅从目录定位工具，执行前再检查实时状态，不能由内置执行器绕过停用。 */
   async getExecutor(toolName: string): Promise<ToolExecutor | undefined> {
     for (const item of this.catalog.values()) {
-      if (!item.tools.some((tool) => tool.name === toolName)) continue;
+      if (!item.tools.some((tool) => tool.name === toolName)) {continue;}
       const row = await this.getRow(item.pluginId);
-      if (!row?.enabled) return undefined;
+      if (!row?.enabled) {return undefined;}
       const tools = Array.isArray(row.tools) ? row.tools as PluginToolDefinition[] : [];
       const tool = tools.find((definition) => definition.name === toolName && definition.pluginId === row.pluginId);
-      if (!tool) return undefined;
+      if (!tool) {return undefined;}
       if (row.kind === 'builtin') {
         const executor = this.builtinExecutors.get(toolName);
         return executor?.definition.pluginId === row.pluginId ? executor : undefined;
       }
       if (row.kind === 'http' && row.endpoint) {
         // 已注册的内置名称不能被运行中修改的 HTTP 记录接管。
-        if (this.builtinExecutors.has(toolName)) return undefined;
+        if (this.builtinExecutors.has(toolName)) {return undefined;}
         return new HttpExecutor(tool, row.endpoint);
       }
       if (row.kind === 'mcp' && row.endpoint) {
-        if (this.builtinExecutors.has(toolName)) return undefined;
+        if (this.builtinExecutors.has(toolName)) {return undefined;}
         const client = new McpClient(
           row.endpoint,
           (row.authType as PluginAuthType) ?? 'none',
@@ -266,12 +266,12 @@ export function validateBuiltinPlugins(
 function validatePluginRows(rows: PluginRow[]): void {
   const names = new Set<string>();
   for (const row of rows) {
-    if (!Array.isArray(row.tools)) throw new Error(`插件 "${row.pluginId}" 的工具定义无效`);
+    if (!Array.isArray(row.tools)) {throw new Error(`插件 "${row.pluginId}" 的工具定义无效`);}
     for (const tool of row.tools) {
       if (!tool || typeof tool.name !== 'string' || tool.pluginId !== row.pluginId) {
         throw new Error(`插件 "${row.pluginId}" 的工具归属或名称无效`);
       }
-      if (names.has(tool.name)) throw new Error(`工具名必须全局唯一，但 "${tool.name}" 重复注册`);
+      if (names.has(tool.name)) {throw new Error(`工具名必须全局唯一，但 "${tool.name}" 重复注册`);}
       names.add(tool.name);
     }
   }

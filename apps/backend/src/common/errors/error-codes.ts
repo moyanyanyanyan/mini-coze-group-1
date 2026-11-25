@@ -45,6 +45,24 @@ export const ErrorCode = {
   // ---- 聊天 ----
   /** 同一会话正在生成中，又来了一条新消息 */
   CONVERSATION_BUSY: 'CONVERSATION_BUSY',
+
+  // ---- 聊天附件 ----
+  /** 扩展名不在支持列表内 */
+  UNSUPPORTED_FILE: 'UNSUPPORTED_FILE',
+  /** 超过该类别的上传上限 */
+  FILE_TOO_LARGE: 'FILE_TOO_LARGE',
+  /** 文件损坏、加密，或文件头与扩展名不匹配 */
+  CORRUPT_FILE: 'CORRUPT_FILE',
+  /** 解析成功但没有任何文本 */
+  EMPTY_CONTENT: 'EMPTY_CONTENT',
+  /** OCR 服务未配置或不可用 */
+  OCR_UNAVAILABLE: 'OCR_UNAVAILABLE',
+  /** 视觉理解服务未配置或不可用（图片仍会保留 OCR 结果） */
+  VISION_UNAVAILABLE: 'VISION_UNAVAILABLE',
+  /** 附件不属于当前会话，或已被其他消息绑定 */
+  ATTACHMENT_INVALID: 'ATTACHMENT_INVALID',
+  /** 附件仍在解析或解析失败 */
+  ATTACHMENT_NOT_READY: 'ATTACHMENT_NOT_READY',
 } as const;
 
 

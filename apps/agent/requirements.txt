@@ -4,3 +4,4 @@ pydantic-settings==2.11.0
 pytest==8.4.2
 httpx==0.28.1
 sentence-transformers==5.1.2
+rapidocr-onnxruntime==1.4.4

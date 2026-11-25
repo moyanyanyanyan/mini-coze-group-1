@@ -59,10 +59,10 @@ export class PublicApiController {
     let heartbeatTimer: ReturnType<typeof setTimeout> | undefined;
 
     const abortOnClose = () => {
-      if (!finished) controller.abort();
+      if (!finished) {controller.abort();}
     };
     const releaseLock = () => {
-      if (lockReleased) return;
+      if (lockReleased) {return;}
       lockReleased = true;
       this.publicApi.releaseStream(plan.conversationId);
     };
@@ -74,10 +74,10 @@ export class PublicApiController {
     };
     const scheduleHeartbeat = () => {
       clearHeartbeat();
-      if (finished || res.writableEnded || res.destroyed) return;
+      if (finished || res.writableEnded || res.destroyed) {return;}
       heartbeatTimer = setTimeout(() => {
         heartbeatTimer = undefined;
-        if (finished || res.writableEnded || res.destroyed) return;
+        if (finished || res.writableEnded || res.destroyed) {return;}
         try {
           res.write(': heartbeat\n\n');
           scheduleHeartbeat();
@@ -123,7 +123,7 @@ export class PublicApiController {
       if (!cancelledByClient) {
         controller.abort(error);
       }
-      if (!headersWritten) throw error;
+      if (!headersWritten) {throw error;}
 
       if (!cancelledByClient) {
         this.logger.error('公开 Stream 异常', error as Error);
@@ -158,7 +158,7 @@ export class PublicApiController {
         }
       }
       releaseLock();
-      if (headersWritten && !res.writableEnded) res.end();
+      if (headersWritten && !res.writableEnded) {res.end();}
     }
   }
 }

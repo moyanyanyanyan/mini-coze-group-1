@@ -29,10 +29,16 @@ function createHarness() {
     .mockResolvedValueOnce({ id: 'user-message' })
     .mockResolvedValueOnce({ id: 'assistant-message' });
   const update = jest.fn().mockResolvedValue({});
+  const attachmentFindMany = jest.fn().mockResolvedValue([]);
+  const attachmentUpdateMany = jest.fn().mockResolvedValue({ count: 0 });
   const prisma = {
     $transaction: (callback: (tx: unknown) => Promise<unknown>) => callback({
       message: { findFirst: jest.fn().mockResolvedValue(null), create },
       conversation: { update: jest.fn().mockResolvedValue({}) },
+      messageAttachment: {
+        findMany: attachmentFindMany,
+        updateMany: attachmentUpdateMany,
+      },
     }),
     message: { findMany: jest.fn().mockResolvedValue([]), update },
   } as unknown as PrismaService;
@@ -55,7 +61,15 @@ function createHarness() {
     runtime as unknown as RuntimeClientService,
     agents,
   );
-  return { service, runtime, update, agents };
+  return {
+    service,
+    runtime,
+    update,
+    agents,
+    create,
+    attachmentFindMany,
+    attachmentUpdateMany,
+  };
 }
 
 function event(
@@ -74,12 +88,17 @@ function event(
   };
 }
 
-async function collect(service: ChatService, agentSnapshot = true) {
+async function collect(
+  service: ChatService,
+  agentSnapshot = true,
+  attachmentIds?: string[],
+) {
   const events: RuntimeSseEvent[] = [];
   for await (const item of service.run({
     conversationId: 'conversation-1',
     userId: 'owner-1',
     content: '问题',
+    attachmentIds,
     signal: new AbortController().signal,
     agentId: agentSnapshot ? 'agent-1' : undefined,
     agentConfig: agentSnapshot ? agentConfig : undefined,
@@ -359,5 +378,80 @@ describe('ChatService stream persistence', () => {
     expect(logged).toContain('errorType=Error');
     expect(logged).not.toContain('敏感半截内容');
     errorSpy.mockRestore();
+  });
+
+  it('injects attachment text into this turn but stores the raw content', async () => {
+    const harness = createHarness();
+    harness.attachmentFindMany.mockResolvedValue([
+      {
+        id: 'attachment-1',
+        fileName: '季度报表.xlsx',
+        sourceType: 'XLSX',
+        status: 'READY',
+        extractedText: '资产编号 ZC-001',
+      },
+    ]);
+    harness.attachmentUpdateMany.mockResolvedValue({ count: 1 });
+    let request: RuntimeRequestBody | undefined;
+    harness.runtime.stream.mockImplementation(async function* (body: RuntimeRequestBody) {
+      request = body;
+      yield event(body, 1, 'run.started', { assistantMessageId: body.assistantMessageId });
+      yield event(body, 2, 'run.completed', {
+        runId: body.runId,
+        conversationId: body.conversationId,
+        assistantMessageId: body.assistantMessageId,
+        status: 'completed',
+        content: '',
+        finishReason: 'stop',
+        usage: null,
+        citations: [],
+        toolResults: [],
+      });
+    });
+
+    await collect(harness.service, true, ['attachment-1']);
+
+    expect(harness.attachmentUpdateMany).toHaveBeenCalledWith({
+      where: {
+        id: { in: ['attachment-1'] },
+        conversationId: 'conversation-1',
+        messageId: null,
+      },
+      data: { messageId: 'user-message' },
+    });
+    expect(request?.message).toContain('不可信资料');
+    expect(request?.message).toContain('ZC-001');
+    // 数据库只存用户原文，附件正文留在 MessageAttachment
+    expect(harness.create).toHaveBeenNthCalledWith(1, {
+      data: expect.objectContaining({ content: '问题', role: 'user' }),
+    });
+  });
+
+  it('rejects attachments that are not ready before calling Runtime', async () => {
+    const harness = createHarness();
+    harness.attachmentFindMany.mockResolvedValue([
+      {
+        id: 'attachment-1',
+        fileName: 'broken.pdf',
+        sourceType: 'PDF',
+        status: 'FAILED',
+        extractedText: null,
+      },
+    ]);
+
+    await expect(collect(harness.service, true, ['attachment-1'])).rejects.toMatchObject({
+      response: { code: 'ATTACHMENT_NOT_READY' },
+    });
+    expect(harness.runtime.stream).not.toHaveBeenCalled();
+  });
+
+  it('rejects attachments that do not belong to the conversation', async () => {
+    const harness = createHarness();
+    harness.attachmentFindMany.mockResolvedValue([]);
+
+    await expect(collect(harness.service, true, ['attachment-unknown'])).rejects.toMatchObject({
+      response: { code: 'ATTACHMENT_INVALID' },
+    });
+    expect(harness.create).not.toHaveBeenCalled();
   });
 });

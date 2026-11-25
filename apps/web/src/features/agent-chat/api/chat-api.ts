@@ -26,6 +26,73 @@ export function deleteConversation(conversationId: string) {
   return del<void>(`/api/conversations/${conversationId}`);
 }
 
+/** 上传接口（ResponseInterceptor 包了 code/message/data 信封）返回的附件元信息 */
+export interface PendingAttachment {
+  id: string;
+  fileName: string;
+  sourceType: string;
+  byteSize: number;
+  status: 'PARSING' | 'READY' | 'FAILED';
+  errorCode?: string | null;
+}
+
+interface AttachmentUploadResult {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  sourceType: string;
+  byteSize: number;
+  status: 'PARSING' | 'READY' | 'FAILED';
+  textBytes: number;
+  preview: string;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+}
+
+interface Envelope<T> {
+  code: number;
+  message: string;
+  data: T;
+}
+
+/**
+ * 一次传一个文件，上传即解析。
+ * HTTP 失败（类型/大小/magic bytes）抛 ApiError；解析失败仍返回 202，
+ * 由调用方展示 FAILED 状态的 chip。
+ */
+export async function uploadAttachment(
+  conversationId: string,
+  file: File,
+): Promise<AttachmentUploadResult> {
+  const form = new FormData();
+  form.append('file', file);
+  const response = await fetch(
+    `${API_BASE}/api/conversations/${conversationId}/attachments`,
+    {
+      method: 'POST',
+      credentials: 'include',
+      body: form,
+    },
+  );
+
+  const payload = (await response.json().catch(() => null)) as
+    | ({ code?: string; message?: string | string[] } & Partial<Envelope<AttachmentUploadResult>>)
+    | null;
+
+  if (!response.ok) {
+    const rawMessage = Array.isArray(payload?.message) ? payload.message[0] : payload?.message;
+    throw new ApiError(
+      response.status,
+      payload?.code ?? 'UNKNOWN',
+      rawMessage ?? '附件上传失败，请稍后再试',
+    );
+  }
+  if (!payload?.data) {
+    throw new ApiError(500, 'INVALID_RESPONSE', '附件上传响应格式无效');
+  }
+  return payload.data;
+}
+
 // ---------- 流式 ----------
 
 /** 后端 C3 下发的一帧。type 在 data 的信封里，和 event: 行一致 */
@@ -124,7 +191,11 @@ export async function streamMessage(
   content: string,
   handlers: StreamHandlers,
   signal?: AbortSignal,
+  options?: { attachmentIds?: string[] },
 ): Promise<void> {
+  const body = options?.attachmentIds?.length
+    ? { content, attachmentIds: options.attachmentIds }
+    : { content };
   const response = await fetch(
     `${API_BASE}/api/conversations/${conversationId}/messages/stream`,
     {
@@ -132,7 +203,7 @@ export async function streamMessage(
       headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
       // HttpOnly Cookie 靠它带上，漏了就是 401
       credentials: 'include',
-      body: JSON.stringify({ content }),
+      body: JSON.stringify(body),
       signal,
     },
   );

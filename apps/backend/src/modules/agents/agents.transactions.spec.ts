@@ -107,9 +107,9 @@ it('无权限时不修改绑定', async () => {
 
 it.each(['update', 'knowledge', 'workflow'] as const)('共享快照调用方 %s 同样在事务内持锁', async (operation) => {
   const { service, prisma, tx } = setup();
-  if (operation === 'update') await service.update('agent-1', { name: 'Changed' }, user);
-  if (operation === 'knowledge') await service.replaceKnowledgeBindings('agent-1', { bindings: [] }, user);
-  if (operation === 'workflow') await service.replaceWorkflowBindings('agent-1', { bindings: [] }, user);
+  if (operation === 'update') {await service.update('agent-1', { name: 'Changed' }, user);}
+  if (operation === 'knowledge') {await service.replaceKnowledgeBindings('agent-1', { bindings: [] }, user);}
+  if (operation === 'workflow') {await service.replaceWorkflowBindings('agent-1', { bindings: [] }, user);}
   expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
   expect(tx.agentVersion.create).toHaveBeenCalledTimes(1);
