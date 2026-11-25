@@ -12,9 +12,10 @@ MiniCoze MVP 的多人协作 Monorepo。当前包含应用骨架、领域目录�
 
 ## 环境要求
 
-- Node.js 22.12+
+- Node.js 26.13.1（统一版本；officeparser 8.9.0 要求 `>=26.12.1`。如沿用 Node 24，必须 `>=24.22.1`）
 - pnpm 12+
 - Python 3.11+
+- 运行 Python 测试时设置 `PYTHONUTF8=1`，避免中文夹具按系统 GBK 解码
 - Docker Desktop（用于 PostgreSQL/pgvector）
 
 ## 首次安装（Windows PowerShell）
