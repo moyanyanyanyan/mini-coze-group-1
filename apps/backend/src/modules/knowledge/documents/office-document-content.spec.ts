@@ -85,6 +85,16 @@ describe('Office document parsing', () => {
       'paragraph',
     ]);
     expect(result.document.images).toHaveLength(1);
+    for (const segment of result.document.segments) {
+      expect(
+        result.document.rawText.slice(
+          segment.startOffset,
+          segment.endOffset,
+        ),
+      ).toBe(segment.text);
+    }
+    expect(result.document.segments.some((segment) => segment.kind === 'tableCell')).toBe(true);
+    expect(result.document.segments.some((segment) => segment.kind === 'imageOcr')).toBe(true);
     expect(result.document.images[0]).toMatchObject({
       attachmentName: 'image1.png',
       attachmentIndex: 0,
@@ -140,6 +150,21 @@ describe('Office document parsing', () => {
       result.document.images.every((image) => image.ocrText === 'CHART OCR'),
     ).toBe(true);
     expect(result.document.unplacedAttachmentIndexes).toEqual([]);
+    for (const segment of result.document.segments) {
+      expect(
+        result.document.rawText.slice(
+          segment.startOffset,
+          segment.endOffset,
+        ),
+      ).toBe(segment.text);
+    }
+    expect(
+      new Set(
+        result.document.segments.map(
+          (segment) => segment.source.slideNumber,
+        ),
+      ),
+    ).toEqual(new Set([1, 2]));
   });
 
   it('returns text without OCR when an Office document has no pictures', async () => {

@@ -29,12 +29,19 @@ export interface OfficeListInfo {
   marker?: string;
 }
 
+export interface OfficeInlineImageText {
+  imageId: string;
+  text: string;
+}
+
 export interface OfficeParagraphBlock {
   kind: 'paragraph';
   text: string;
   headingLevel?: number;
   list?: OfficeListInfo;
   imageIds: string[];
+  /** OCR text retained separately so its source remains the image, not the paragraph. */
+  imageTexts?: OfficeInlineImageText[];
   source: OfficeSourceLocation;
 }
 
@@ -96,6 +103,24 @@ export interface OfficeSection {
   source: OfficeSourceLocation;
 }
 
+export type OfficeTextSegmentKind =
+  | 'paragraph'
+  | 'heading'
+  | 'listItem'
+  | 'tableCell'
+  | 'imageOcr';
+
+export interface OfficeTextSegment {
+  kind: OfficeTextSegmentKind;
+  text: string;
+  /** UTF-16 offsets into NormalizedOfficeDocument.rawText. */
+  startOffset: number;
+  endOffset: number;
+  source: OfficeSourceLocation;
+  headingLevel?: number;
+  list?: OfficeListInfo;
+}
+
 export interface NormalizedOfficeDocument {
   format: OfficeFormat;
   sections: OfficeSection[];
@@ -105,6 +130,8 @@ export interface NormalizedOfficeDocument {
   /** Attachments with no image node in the AST have bytes but no known placement. */
   unplacedAttachmentIndexes: number[];
   rawText: string;
+  /** Source-bearing text spans whose offsets align with rawText. */
+  segments: OfficeTextSegment[];
 }
 
 function location(
@@ -444,59 +471,172 @@ export function convertOfficeAst(
       images.some((image) => image.attachmentIndex === index) ? [] : [index],
     ),
     rawText: '',
+    segments: [],
   };
-  result.rawText = mergeOfficeText(result);
+  const merged = mergeOfficeDocument(result);
+  result.rawText = merged.text;
+  result.segments = merged.segments;
   return result;
 }
 
-/** Paragraphs and text boxes use newlines; blocks and slides use a blank line. Images add only their OCR text. */
-export function mergeOfficeText(
-  document: Pick<NormalizedOfficeDocument, 'sections'>,
-): string {
-  function paragraphText(block: OfficeParagraphBlock): string {
-    if (!block.text) {
-      return '';
+interface RenderedText {
+  text: string;
+  segments: OfficeTextSegment[];
+}
+
+function joinRendered(
+  parts: RenderedText[],
+  separator: string,
+  preserveEmpty = false,
+): RenderedText {
+  let text = '';
+  const segments: OfficeTextSegment[] = [];
+  let emitted = 0;
+  for (const part of parts) {
+    if (!part.text && !preserveEmpty) {
+      continue;
     }
-    if (!block.list) {
-      return block.text;
+    if (emitted > 0) {
+      text += separator;
     }
-    const indent = '  '.repeat(Math.max(0, block.list.level));
-    const marker =
-      block.list.marker ??
-      (block.list.listType === 'ordered'
-        ? `${block.list.itemIndex + 1}.`
-        : '-');
-    return `${indent}${marker ? `${marker} ` : ''}${block.text}`;
+    emitted++;
+    const offset = text.length;
+    text += part.text;
+    for (const segment of part.segments) {
+      segments.push({
+        ...segment,
+        startOffset: segment.startOffset + offset,
+        endOffset: segment.endOffset + offset,
+      });
+    }
+  }
+  return { text, segments };
+}
+
+function paragraphText(block: OfficeParagraphBlock): string {
+  if (!block.text) {
+    return '';
+  }
+  if (!block.list) {
+    return block.text;
+  }
+  const indent = '  '.repeat(Math.max(0, block.list.level));
+  const marker =
+    block.list.marker ??
+    (block.list.listType === 'ordered'
+      ? `${block.list.itemIndex + 1}.`
+      : '-');
+  return `${indent}${marker ? `${marker} ` : ''}${block.text}`;
+}
+
+function paragraphKind(block: OfficeParagraphBlock): OfficeTextSegmentKind {
+  if (block.headingLevel) {
+    return 'heading';
+  }
+  if (block.list) {
+    return 'listItem';
+  }
+  return 'paragraph';
+}
+
+/**
+ * Builds rawText and the aligned OfficeTextSegment list in one traversal. Every
+ * segment offset is relative to the final rawText (UTF-16), and separators are
+ * deliberately not assigned to any source.
+ */
+export function mergeOfficeDocument(
+  document: Pick<NormalizedOfficeDocument, 'sections' | 'images'>,
+): RenderedText {
+  const imageById = new Map(document.images.map((image) => [image.id, image]));
+
+  function renderParagraph(paragraph: OfficeParagraphBlock): RenderedText {
+    const parts: RenderedText[] = [];
+    const text = paragraphText(paragraph);
+    if (text) {
+      parts.push({
+        text,
+        segments: [
+          {
+            kind: paragraphKind(paragraph),
+            text,
+            startOffset: 0,
+            endOffset: text.length,
+            source: paragraph.source,
+            ...(paragraph.headingLevel
+              ? { headingLevel: paragraph.headingLevel }
+              : {}),
+            ...(paragraph.list ? { list: paragraph.list } : {}),
+          },
+        ],
+      });
+    }
+    for (const imageText of paragraph.imageTexts ?? []) {
+      if (!imageText.text) {
+        continue;
+      }
+      parts.push({
+        text: imageText.text,
+        segments: [
+          {
+            kind: 'imageOcr',
+            text: imageText.text,
+            startOffset: 0,
+            endOffset: imageText.text.length,
+            source: imageById.get(imageText.imageId)?.source ?? paragraph.source,
+          },
+        ],
+      });
+    }
+    return joinRendered(parts, '\n');
   }
 
-  function blockText(block: OfficeBlock): string {
+  function renderBlock(block: OfficeBlock): RenderedText {
     if (block.kind === 'paragraph') {
-      return paragraphText(block);
+      return renderParagraph(block);
     }
     if (block.kind === 'image') {
-      return block.text ?? '';
+      const text = block.text ?? '';
+      const segment: OfficeTextSegment = {
+        kind: 'imageOcr',
+        text,
+        startOffset: 0,
+        endOffset: text.length,
+        source: block.source,
+      };
+      return { text, segments: text ? [segment] : [] };
     }
     if (block.kind === 'textBox') {
-      return block.paragraphs
-        .map((item) => paragraphText(item))
-        .filter(Boolean)
-        .join('\n');
+      return joinRendered(
+        block.paragraphs.map((paragraph) => renderParagraph(paragraph)),
+        '\n',
+      );
     }
-    return block.rows
-      .map((row) =>
-        row
-          .map((cell) => cell.blocks.map(blockText).filter(Boolean).join('\n'))
-          .join('\t'),
-      )
-      .join('\n');
+    const rows = block.rows.map((row) => {
+      const cells = row.map((cell) => {
+        const rendered = joinRendered(
+          cell.blocks.map((item) => renderBlock(item)),
+          '\n',
+        );
+        return {
+          text: rendered.text,
+          segments: rendered.segments.map((segment) => ({
+            ...segment,
+            ...(segment.kind === 'imageOcr' ? {} : { kind: 'tableCell' as const }),
+          })),
+        };
+      });
+      return joinRendered(cells, '\t', true);
+    });
+    return joinRendered(rows, '\n', true);
   }
-  function sectionText(section: OfficeSection): string {
-    const parts: string[] = [];
-    let listRun: string[] = [];
+
+  function renderSection(section: OfficeSection): RenderedText {
+    const parts: RenderedText[] = [];
+    let listRun: RenderedText[] = [];
     let listKey: string | undefined;
     const flushList = () => {
       if (listRun.length > 0) {
-        parts.push(listRun.join('\n'));
+        parts.push(joinRendered(listRun, '\n'));
         listRun = [];
       }
       listKey = undefined;
@@ -508,30 +648,31 @@ export function mergeOfficeText(
           flushList();
         }
         listKey = key;
-        const text = paragraphText(block);
-        if (text) {
-          listRun.push(text);
-        }
+        listRun.push(renderParagraph(block));
         continue;
       }
       flushList();
-      const text = blockText(block);
-      if (text) {
-        parts.push(text);
-      }
+      parts.push(renderBlock(block));
     }
     flushList();
-    return parts.join('\n\n');
+    return joinRendered(parts, '\n\n');
   }
 
-  return document.sections.map(sectionText).filter(Boolean).join('\n\n');
+  return joinRendered(document.sections.map(renderSection), '\n\n');
+}
+
+/** Paragraphs and text boxes use newlines; blocks and slides use a blank line. Images add only their OCR text. */
+export function mergeOfficeText(
+  document: Pick<NormalizedOfficeDocument, 'sections' | 'images'>,
+): string {
+  return mergeOfficeDocument(document).text;
 }
 
 /**
  * Places OCR text at each image's source position. DOCX pictures are usually
- * children of a paragraph, so their text is appended to that paragraph; PPTX
- * pictures are standalone blocks and receive their own text. The same attachment
- * reused in several places contributes its text at every placement.
+ * children of a paragraph, so their text follows that paragraph; PPTX pictures
+ * are standalone blocks and receive their own text. The same attachment reused
+ * in several places contributes its text at every placement.
  */
 export function applyOfficeImageText(
   document: NormalizedOfficeDocument,
@@ -545,14 +686,14 @@ export function applyOfficeImageText(
   }
 
   function applyParagraph(paragraph: OfficeParagraphBlock): void {
-    const additions = [...new Set(paragraph.imageIds)]
-      .map((id) => texts.get(id))
-      .filter((text): text is string => Boolean(text));
-    if (additions.length > 0) {
-      paragraph.text = [paragraph.text, ...additions]
-        .filter(Boolean)
-        .join('\n');
+    const imageTexts: OfficeInlineImageText[] = [];
+    for (const imageId of new Set(paragraph.imageIds)) {
+      const text = texts.get(imageId);
+      if (text) {
+        imageTexts.push({ imageId, text });
+      }
     }
+    paragraph.imageTexts = imageTexts.length > 0 ? imageTexts : undefined;
   }
 
   function applyBlocks(blocks: OfficeBlock[]): void {
@@ -580,6 +721,8 @@ export function applyOfficeImageText(
     applyBlocks(section.blocks);
     applyBlocks(section.notes);
   });
-  document.rawText = mergeOfficeText(document);
+  const merged = mergeOfficeDocument(document);
+  document.rawText = merged.text;
+  document.segments = merged.segments;
   return document;
 }

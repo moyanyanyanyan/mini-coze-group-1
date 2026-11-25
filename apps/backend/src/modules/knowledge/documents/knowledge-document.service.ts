@@ -11,7 +11,14 @@ import { imageMaxBytes, officeMaxBytes } from '../../../config/upload-limits';
 import { chunkDocument } from './chunk-document';
 import { extractHybridPdfDocumentText } from './pdf-hybrid-document-content';
 import { extractOfficeDocument } from './office-document-content';
+import type { OfficeTextSegment } from './office-ast-converter';
+import { mapChunkSourceRanges } from './chunk-source';
 import { CreateTextDocumentDto } from '../dto/create-text-document.dto';
+
+interface ExtractedDocumentText {
+  text: string;
+  segments?: OfficeTextSegment[];
+}
 
 interface UploadedDocumentFile {
   originalname: string;
@@ -162,10 +169,14 @@ export class KnowledgeDocumentService implements OnModuleInit {
     try {
       const document = await this.prisma.knowledgeDocument.findUniqueOrThrow({ where: { id } });
       await this.prisma.knowledgeDocument.update({ where: { id }, data: { stage: 'EXTRACTING' } });
-      const text = await this.extractText(document);
+      const extracted = await this.extractText(document);
+      const text = extracted.text;
       await this.prisma.knowledgeDocument.update({ where: { id }, data: { rawText: text, stage: 'CHUNKING' } });
       const chunks = chunkDocument(text);
       if (chunks.length === 0) throw new DocumentContentError('EMPTY_CONTENT', '资料无法生成可检索片段');
+      const chunkSources = extracted.segments
+        ? mapChunkSourceRanges(chunks, extracted.segments)
+        : null;
       await this.prisma.knowledgeDocument.update({ where: { id }, data: { stage: 'EMBEDDING' } });
       const { model, vectors } = await this.embedding.embed(chunks.map((chunk) => chunk.content));
       await this.prisma.knowledgeDocument.update({ where: { id }, data: { stage: 'PERSISTING' } });
@@ -174,6 +185,9 @@ export class KnowledgeDocumentService implements OnModuleInit {
         id: randomUUID(), documentId: id, knowledgeBaseId: document.knowledgeBaseId,
         position: chunk.position, content: chunk.content,
         startOffset: chunk.startOffset, endOffset: chunk.endOffset,
+        ...(chunkSources?.[index]
+          ? { sourceRanges: chunkSources[index] as unknown as Prisma.InputJsonValue }
+          : {}),
         vector: `[${vectors[index].join(',')}]`,
       }));
       await this.prisma.$transaction(async (tx) => {
@@ -205,24 +219,26 @@ export class KnowledgeDocumentService implements OnModuleInit {
     sourceType: string;
     sourceBytes: Uint8Array | null;
     originalFileName: string | null;
-  }): Promise<string> {
+  }): Promise<ExtractedDocumentText> {
     const bytes = document.sourceBytes ?? new Uint8Array();
     switch (document.sourceType) {
       case 'IMAGE':
-        return extractImageDocumentText(bytes, document.originalFileName, this.ocr);
+        return { text: await extractImageDocumentText(bytes, document.originalFileName, this.ocr) };
       case 'PDF':
-        return (await extractHybridPdfDocumentText(bytes, document.originalFileName ?? 'document.pdf', this.ocr)).rawText;
+        return { text: (await extractHybridPdfDocumentText(bytes, document.originalFileName ?? 'document.pdf', this.ocr)).rawText };
       case 'TEXT':
       case 'TXT':
       case 'JSON':
-        return extractDocumentText(document.sourceType, bytes);
+        return { text: extractDocumentText(document.sourceType, bytes) };
       case 'DOCX':
-      case 'PPTX':
-        return (await extractOfficeDocument(
+      case 'PPTX': {
+        const result = await extractOfficeDocument(
           bytes,
           document.originalFileName ?? `document.${document.sourceType.toLowerCase()}`,
           this.ocr,
-        )).document.rawText;
+        );
+        return { text: result.document.rawText, segments: result.document.segments };
+      }
       default:
         throw new DocumentContentError('UNSUPPORTED_FILE', '文件类型不支持');
     }

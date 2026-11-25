@@ -1,4 +1,4 @@
-﻿import type { OfficeAstInput } from './office-ast-converter';
+import type { OfficeAstInput } from './office-ast-converter';
 import {
   applyOfficeImageText,
   convertOfficeAst,
@@ -61,6 +61,23 @@ describe('Office AST conversion', () => {
 
     const result = convertOfficeAst(ast);
     expect(result.rawText).toBe('Intro\n\nAlpha\tBeta\n1\t2\n\nTail');
+    expect(result.segments.map((segment) => segment.kind)).toEqual([
+      'paragraph',
+      'tableCell',
+      'tableCell',
+      'tableCell',
+      'tableCell',
+      'paragraph',
+    ]);
+    for (const segment of result.segments) {
+      expect(result.rawText.slice(segment.startOffset, segment.endOffset)).toBe(
+        segment.text,
+      );
+    }
+    expect(result.segments[0].source.path).toBe('content.0');
+    expect(result.segments[1].source.path).toBe(
+      'content.1.children.0.children.0.children.0',
+    );
     expect(result.sections).toHaveLength(1);
     expect(result.sections[0].blocks.map((block) => block.kind)).toEqual([
       'paragraph',
@@ -165,6 +182,14 @@ describe('Office AST conversion', () => {
       },
     });
     expect(result.rawText).toBe('Title\n\nLine A\nLine B\n\nNext');
+    expect(
+      result.segments.map((segment) => segment.source.slideNumber),
+    ).toEqual([1, 1, 1, 2]);
+    for (const segment of result.segments) {
+      expect(result.rawText.slice(segment.startOffset, segment.endOffset)).toBe(
+        segment.text,
+      );
+    }
     expect(mergeOfficeText(result)).toBe(result.rawText);
     expect(result.unplacedAttachmentIndexes).toEqual([1]);
   });
@@ -317,6 +342,14 @@ describe('Office AST conversion', () => {
     );
     expect(docxResult.rawText).toBe('Figure:\nINLINE OCR');
     expect(docxResult.images[0].ocrText).toBe('INLINE OCR');
+    expect(docxResult.segments.map((segment) => segment.kind)).toEqual([
+      'paragraph',
+      'imageOcr',
+    ]);
+    expect(docxResult.segments[1]).toMatchObject({
+      text: 'INLINE OCR',
+      source: { path: 'content.0.children.1' },
+    });
 
     const pptx: OfficeAstInput = {
       type: 'pptx',
@@ -353,6 +386,14 @@ describe('Office AST conversion', () => {
     expect(pptxResult.sections[0].blocks[1]).toMatchObject({
       kind: 'image',
       text: 'SLIDE OCR',
+    });
+    expect(pptxResult.segments.map((segment) => segment.kind)).toEqual([
+      'paragraph',
+      'imageOcr',
+    ]);
+    expect(pptxResult.segments[1].source).toMatchObject({
+      path: 'content.0.children.1',
+      slideNumber: 1,
     });
   });
 

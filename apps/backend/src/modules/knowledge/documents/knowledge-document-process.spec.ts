@@ -511,6 +511,14 @@ describe('KnowledgeDocumentService Office integration', () => {
     expect(rawText).toContain(sourceType === 'DOCX' ? 'Alpha paragraph.' : 'T8 Slide One');
     expect(embedding.embed).toHaveBeenCalledTimes(1);
     expect(tx.knowledgeChunk.createMany).toHaveBeenCalledTimes(1);
+    const chunkRows = tx.knowledgeChunk.createMany.mock.calls[0][0].data as Array<{
+      sourceRanges?: { ranges: Array<{ path: string; slideNumber?: number }> };
+    }>;
+    const ranges = chunkRows.flatMap((row) => row.sourceRanges?.ranges ?? []);
+    expect(ranges.length).toBeGreaterThan(0);
+    if (sourceType === 'PPTX') {
+      expect(ranges.some((range) => range.slideNumber === 1)).toBe(true);
+    }
     expect(tx.knowledgeDocument.update).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ status: 'READY', stage: 'COMPLETED' }),
     }));
