@@ -1,5 +1,5 @@
 import { chunkDocument } from './chunk-document';
-import { mapChunkSourceRanges } from './chunk-source';
+import { mapChunkSourceRanges, parseChunkSourceRanges } from './chunk-source';
 import type { OfficeTextSegment } from './office-ast-converter';
 
 function segment(
@@ -87,5 +87,65 @@ describe('chunk source range mapping', () => {
         { startOffset: 1000, endOffset: 1050, overlap: false },
       ],
     });
+  });
+
+  it('validates and projects stored ranges for API responses', () => {
+    expect(parseChunkSourceRanges({
+      version: 1,
+      ranges: [{
+        path: 'content.0',
+        slideNumber: 2,
+        kind: 'heading',
+        startOffset: 0,
+        endOffset: 8,
+        overlap: false,
+        headingLevel: 1,
+        bounds: { x: 1, y: 2, width: 3, height: 4, baseline: 5 },
+        unexpected: '<script>',
+      }],
+      extra: true,
+    })).toEqual({
+      version: 1,
+      ranges: [{
+        path: 'content.0',
+        slideNumber: 2,
+        kind: 'heading',
+        startOffset: 0,
+        endOffset: 8,
+        overlap: false,
+        headingLevel: 1,
+        bounds: { x: 1, y: 2, width: 3, height: 4 },
+      }],
+    });
+  });
+
+  it('returns null for legacy, malformed or unsafe stored ranges', () => {
+    expect(parseChunkSourceRanges(null)).toBeNull();
+    expect(parseChunkSourceRanges({ version: 1, ranges: [] })).toEqual({
+      version: 1,
+      ranges: [],
+    });
+    expect(parseChunkSourceRanges({ version: 2, ranges: [] })).toBeNull();
+    expect(parseChunkSourceRanges({ version: 1, ranges: [{}] })).toBeNull();
+    expect(parseChunkSourceRanges({
+      version: 1,
+      ranges: [{
+        path: 'content.0',
+        kind: 'paragraph',
+        startOffset: 5,
+        endOffset: 4,
+        overlap: false,
+      }],
+    })).toBeNull();
+    expect(parseChunkSourceRanges({
+      version: 1,
+      ranges: [{
+        path: 'content.0',
+        kind: 'unknown',
+        startOffset: 0,
+        endOffset: 4,
+        overlap: false,
+      }],
+    })).toBeNull();
   });
 });

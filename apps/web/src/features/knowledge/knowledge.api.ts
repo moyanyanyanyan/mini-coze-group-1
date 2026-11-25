@@ -35,6 +35,29 @@ export interface KnowledgeDocumentContentPage {
   totalLength: number;
 }
 
+export interface KnowledgeChunkSourceRange {
+  path: string;
+  slideNumber?: number;
+  bounds?: { x: number; y: number; width: number; height: number };
+  kind: 'paragraph' | 'heading' | 'listItem' | 'tableCell' | 'imageOcr';
+  startOffset: number;
+  endOffset: number;
+  overlap: boolean;
+  headingLevel?: number;
+  list?: {
+    listId?: string;
+    listType: 'ordered' | 'unordered';
+    level: number;
+    itemIndex: number;
+    marker?: string;
+  };
+}
+
+export interface KnowledgeChunkSourceRanges {
+  version: 1;
+  ranges: KnowledgeChunkSourceRange[];
+}
+
 export interface KnowledgeChunkPreview {
   id: string;
   position: number;
@@ -42,6 +65,7 @@ export interface KnowledgeChunkPreview {
   startOffset: number;
   endOffset: number;
   enabled: boolean;
+  sourceRanges: KnowledgeChunkSourceRanges | null;
 }
 
 export interface KnowledgeChunkPage {
@@ -59,6 +83,7 @@ export interface KnowledgeSearchHit {
   content: string;
   startOffset: number | null;
   endOffset: number | null;
+  sourceRanges: KnowledgeChunkSourceRanges | null;
   score: number;
 }
 
