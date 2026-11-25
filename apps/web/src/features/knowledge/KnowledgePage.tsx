@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { KnowledgeView, documentFormat } from '@minicoze/ui/knowledge';
 import { useConfirm } from '@minicoze/ui/hooks';
 import { KnowledgeCenterPage } from './KnowledgeCenterPage';
-import { createKnowledgeBase, createTextDocument, getKnowledgeDocument, getKnowledgeDocumentContent, getKnowledgeDocumentContentPage, getKnowledgeWorkspaceId, deleteKnowledgeBase, deleteKnowledgeDocument, listKnowledgeBases, listKnowledgeDocuments, previewKnowledgeSearch, retryKnowledgeDocument, updateKnowledgeBase, updateKnowledgeBaseStatus, uploadDocumentFile, type KnowledgeBase, type KnowledgeDocument, type KnowledgeSearchResult } from './knowledge.api';
+import { createKnowledgeBase, createTextDocument, getKnowledgeDocument, getKnowledgeDocumentContent, getKnowledgeDocumentContentPage, getKnowledgeWorkspaceId, deleteKnowledgeBase, deleteKnowledgeDocument, listDocumentChunks, listKnowledgeBases, listKnowledgeDocuments, previewKnowledgeSearch, retryKnowledgeDocument, updateKnowledgeBase, updateKnowledgeBaseStatus, uploadDocumentFile, type KnowledgeBase, type KnowledgeDocument, type KnowledgeSearchResult, type KnowledgeSourceRange } from './knowledge.api';
 import { navigate, usePathname } from '../../shared/routing/navigation';
 import { knowledgeUploadError } from './upload-validation';
 
@@ -53,6 +53,9 @@ function KnowledgeDetailPage({ knowledgeBaseId }: { knowledgeBaseId: string }) {
   const [documentContentError, setDocumentContentError] = useState('');
   const [documentContentHasMore, setDocumentContentHasMore] = useState(false);
   const [documentContentTotalLength, setDocumentContentTotalLength] = useState<number | undefined>(undefined);
+  const [documentSourceRanges, setDocumentSourceRanges] = useState<KnowledgeSourceRange[]>([]);
+  const [documentSourceRangesLoading, setDocumentSourceRangesLoading] = useState(false);
+  const [documentSourceRangesError, setDocumentSourceRangesError] = useState('');
   const [query, setQuery] = useState('');
   const [searchResult, setSearchResult] = useState<KnowledgeSearchResult | null>(null);
   const [contentByDocumentId, setContentByDocumentId] = useState<Record<string, string>>({});
@@ -173,7 +176,7 @@ function KnowledgeDetailPage({ knowledgeBaseId }: { knowledgeBaseId: string }) {
       if (sourceMode === 'text') {
         await createTextDocument(selectedId, { workspaceId: workspaceId, title: documentTitle.trim(), text: documentText });
       } else {
-        if (!documentFile) throw new Error('请选择 TXT、JSON、PDF 或图片文件');
+        if (!documentFile) throw new Error('请选择 TXT、JSON、PDF、DOCX、PPTX 或图片文件');
         const uploadError = knowledgeUploadError(documentFile);
         if (uploadError) throw new Error(uploadError);
         await uploadDocumentFile(selectedId, { workspaceId: workspaceId, title: documentTitle, file: documentFile });
@@ -193,6 +196,23 @@ function KnowledgeDetailPage({ knowledgeBaseId }: { knowledgeBaseId: string }) {
   function handleDocumentFileChange(file: File | null) {
     setDocumentFile(file);
     setDocumentError(file ? (knowledgeUploadError(file) ?? '') : '');
+  }
+
+  async function handleOpenDocument(id: string) {
+    setSelectedDocumentId(id);
+    setDocumentDrawerOpen(true);
+    setDocumentSourceRanges([]);
+    setDocumentSourceRangesError('');
+    if (!selectedId) return;
+    setDocumentSourceRangesLoading(true);
+    try {
+      const page = await listDocumentChunks(selectedId, id, workspaceId, 1);
+      setDocumentSourceRanges(page.items.flatMap((item) => item.sourceRanges?.ranges ?? []));
+    } catch (cause) {
+      setDocumentSourceRangesError(getMessage(cause));
+    } finally {
+      setDocumentSourceRangesLoading(false);
+    }
   }
 
   async function handleRetry(documentId: string) {
@@ -330,7 +350,12 @@ function KnowledgeDetailPage({ knowledgeBaseId }: { knowledgeBaseId: string }) {
         addingDocument, sourceMode, documentTitle, documentText, selectedDocumentId, selectedDocument,
         documentDrawerOpen, readyDocuments, hasProcessing,
       }}
-      documentContentState={{ content: documentContent, loading: documentContentLoading, error: documentContentError, hasMore: documentContentHasMore, totalLength: documentContentTotalLength }}
+      documentContentState={{
+        content: documentContent, loading: documentContentLoading, error: documentContentError,
+        hasMore: documentContentHasMore, totalLength: documentContentTotalLength,
+        sourceRanges: documentSourceRanges, sourceRangesLoading: documentSourceRangesLoading,
+        sourceRangesError: documentSourceRangesError,
+      }}
       searchState={{ query, searchResult, contentByDocumentId, searching, searchError, canSearch: Boolean(query.trim()) }}
       confirmation={confirmation}
       fileInputRef={fileInputRef}
@@ -361,7 +386,7 @@ function KnowledgeDetailPage({ knowledgeBaseId }: { knowledgeBaseId: string }) {
         onDocumentFileChange: handleDocumentFileChange,
         handleDocumentSubmit,
         handleRetry,
-        onViewDocumentChunks: (id) => { setSelectedDocumentId(id); setDocumentDrawerOpen(true); },
+        onViewDocumentChunks: (id) => { void handleOpenDocument(id); },
         onReadDocument: (id) => navigate(`/workspace/knowledge/${encodeURIComponent(knowledgeBaseId)}/read/${encodeURIComponent(id)}`),
         onCloseDocumentDrawer: () => setDocumentDrawerOpen(false),
         handleDeleteDocument: (id) => {

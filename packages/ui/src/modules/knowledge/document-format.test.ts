@@ -18,6 +18,11 @@ describe('document format label', () => {
     expect(documentFormat({ sourceType: 'IMAGE', originalFileName: 'archive.bin' })).toBe('图片');
   });
 
+  it('shows DOCX and PPTX for Office documents', () => {
+    expect(documentFormat({ sourceType: 'DOCX', originalFileName: 'manual.DOCX' })).toBe('DOCX');
+    expect(documentFormat({ sourceType: 'PPTX', originalFileName: 'deck.pptx' })).toBe('PPTX');
+  });
+
   it('keeps non-image source types unchanged', () => {
     expect(documentFormat({ sourceType: 'TEXT', originalFileName: null })).toBe('TEXT');
     expect(documentFormat({ sourceType: 'TXT', originalFileName: 'note.txt' })).toBe('TXT');

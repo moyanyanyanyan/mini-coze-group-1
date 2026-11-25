@@ -19,7 +19,10 @@ function props(): KnowledgeViewProps {
       documentSaving: false, deletingDocumentId: null, addingDocument: false, sourceMode: 'text',
       documentTitle: '', documentText: '', selectedDocumentId: document.id, selectedDocument: document,
       documentDrawerOpen: false, readyDocuments: [document], hasProcessing: false },
-    documentContentState: { content: '第一段识别内容', loading: false, error: '' },
+    documentContentState: {
+      content: '第一段识别内容', loading: false, error: '',
+      sourceRanges: [], sourceRangesLoading: false, sourceRangesError: '',
+    },
     searchState: { query: '', searchResult: null, contentByDocumentId: {}, searching: false, searchError: '', canSearch: false },
     confirmation: <span>确认弹窗插槽</span>, fileInputRef: createRef<HTMLInputElement>(),
     onBackToCenter: noop,
@@ -48,7 +51,7 @@ describe('knowledge view', () => {
     input.documentState.selectedDocument = input.documentState.documents[0];
     input.documentContentState.content = 'Extracted PDF text';
     const html = renderToStaticMarkup(<KnowledgeView {...input} />);
-    expect(html).toContain('accept=".txt,.json,.pdf,.png,.jpg,.jpeg"');
+    expect(html).toContain('accept=".txt,.json,.pdf,.docx,.pptx,.png,.jpg,.jpeg"');
     expect(html).toContain('PDF 最多 64 MiB');
     expect(html).toContain('<td>PDF</td>');
     expect(html).toContain('Extracted PDF text');
@@ -97,6 +100,45 @@ describe('knowledge view', () => {
     const html = renderToStaticMarkup(<KnowledgeView {...input} />);
     expect(html).toContain('PDF 文件无法解析，请检查文件后重试。');
   });
+  it('shows Word paragraph and table sources for a DOCX preview', () => {
+    const input = props();
+    input.documentState.documents = [{ ...document, sourceType: 'DOCX', originalFileName: 'manual.docx' }];
+    input.documentState.selectedDocument = input.documentState.documents[0];
+    input.documentState.documentDrawerOpen = true;
+    input.documentContentState.sourceRanges = [
+      { path: 'content.3', kind: 'paragraph', startOffset: 0, endOffset: 5, overlap: false },
+      { path: 'content.4.children.0.children.1.children.0', kind: 'tableCell', startOffset: 6, endOffset: 9, overlap: false },
+    ];
+    const html = renderToStaticMarkup(<KnowledgeView {...input} />);
+    expect(html).toContain('<td>DOCX</td>');
+    expect(html).toContain('Word 段落 4');
+    expect(html).toContain('Word 表格 5 · 单元格');
+  });
+
+  it('shows PPT slide numbers in search results', () => {
+    const input = props();
+    input.documentState.activeTab = 'search';
+    input.searchState.searchResult = {
+      status: 'HIT',
+      hits: [{
+        chunkId: 'chunk-1',
+        knowledgeBaseId: 'base-1',
+        documentId: 'deck-1',
+        documentTitle: 'deck.pptx',
+        content: '幻灯片内容',
+        startOffset: 0,
+        endOffset: 5,
+        sourceRanges: {
+          version: 1,
+          ranges: [{ path: 'content.0', slideNumber: 2, kind: 'heading', startOffset: 0, endOffset: 5, overlap: false }],
+        },
+        score: 0.9,
+      }],
+    };
+    const html = renderToStaticMarkup(<KnowledgeView {...input} />);
+    expect(html).toContain('PPT 第 2 页 · 标题');
+  });
+
   it('renders disabled libraries without document, chunk or search controls', () => {
     const input = props();
     input.catalog.selectedBaseStatus = 'DISABLED';

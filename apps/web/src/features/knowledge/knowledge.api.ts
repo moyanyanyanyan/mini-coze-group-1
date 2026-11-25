@@ -12,7 +12,7 @@ export interface KnowledgeDocument {
   id: string;
   knowledgeBaseId: string;
   title: string;
-  sourceType: 'TEXT' | 'TXT' | 'JSON' | 'PDF' | 'IMAGE';
+  sourceType: 'TEXT' | 'TXT' | 'JSON' | 'PDF' | 'IMAGE' | 'DOCX' | 'PPTX';
   originalFileName: string | null;
   status: 'PROCESSING' | 'READY' | 'FAILED';
   stage: 'VALIDATING' | 'EXTRACTING' | 'CHUNKING' | 'EMBEDDING' | 'PERSISTING' | 'COMPLETED' | 'FAILED';
@@ -57,6 +57,8 @@ export interface KnowledgeChunkSourceRanges {
   version: 1;
   ranges: KnowledgeChunkSourceRange[];
 }
+
+export type KnowledgeSourceRange = KnowledgeChunkSourceRange;
 
 export interface KnowledgeChunkPreview {
   id: string;

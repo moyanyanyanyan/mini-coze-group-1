@@ -40,4 +40,21 @@ describe('groupSearchResults', () => {
     ], { 'doc-1': 'abcde' });
     expect(result[0].segments.map((segment) => segment.content)).toEqual(['chunk', 'chunk']);
   });
+
+  it('merges source ranges when overlapping hits are combined', () => {
+    const source = (slideNumber: number) => ({
+      version: 1 as const,
+      ranges: [{
+        path: `content.${slideNumber}`, slideNumber, kind: 'paragraph' as const,
+        startOffset: 0, endOffset: 5, overlap: false,
+      }],
+    });
+    const result = groupSearchResults([
+      hit({ startOffset: 0, endOffset: 5, sourceRanges: source(1) }),
+      hit({ chunkId: 'chunk-2', startOffset: 4, endOffset: 9, sourceRanges: source(2) }),
+    ], { 'doc-1': 'abcdefghi' });
+    expect(result[0].segments).toHaveLength(1);
+    expect(result[0].segments[0].sourceRanges?.ranges.map((range) => range.slideNumber))
+      .toEqual([1, 2]);
+  });
 });

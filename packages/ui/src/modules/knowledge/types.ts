@@ -10,7 +10,7 @@ export interface KnowledgeBaseItem {
 export interface KnowledgeDocumentItem {
   id: string;
   title: string;
-  sourceType: 'TEXT' | 'TXT' | 'JSON' | 'PDF' | 'IMAGE';
+  sourceType: 'TEXT' | 'TXT' | 'JSON' | 'PDF' | 'IMAGE' | 'DOCX' | 'PPTX';
   status: 'PROCESSING' | 'READY' | 'FAILED';
   stage: string;
   chunkCount: number;
@@ -19,9 +19,49 @@ export interface KnowledgeDocumentItem {
   createdAt: string;
 }
 
+export type KnowledgeSourceKind =
+  | 'paragraph'
+  | 'heading'
+  | 'listItem'
+  | 'tableCell'
+  | 'imageOcr';
+
+export interface KnowledgeSourceRange {
+  path: string;
+  slideNumber?: number;
+  bounds?: { x: number; y: number; width: number; height: number };
+  kind: KnowledgeSourceKind;
+  startOffset: number;
+  endOffset: number;
+  overlap: boolean;
+  headingLevel?: number;
+  list?: {
+    listId?: string;
+    listType: 'ordered' | 'unordered';
+    level: number;
+    itemIndex: number;
+    marker?: string;
+  };
+}
+
+export interface KnowledgeSourceRanges {
+  version: 1;
+  ranges: KnowledgeSourceRange[];
+}
+
 export interface KnowledgeSearchPreview {
   status: 'HIT' | 'NO_HIT';
-  hits: { chunkId: string; knowledgeBaseId: string; documentId: string; documentTitle: string; content: string; startOffset: number | null; endOffset: number | null; score: number }[];
+  hits: {
+    chunkId: string;
+    knowledgeBaseId: string;
+    documentId: string;
+    documentTitle: string;
+    content: string;
+    startOffset: number | null;
+    endOffset: number | null;
+    sourceRanges: KnowledgeSourceRanges | null;
+    score: number;
+  }[];
 }
 
 export interface KnowledgeCatalogState {
@@ -76,6 +116,9 @@ export interface KnowledgeDocumentContentState {
   error: string;
   hasMore?: boolean;
   totalLength?: number;
+  sourceRanges: KnowledgeSourceRange[];
+  sourceRangesLoading: boolean;
+  sourceRangesError: string;
 }
 
 export interface KnowledgeActions {

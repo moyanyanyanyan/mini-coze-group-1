@@ -160,6 +160,9 @@
 .knowledge-search-segments li + li { margin-top: 14px; }
 .knowledge-search-segments strong { color: var(--ink-600); font-size: 12px; }
 .knowledge-search-segments p { margin: 7px 0 0; color: var(--ink-900); line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.knowledge-source-hint { margin: 0 0 12px; color: var(--ink-600); font-size: 13px; line-height: 1.6; }
+.knowledge-source-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.knowledge-source-badge { display: inline-flex; padding: 4px 9px; border: 1px solid var(--violet-200); border-radius: 999px; background: var(--violet-50); color: var(--violet-700); font-size: 12px; line-height: 1.4; }
 .knowledge-center-content { max-width: 1120px; }
 .knowledge-center-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 34px; }
 .knowledge-center-heading h1 { margin: 0; font-size: clamp(28px, 3vw, 38px); letter-spacing: -.035em; }

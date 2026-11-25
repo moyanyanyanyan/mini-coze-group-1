@@ -1,4 +1,4 @@
-export const KNOWLEDGE_FILE_ACCEPT = '.txt,.json,.pdf,.png,.jpg,.jpeg';
+export const KNOWLEDGE_FILE_ACCEPT = '.txt,.json,.pdf,.docx,.pptx,.png,.jpg,.jpeg';
 
 const MIB = 1024 * 1024;
 
@@ -20,8 +20,11 @@ export function knowledgeUploadError(file: KnowledgeUploadCandidate): string | n
   if (extension === '.pdf') {
     return file.size > 64 * MIB ? 'PDF 文件不能超过 64 MiB' : null;
   }
+  if (extension === '.docx' || extension === '.pptx') {
+    return file.size > 32 * MIB ? 'DOCX / PPTX 文件不能超过 32 MiB' : null;
+  }
   if (extension === '.png' || extension === '.jpg' || extension === '.jpeg') {
     return file.size > 10 * MIB ? 'PNG / JPG / JPEG 图片不能超过 10 MiB' : null;
   }
-  return '只支持 TXT、JSON、PDF、PNG、JPG、JPEG 文件';
+  return '只支持 TXT、JSON、PDF、DOCX、PPTX、PNG、JPG、JPEG 文件';
 }

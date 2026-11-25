@@ -3,6 +3,7 @@ import { ActionMenu } from '../../components/ActionMenu';
 import type { KnowledgeViewProps } from './types';
 import { groupSearchResults } from './search-results';
 import { documentFormat } from './document-format';
+import { describeSourceRange, uniqueSourceRanges } from './source-format';
 import './knowledge.css';
 
 export function KnowledgeView({
@@ -13,7 +14,8 @@ export function KnowledgeView({
   const { activeTab, documents, documentError, documentLoading, documentSaving, deletingDocumentId,
     addingDocument, sourceMode, documentTitle, documentText, selectedDocument, documentDrawerOpen,
     hasProcessing } = documentState;
-  const { content: documentContent, loading: documentContentLoading, error: documentContentError, hasMore: documentContentHasMore, totalLength: documentContentTotalLength } = documentContentState;
+  const { content: documentContent, loading: documentContentLoading, error: documentContentError, hasMore: documentContentHasMore, totalLength: documentContentTotalLength,
+    sourceRanges: documentSourceRanges, sourceRangesLoading: documentSourceLoading, sourceRangesError: documentSourceError } = documentContentState;
   const { query, searchResult, contentByDocumentId, searching, searchError, canSearch } = searchState;
   const [documentQuery, setDocumentQuery] = useState('');
   const [documentStatusFilter, setDocumentStatusFilter] = useState<'ALL' | 'READY' | 'PROCESSING' | 'FAILED'>('ALL');
@@ -101,7 +103,7 @@ export function KnowledgeView({
                     {sourceMode === 'text' ? (
                       <><label htmlFor="document-text">正文</label><textarea id="document-text" value={documentText} onChange={(event) => onDocumentTextChange(event.target.value)} rows={8} required placeholder="在此粘贴资料正文" /></>
                     ) : (
-                      <><label htmlFor="document-file">TXT / JSON 最多 1 MiB；PDF 最多 64 MiB；PNG / JPG / JPEG 图片最多 10 MiB</label><input id="document-file" ref={fileInputRef} type="file" accept=".txt,.json,.pdf,.png,.jpg,.jpeg" onChange={(event) => onDocumentFileChange(event.target.files?.[0] ?? null)} required /></>
+                      <><label htmlFor="document-file">TXT / JSON 最多 1 MiB；PDF 最多 64 MiB；DOCX / PPTX 最多 32 MiB；PNG / JPG / JPEG 图片最多 10 MiB</label><input id="document-file" ref={fileInputRef} type="file" accept=".txt,.json,.pdf,.docx,.pptx,.png,.jpg,.jpeg" onChange={(event) => onDocumentFileChange(event.target.files?.[0] ?? null)} required /></>
                     )}
                     <button type="submit" disabled={documentSaving}>{documentSaving ? '提交中…' : '提交资料'}</button>
                   </form>
@@ -133,7 +135,7 @@ export function KnowledgeView({
                   {searchResult.status === 'HIT' && <div className="knowledge-search-groups">{groupedSearchResults.map((group) => (
                     <article className="knowledge-search-group" key={group.documentId}>
                       <div className="knowledge-search-group-header"><button type="button" className="knowledge-document-link" onClick={() => onViewDocumentChunks(group.documentId)}>{group.documentTitle}</button><span>{group.segments.length} 处相关内容</span><button type="button" onClick={() => onViewDocumentChunks(group.documentId)}>查看资料</button></div>
-                      <ol className="knowledge-search-segments">{group.segments.map((segment, index) => <li key={`${group.documentId}:${segment.startOffset ?? 'unknown'}:${index}`}><strong>相关内容 {index + 1}</strong><p>{segment.content}</p></li>)}</ol>
+                      <ol className="knowledge-search-segments">{group.segments.map((segment, index) => <li key={`${group.documentId}:${segment.startOffset ?? 'unknown'}:${index}`}><strong>相关内容 {index + 1}</strong><p>{segment.content}</p>{segment.sourceRanges && uniqueSourceRanges(segment.sourceRanges.ranges).length > 0 && <div className="knowledge-source-badges" aria-label="内容来源">{uniqueSourceRanges(segment.sourceRanges.ranges).map((range, rangeIndex) => <span className="knowledge-source-badge" key={`${range.path}:${range.slideNumber ?? ''}:${range.kind}:${rangeIndex}`}>{describeSourceRange(range)}</span>)}</div>}</li>)}</ol>
                     </article>
                   ))}</div>}
                 </div>}
@@ -148,6 +150,7 @@ export function KnowledgeView({
                     {selectedDocument.status === 'PROCESSING' && <section className="knowledge-processing-panel"><strong>正在处理这份资料</strong><p>处理完成后，资料会自动变为可检索状态。请稍候。</p></section>}
                     {selectedDocument.status === 'FAILED' && <section className="knowledge-failed-panel"><strong>这份资料暂时无法处理</strong><p>{friendlyDocumentError(selectedDocument.error?.message)}</p><button type="button" className="knowledge-primary-button" disabled={deletingDocumentId !== null} onClick={() => void handleRetry(selectedDocument.id)}>重新处理</button></section>}
                     {selectedDocument.status === 'READY' && <section className="knowledge-detail-section"><div className="knowledge-panel-heading"><div><h3>识别内容</h3><p>以下内容为资料处理后识别出的连续文本。</p></div></div>{documentContentError && <p className="knowledge-error" role="alert">{documentContentError}</p>}{documentContentLoading ? <p className="knowledge-empty">正在加载识别内容…</p> : documentContent === null ? null : documentContent ? <><div className="knowledge-document-content">{documentContent}</div>{documentContentHasMore && <button type="button" className="knowledge-primary-button knowledge-read-more" onClick={() => onReadDocument(selectedDocument.id)}>阅读全文</button>}</> : <p className="knowledge-empty">这份资料没有可展示的识别内容。</p>}</section>}
+                    {selectedDocument.status === 'READY' && <section className="knowledge-detail-section"><h3>来源位置</h3><p className="knowledge-source-hint">以下为该资料中可追溯的段落、表格单元格与幻灯片来源。</p>{documentSourceError && <p className="knowledge-error" role="alert">{documentSourceError}</p>}{documentSourceLoading ? <p className="knowledge-empty">正在加载来源位置…</p> : documentSourceRanges.length > 0 ? <div className="knowledge-source-badges">{uniqueSourceRanges(documentSourceRanges).map((range, index) => <span className="knowledge-source-badge" key={`${range.path}:${range.slideNumber ?? ''}:${range.kind}:${index}`}>{describeSourceRange(range, selectedDocument.sourceType)}</span>)}</div> : <p className="knowledge-empty">这份资料没有可展示的来源位置。</p>}</section>}
                   </div>
                   <footer className="knowledge-drawer-footer"><button type="button" className="knowledge-delete" disabled={selectedDocument.status === 'PROCESSING' || deletingDocumentId !== null} onClick={() => void handleDeleteDocument(selectedDocument.id)}>{deletingDocumentId === selectedDocument.id ? '删除中…' : '删除资料'}</button></footer>
                 </aside>
@@ -163,6 +166,8 @@ export function KnowledgeView({
 function friendlyDocumentError(message?: string | null): string {
   if (!message) return '处理失败，请检查资料格式后重试。';
   if (/PDF.*无法解析/i.test(message)) return 'PDF 文件无法解析，请检查文件后重试。';
+  if (/超时|timeout/i.test(message)) return '资料处理超时，请稍后重新处理。';
+  if (/Word|PPT|Office|DOCX|PPTX/i.test(message)) return 'Office 文件无法解析，请检查文件是否损坏或加密后重试。';
   if (/图片|OCR|识别/i.test(message)) return '图片文字识别失败，请检查图片清晰度后重试。';
   if (/utf|编码|encoding/i.test(message)) return '文件编码无法识别，请转换为 UTF-8 后重试。';
   if (/empty|空|content/i.test(message)) return '资料内容为空，请补充内容后重试。';

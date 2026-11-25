@@ -1,3 +1,6 @@
+import type { KnowledgeSourceRanges } from './types';
+import { uniqueSourceRanges } from './source-format';
+
 export interface SearchResultHit {
   chunkId: string;
   documentId: string;
@@ -5,6 +8,7 @@ export interface SearchResultHit {
   content: string;
   startOffset: number | null;
   endOffset: number | null;
+  sourceRanges?: KnowledgeSourceRanges | null;
   score: number;
 }
 
@@ -12,6 +16,7 @@ export interface SearchResultSegment {
   content: string;
   startOffset: number | null;
   endOffset: number | null;
+  sourceRanges?: KnowledgeSourceRanges | null;
   score: number;
 }
 
@@ -47,7 +52,13 @@ function mergeDocumentHits(hits: SearchResultHit[], rawText?: string): SearchRes
       && (hit.startOffset as number) >= 0 && (hit.endOffset as number) > (hit.startOffset as number)
       && (hit.endOffset as number) <= rawText.length
   ));
-  if (!canUseOffsets) return hits.map((hit) => ({ content: hit.content, startOffset: hit.startOffset, endOffset: hit.endOffset, score: hit.score }));
+  if (!canUseOffsets) return hits.map((hit) => ({
+    content: hit.content,
+    startOffset: hit.startOffset,
+    endOffset: hit.endOffset,
+    sourceRanges: hit.sourceRanges ?? null,
+    score: hit.score,
+  }));
 
   const sorted = [...hits].sort((left, right) => (left.startOffset as number) - (right.startOffset as number));
   const segments: SearchResultSegment[] = [];
@@ -59,9 +70,27 @@ function mergeDocumentHits(hits: SearchResultHit[], rawText?: string): SearchRes
       previous.endOffset = Math.max(previous.endOffset as number, end);
       previous.score = Math.max(previous.score, hit.score);
       previous.content = rawText.slice(previous.startOffset as number, previous.endOffset as number);
+      previous.sourceRanges = mergeSourceRanges(previous.sourceRanges, hit.sourceRanges);
     } else {
-      segments.push({ content: rawText.slice(start, end), startOffset: start, endOffset: end, score: hit.score });
+      segments.push({
+        content: rawText.slice(start, end),
+        startOffset: start,
+        endOffset: end,
+        sourceRanges: hit.sourceRanges ?? null,
+        score: hit.score,
+      });
     }
   }
   return segments;
+}
+
+function mergeSourceRanges(
+  left: KnowledgeSourceRanges | null | undefined,
+  right: KnowledgeSourceRanges | null | undefined,
+): KnowledgeSourceRanges | null {
+  const ranges = uniqueSourceRanges([
+    ...(left?.ranges ?? []),
+    ...(right?.ranges ?? []),
+  ]);
+  return ranges.length > 0 ? { version: 1, ranges } : null;
 }
