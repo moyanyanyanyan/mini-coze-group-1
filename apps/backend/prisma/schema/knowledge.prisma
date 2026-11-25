@@ -24,6 +24,8 @@ enum KnowledgeDocumentSourceType {
   JSON
   PDF
   IMAGE
+  DOCX
+  PPTX
 }
 
 enum KnowledgeDocumentStatus {
@@ -74,6 +76,7 @@ model KnowledgeChunk {
   startOffset     Int
   endOffset       Int
   enabled         Boolean               @default(true)
+  sourceRanges    Json?
   vector          KnowledgeChunkVector?
 
   @@unique([documentId, position])

@@ -152,12 +152,7 @@ export class KnowledgeDocumentService implements OnModuleInit {
     try {
       const document = await this.prisma.knowledgeDocument.findUniqueOrThrow({ where: { id } });
       await this.prisma.knowledgeDocument.update({ where: { id }, data: { stage: 'EXTRACTING' } });
-      const bytes = document.sourceBytes ?? new Uint8Array();
-      const text = document.sourceType === 'IMAGE'
-        ? await extractImageDocumentText(bytes, document.originalFileName, this.ocr)
-        : document.sourceType === 'PDF'
-          ? (await extractHybridPdfDocumentText(bytes, document.originalFileName ?? 'document.pdf', this.ocr)).rawText
-          : extractDocumentText(document.sourceType, bytes);
+      const text = await this.extractText(document);
       await this.prisma.knowledgeDocument.update({ where: { id }, data: { rawText: text, stage: 'CHUNKING' } });
       const chunks = chunkDocument(text);
       if (chunks.length === 0) throw new DocumentContentError('EMPTY_CONTENT', '资料无法生成可检索片段');
@@ -193,6 +188,30 @@ export class KnowledgeDocumentService implements OnModuleInit {
         : error instanceof EmbeddingUnavailableError ? error.message : '文档处理失败，请稍后重试';
       this.logger.error(`文档 ${id} 处理失败：${code}`, error);
       await this.prisma.knowledgeDocument.update({ where: { id }, data: { status: 'FAILED', stage: 'FAILED', errorCode: code, errorMessage: message } });
+    }
+  }
+
+  private async extractText(document: {
+    sourceType: string;
+    sourceBytes: Uint8Array | null;
+    originalFileName: string | null;
+  }): Promise<string> {
+    const bytes = document.sourceBytes ?? new Uint8Array();
+    switch (document.sourceType) {
+      case 'IMAGE':
+        return extractImageDocumentText(bytes, document.originalFileName, this.ocr);
+      case 'PDF':
+        return (await extractHybridPdfDocumentText(bytes, document.originalFileName ?? 'document.pdf', this.ocr)).rawText;
+      case 'TEXT':
+      case 'TXT':
+      case 'JSON':
+        return extractDocumentText(document.sourceType, bytes);
+      case 'DOCX':
+      case 'PPTX':
+        // The Office parser is wired in the next backend step; do not fall back to UTF-8 text.
+        throw new DocumentContentError('UNSUPPORTED_FILE', 'Office 文档解析尚未接入');
+      default:
+        throw new DocumentContentError('UNSUPPORTED_FILE', '文件类型不支持');
     }
   }
 
