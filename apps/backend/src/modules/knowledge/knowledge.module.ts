@@ -20,7 +20,11 @@ import { KnowledgeWorkspaceGuard } from './knowledge-workspace.guard';
     useFactory: (config: ConfigService) => ({
       limits: {
         // Multer only applies the transport ceiling; per-type limits stay in the service.
-        fileSize: Math.max(config.getOrThrow<number>('PDF_MAX_BYTES'), config.getOrThrow<number>('OCR_IMAGE_MAX_BYTES')),
+        fileSize: Math.max(
+          config.getOrThrow<number>('PDF_MAX_BYTES'),
+          config.getOrThrow<number>('OCR_IMAGE_MAX_BYTES'),
+          config.getOrThrow<number>('OFFICE_MAX_BYTES'),
+        ),
       },
     }),
   })],

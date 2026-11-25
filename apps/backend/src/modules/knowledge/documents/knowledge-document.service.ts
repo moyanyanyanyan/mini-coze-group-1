@@ -5,11 +5,12 @@ import { basename, extname } from 'node:path';
 import { PrismaService } from '../../../database/prisma.service';
 import { EmbeddingClient, EMBEDDING_DIMENSION, EmbeddingUnavailableError } from '../../../integrations/embedding.client';
 import { OcrWorkerClient, OcrWorkerError } from '../../../integrations/ocr-worker.client';
-import { decodeUploadFilename, DocumentContentError, extractDocumentText, MAX_DOCUMENT_BYTES, pdfMaxBytes, readDocumentTextPage, sourceTypeFromFilename } from './document-content';
+import { decodeUploadFilename, DocumentContentError, extractDocumentText, assertOfficeUpload, MAX_DOCUMENT_BYTES, pdfMaxBytes, readDocumentTextPage, sourceTypeFromFilename, type DocumentSourceType } from './document-content';
 import { assertImageUpload, extractImageDocumentText } from './image-document-content';
-import { imageMaxBytes } from '../../../config/upload-limits';
+import { imageMaxBytes, officeMaxBytes } from '../../../config/upload-limits';
 import { chunkDocument } from './chunk-document';
 import { extractHybridPdfDocumentText } from './pdf-hybrid-document-content';
+import { extractOfficeDocument } from './office-document-content';
 import { CreateTextDocumentDto } from '../dto/create-text-document.dto';
 
 interface UploadedDocumentFile {
@@ -48,9 +49,9 @@ export class KnowledgeDocumentService implements OnModuleInit {
 
   async createFile(knowledgeBaseId: string, workspaceId: string, title: string | undefined, file: UploadedDocumentFile | undefined) {
     await this.assertKnowledgeBase(knowledgeBaseId, workspaceId);
-    if (!file) throw new BadRequestException('请选择 TXT、JSON、PDF、PNG 或 JPEG 文件');
+    if (!file) throw new BadRequestException('请选择 TXT、JSON、PDF、DOCX、PPTX、PNG 或 JPEG 文件');
     const filename = decodeUploadFilename(file.originalname);
-    let sourceType: 'TXT' | 'JSON' | 'PDF' | 'IMAGE';
+    let sourceType: DocumentSourceType;
     try {
       sourceType = sourceTypeFromFilename(filename);
     } catch (error) {
@@ -64,6 +65,15 @@ export class KnowledgeDocumentService implements OnModuleInit {
         assertImageUpload(filename, file.mimetype, file.buffer);
       } catch (error) {
         throw new BadRequestException(error instanceof Error ? error.message : '图片文件格式无效');
+      }
+    } else if (sourceType === 'DOCX' || sourceType === 'PPTX') {
+      if (file.size > officeMaxBytes() || file.buffer.byteLength > officeMaxBytes()) {
+        throw new PayloadTooLargeException('Office 文件超过上传大小限制');
+      }
+      try {
+        assertOfficeUpload(filename, file.buffer);
+      } catch (error) {
+        throw new BadRequestException(error instanceof Error ? error.message : 'Office 文件格式无效');
       }
     } else if (file.size > MAX_DOCUMENT_BYTES) {
       throw new BadRequestException('TXT 和 JSON 文件不能超过 1 MiB');
@@ -208,8 +218,11 @@ export class KnowledgeDocumentService implements OnModuleInit {
         return extractDocumentText(document.sourceType, bytes);
       case 'DOCX':
       case 'PPTX':
-        // The Office parser is wired in the next backend step; do not fall back to UTF-8 text.
-        throw new DocumentContentError('UNSUPPORTED_FILE', 'Office 文档解析尚未接入');
+        return (await extractOfficeDocument(
+          bytes,
+          document.originalFileName ?? `document.${document.sourceType.toLowerCase()}`,
+          this.ocr,
+        )).document.rawText;
       default:
         throw new DocumentContentError('UNSUPPORTED_FILE', '文件类型不支持');
     }

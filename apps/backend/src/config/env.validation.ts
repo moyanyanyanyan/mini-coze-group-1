@@ -1,5 +1,5 @@
 import { plainToInstance, Type } from 'class-transformer';
-import { MAX_IMAGE_DOCUMENT_BYTES, MAX_PDF_DOCUMENT_BYTES } from './upload-limits';
+import { MAX_IMAGE_DOCUMENT_BYTES, MAX_OFFICE_DOCUMENT_BYTES, MAX_PDF_DOCUMENT_BYTES } from './upload-limits';
 import { 
   IsInt, 
   IsIn,
@@ -54,6 +54,12 @@ class EnvironmentVariables {
   @Min(1)
   @Max(Number.MAX_SAFE_INTEGER)
   OCR_IMAGE_MAX_BYTES = MAX_IMAGE_DOCUMENT_BYTES;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(Number.MAX_SAFE_INTEGER)
+  OFFICE_MAX_BYTES = MAX_OFFICE_DOCUMENT_BYTES;
 
   // Runtime 未配置时后端仍可启动，实际内部调用时再明确报错。
   @IsOptional()

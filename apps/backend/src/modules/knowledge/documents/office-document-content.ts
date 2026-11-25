@@ -1,6 +1,6 @@
 import { extname } from 'node:path';
 import { parseOffice, type OfficeParserAST } from 'officeparser';
-import { imageMaxBytes } from '../../../config/upload-limits';
+import { imageMaxBytes, officeMaxBytes } from '../../../config/upload-limits';
 import type { OcrWorkerClient } from '../../../integrations/ocr-worker.client';
 import { DocumentContentError } from './document-content';
 import { recognizeImageText } from './image-document-content';
@@ -88,6 +88,9 @@ export async function extractOfficeDocument(
 ): Promise<OfficeDocumentParseResult> {
   if (bytes.byteLength === 0) {
     throw new DocumentContentError('EMPTY_CONTENT', 'Office 文档内容不能为空');
+  }
+  if (bytes.byteLength > officeMaxBytes()) {
+    throw new DocumentContentError('FILE_TOO_LARGE', 'Office 文件超过上传大小限制');
   }
   const format = officeFormatFromFilename(filename);
   if (!format) {

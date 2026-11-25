@@ -1,8 +1,10 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { KnowledgeDocumentService } from './knowledge-document.service';
 import { DocumentContentError, MAX_DOCUMENT_BYTES, MAX_PDF_DOCUMENT_BYTES } from './document-content';
 import { extractPdfDocumentPages } from './pdf-document-content';
 import { OcrWorkerError } from '../../../integrations/ocr-worker.client';
-import { imageMaxBytes } from '../../../config/upload-limits';
+import { imageMaxBytes, officeMaxBytes } from '../../../config/upload-limits';
 
 jest.mock('./pdf-document-content', () => ({ extractPdfDocumentPages: jest.fn() }));
 
@@ -16,7 +18,7 @@ function ocrPage(pageNumber: number, text: string) {
   return { pageNumber, text, method: 'ocr' as const, regions: [], elapsedMs: 1, renderDpi: 200, width: 100, height: 100 };
 }
 
-function setup(sourceType: 'PDF' | 'TXT' | 'JSON' | 'TEXT' | 'IMAGE', sourceBytes: Uint8Array, originalFileName: string | null = null) {
+function setup(sourceType: 'PDF' | 'TXT' | 'JSON' | 'TEXT' | 'IMAGE' | 'DOCX' | 'PPTX', sourceBytes: Uint8Array, originalFileName: string | null = null) {
   const updates: Array<Record<string, unknown>> = [];
   const tx = {
     knowledgeChunk: { deleteMany: jest.fn().mockResolvedValue({}), createMany: jest.fn().mockResolvedValue({}) },
@@ -463,5 +465,81 @@ describe('KnowledgeDocumentService image integration', () => {
       status: 'FAILED', stage: 'FAILED', errorCode: 'UNSUPPORTED_FILE', errorMessage: '图片文档缺少有效的原始文件名',
     });
     expect(embedding.embed).not.toHaveBeenCalled();
+  });
+});
+
+const ZIP_HEADER = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00]);
+
+function officeFixture(name: string): Buffer {
+  return readFileSync(join(__dirname, '../../../../test/fixtures', name));
+}
+
+describe('KnowledgeDocumentService Office integration', () => {
+  it.each([
+    ['DOCX', 't8.docx'],
+    ['PPTX', 't8.pptx'],
+  ] as const)('takes a %s upload through extraction, chunking, embedding and READY', async (sourceType, filename) => {
+    const bytes = officeFixture(filename);
+    const { service, prisma, ocr, embedding, tx, updates } = setup(sourceType, bytes, filename);
+    const schedule = jest.fn();
+    (service as unknown as { schedule(id: string): void }).schedule = schedule;
+    ocr.recognizeImage.mockResolvedValue({
+      status: 'ok',
+      pages: [imageOcrPage('OFFICE IMAGE TEXT')],
+    });
+
+    const created = await service.createFile('kb', 'ws', undefined, {
+      originalname: filename, buffer: bytes, size: bytes.length,
+      mimetype: sourceType === 'DOCX'
+        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        : 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    });
+    expect(created).toMatchObject({ sourceType, status: 'PROCESSING' });
+    expect(prisma.knowledgeDocument.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        sourceType,
+        originalFileName: filename,
+        sourceBytes: new Uint8Array(bytes),
+      }),
+    });
+    expect(schedule).toHaveBeenCalledWith('doc');
+
+    await process(service);
+
+    const rawText = updates.find((update) => typeof update.rawText === 'string')?.rawText;
+    expect(rawText).toContain('OFFICE IMAGE TEXT');
+    expect(rawText).toContain(sourceType === 'DOCX' ? 'Alpha paragraph.' : 'T8 Slide One');
+    expect(embedding.embed).toHaveBeenCalledTimes(1);
+    expect(tx.knowledgeChunk.createMany).toHaveBeenCalledTimes(1);
+    expect(tx.knowledgeDocument.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: 'READY', stage: 'COMPLETED' }),
+    }));
+    expect(ocr.recognizeImage).toHaveBeenCalled();
+  });
+
+  it('enforces the 32 MiB Office upload boundary before saving', async () => {
+    const { service, prisma } = setup('DOCX', ZIP_HEADER);
+    const schedule = jest.fn();
+    (service as unknown as { schedule(id: string): void }).schedule = schedule;
+
+    await expect(service.createFile('kb', 'ws', undefined, {
+      originalname: 'manual.docx', buffer: ZIP_HEADER, size: officeMaxBytes(),
+    })).resolves.toMatchObject({ sourceType: 'DOCX' });
+    expect(prisma.knowledgeDocument.create).toHaveBeenCalledTimes(1);
+
+    await expect(service.createFile('kb', 'ws', undefined, {
+      originalname: 'manual.docx', buffer: ZIP_HEADER, size: officeMaxBytes() + 1,
+    })).rejects.toMatchObject({ status: 413 });
+    expect(prisma.knowledgeDocument.create).toHaveBeenCalledTimes(1);
+    expect(schedule).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a renamed non-ZIP Office file before saving', async () => {
+    const { service, prisma } = setup('DOCX', Buffer.from('not a zip'));
+
+    await expect(service.createFile('kb', 'ws', undefined, {
+      originalname: 'fake.docx', buffer: Buffer.from('not a zip'), size: 9,
+    })).rejects.toThrow(/OOXML/);
+    expect(prisma.knowledgeDocument.create).not.toHaveBeenCalled();
   });
 });

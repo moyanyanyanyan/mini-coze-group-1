@@ -20,13 +20,36 @@ export function decodeUploadFilename(filename: string): string {
   }
 }
 
-export function sourceTypeFromFilename(filename: string): 'TXT' | 'JSON' | 'PDF' | 'IMAGE' {
+export type DocumentSourceType = 'TXT' | 'JSON' | 'PDF' | 'IMAGE' | 'DOCX' | 'PPTX';
+
+export function sourceTypeFromFilename(filename: string): DocumentSourceType {
   const extension = extname(filename).toLowerCase();
   if (extension === '.txt') return 'TXT';
   if (extension === '.json') return 'JSON';
   if (extension === '.pdf') return 'PDF';
+  if (extension === '.docx') return 'DOCX';
+  if (extension === '.pptx') return 'PPTX';
   if (extension === '.png' || extension === '.jpg' || extension === '.jpeg') return 'IMAGE';
-  throw new DocumentContentError('UNSUPPORTED_FILE', '只支持 .txt、.json、.pdf、.png、.jpg 和 .jpeg 文件');
+  throw new DocumentContentError('UNSUPPORTED_FILE', '只支持 .txt、.json、.pdf、.docx、.pptx、.png、.jpg 和 .jpeg 文件');
+}
+
+const ZIP_LOCAL_FILE_HEADER = [0x50, 0x4b, 0x03, 0x04];
+
+/**
+ * DOCX/PPTX are ZIP/OOXML packages. The upload path checks the ZIP container
+ * synchronously; officeparser later proves the package is the declared OOXML type.
+ */
+export function assertOfficeUpload(filename: string, bytes: Uint8Array): 'DOCX' | 'PPTX' {
+  const sourceType = sourceTypeFromFilename(filename);
+  if (sourceType !== 'DOCX' && sourceType !== 'PPTX') {
+    throw new DocumentContentError('UNSUPPORTED_FILE', '只支持 .docx 和 .pptx 文件');
+  }
+  const hasZipHeader = bytes.byteLength >= ZIP_LOCAL_FILE_HEADER.length &&
+    ZIP_LOCAL_FILE_HEADER.every((value, index) => bytes[index] === value);
+  if (!hasZipHeader) {
+    throw new DocumentContentError('UNSUPPORTED_FILE', `${sourceType} 文件不是有效的 OOXML 压缩包`);
+  }
+  return sourceType;
 }
 
 export interface DocumentTextPage {

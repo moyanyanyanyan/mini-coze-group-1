@@ -1,4 +1,4 @@
-import { decodeUploadFilename, DocumentContentError, extractDocumentText, MAX_DOCUMENT_BYTES, readDocumentTextPage, sourceTypeFromFilename } from './document-content';
+import { assertOfficeUpload, decodeUploadFilename, DocumentContentError, extractDocumentText, MAX_DOCUMENT_BYTES, readDocumentTextPage, sourceTypeFromFilename } from './document-content';
 
 describe('document content extraction', () => {
   it.each(['TXT', 'JSON'] as const)('enforces the 1 MiB %s extraction boundary', (sourceType) => {
@@ -37,12 +37,29 @@ describe('document content extraction', () => {
     expect(sourceTypeFromFilename('rules.txt')).toBe('TXT');
     expect(sourceTypeFromFilename('rules.JSON')).toBe('JSON');
     expect(sourceTypeFromFilename('rules.PDF')).toBe('PDF');
+    expect(sourceTypeFromFilename('manual.docx')).toBe('DOCX');
+    expect(sourceTypeFromFilename('manual.DOCX')).toBe('DOCX');
+    expect(sourceTypeFromFilename('deck.pptx')).toBe('PPTX');
+    expect(sourceTypeFromFilename('deck.PPTX')).toBe('PPTX');
     expect(sourceTypeFromFilename('scan.png')).toBe('IMAGE');
     expect(sourceTypeFromFilename('scan.PNG')).toBe('IMAGE');
     expect(sourceTypeFromFilename('photo.jpg')).toBe('IMAGE');
     expect(sourceTypeFromFilename('photo.JPEG')).toBe('IMAGE');
     expect(() => sourceTypeFromFilename('animation.gif')).toThrow(DocumentContentError);
     expect(() => sourceTypeFromFilename('vector.svg')).toThrow(DocumentContentError);
+    expect(() => sourceTypeFromFilename('legacy.doc')).toThrow(DocumentContentError);
+    expect(() => sourceTypeFromFilename('legacy.ppt')).toThrow(DocumentContentError);
+  });
+
+  it('accepts only ZIP containers for DOCX/PPTX and rejects renamed payloads', () => {
+    const zipHeader = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00]);
+    expect(assertOfficeUpload('manual.docx', zipHeader)).toBe('DOCX');
+    expect(assertOfficeUpload('deck.pptx', zipHeader)).toBe('PPTX');
+    expect(() => assertOfficeUpload('manual.docx', Buffer.from('not a zip'))).toThrow(
+      new DocumentContentError('UNSUPPORTED_FILE', 'DOCX 文件不是有效的 OOXML 压缩包'),
+    );
+    expect(() => assertOfficeUpload('manual.docx', Buffer.alloc(0))).toThrow(DocumentContentError);
+    expect(() => assertOfficeUpload('manual.pdf', zipHeader)).toThrow(DocumentContentError);
   });
 
   it('recovers a UTF-8 Chinese upload filename read as Latin-1', () => {

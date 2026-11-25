@@ -4,6 +4,7 @@ import {
   OcrWorkerError,
   type OcrWorkerResponse,
 } from '../../../integrations/ocr-worker.client';
+import { officeMaxBytes } from '../../../config/upload-limits';
 import { DocumentContentError } from './document-content';
 import {
   extractOfficeDocument,
@@ -14,6 +15,8 @@ import {
 function fixture(name: string): Buffer {
   return readFileSync(join(__dirname, '../../../../test/fixtures', name));
 }
+
+const ZIP_HEADER = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00]);
 
 function ocrPage(text: string) {
   return {
@@ -179,6 +182,15 @@ describe('Office document parsing', () => {
     expect(result.warnings).toEqual([
       expect.objectContaining({ code: 'IMAGE_OCR_SKIPPED' }),
     ]);
+  });
+
+  it('rejects an Office archive over the 32 MiB parser boundary before parsing', async () => {
+    const worker = setupOcr();
+    const bytes = Buffer.alloc(officeMaxBytes() + 1);
+    ZIP_HEADER.copy(bytes);
+    await expect(extractOfficeDocument(bytes, 'large.docx', worker))
+      .rejects.toMatchObject({ code: 'FILE_TOO_LARGE' });
+    expect(worker.recognizeImage).not.toHaveBeenCalled();
   });
 
   it('propagates OCR worker failures instead of returning partial Office text', async () => {
