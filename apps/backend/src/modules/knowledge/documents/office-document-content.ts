@@ -1,5 +1,9 @@
 import { extname } from 'node:path';
-import { parseOffice, type OfficeParserAST } from 'officeparser';
+import {
+  parseOffice,
+  type DecompressionLimits,
+  type OfficeParserAST,
+} from 'officeparser';
 import { imageMaxBytes, officeMaxBytes } from '../../../config/upload-limits';
 import type { OcrWorkerClient } from '../../../integrations/ocr-worker.client';
 import { DocumentContentError } from './document-content';
@@ -12,7 +16,10 @@ import {
   type OfficeFormat,
 } from './office-ast-converter';
 
-export type OfficeParseWarningCode = 'IMAGE_OCR_SKIPPED' | 'IMAGE_TOO_LARGE';
+export type OfficeParseWarningCode =
+  | 'IMAGE_OCR_SKIPPED'
+  | 'IMAGE_TOO_LARGE'
+  | 'IMAGE_OCR_LIMIT_REACHED';
 
 export interface OfficeParseWarning {
   code: OfficeParseWarningCode;
@@ -30,6 +37,33 @@ const OCR_IMAGE_MIME_TYPES = new Set([
   'image/jpeg',
   'image/jpg',
   'image/webp',
+]);
+
+export const OFFICE_DECOMPRESSION_LIMITS: DecompressionLimits = {
+  maxUncompressedBytes: 128 * 1024 * 1024,
+  maxZipEntries: 2_000,
+  maxTableCells: 200_000,
+  maxXmlElements: 1_000_000,
+  maxRepeatedContent: 8 * 1024 * 1024,
+  maxRawContentLength: 16 * 1024 * 1024,
+};
+
+export const OFFICE_PARSE_TIMEOUT_MS = 120_000;
+export const MAX_OFFICE_ATTACHMENTS = 200;
+export const MAX_OFFICE_OCR_IMAGES = 50;
+export const MAX_OFFICE_OCR_BYTES = 50 * 1024 * 1024;
+export const MAX_OFFICE_TEXT_CHARS = 1_000_000;
+
+const RESOURCE_LIMIT_ERROR_CODES = new Set([
+  'ZIP_ENTRY_COUNT_LIMIT_EXCEEDED',
+  'ZIP_SIZE_LIMIT_EXCEEDED',
+  'XML_ELEMENT_LIMIT_EXCEEDED',
+]);
+
+const RESOURCE_LIMIT_WARNING_CODES = new Set([
+  'TABLE_CELL_LIMIT_EXCEEDED',
+  'REPEATED_CONTENT_LIMIT_EXCEEDED',
+  'RAW_CONTENT_LIMIT_EXCEEDED',
 ]);
 
 export function officeFormatFromFilename(
@@ -106,11 +140,43 @@ export async function extractOfficeDocument(
       extractAttachments: true,
       ocr: false,
       ignoreSlideMasters: true,
+      decompressionLimits: OFFICE_DECOMPRESSION_LIMITS,
+      abortSignal: AbortSignal.timeout(OFFICE_PARSE_TIMEOUT_MS),
     });
-  } catch {
+  } catch (error) {
+    const code = (error as { officeIssue?: { code?: string } } | null)
+      ?.officeIssue?.code;
+    if (code === 'OPERATION_ABORTED') {
+      throw new DocumentContentError(
+        'OFFICE_PARSE_TIMEOUT',
+        `${formatLabel(format)}解析超时`,
+      );
+    }
+    if (code !== undefined && RESOURCE_LIMIT_ERROR_CODES.has(code)) {
+      throw new DocumentContentError(
+        'OFFICE_RESOURCE_LIMIT',
+        `${formatLabel(format)}超过安全解析限制`,
+      );
+    }
     throw new DocumentContentError(
       'INVALID_OFFICE_DOCUMENT',
       `${formatLabel(format)}无法解析`,
+    );
+  }
+  if (
+    ast.warnings.some((warning) =>
+      RESOURCE_LIMIT_WARNING_CODES.has(warning.code),
+    )
+  ) {
+    throw new DocumentContentError(
+      'OFFICE_RESOURCE_LIMIT',
+      `${formatLabel(format)}超过安全解析限制`,
+    );
+  }
+  if (ast.attachments.length > MAX_OFFICE_ATTACHMENTS) {
+    throw new DocumentContentError(
+      'OFFICE_RESOURCE_LIMIT',
+      `${formatLabel(format)}附件数量超过安全限制`,
     );
   }
   if (ast.type !== format) {
@@ -125,15 +191,15 @@ export async function extractOfficeDocument(
   const readable = readableImageIds(document);
   const recognizedByAttachment = new Map<number, string>();
   const textsByImage = new Map<string, string>();
+  let ocrImageCount = 0;
+  let ocrByteCount = 0;
 
   for (const image of document.images) {
-    if (!readable.has(image.id)) {
+    if (!readable.has(image.id) || image.attachmentIndex === null) {
       continue;
     }
-    const attachment =
-      image.attachmentIndex === null
-        ? undefined
-        : document.attachments[image.attachmentIndex];
+    const attachmentIndex = image.attachmentIndex;
+    const attachment = document.attachments[attachmentIndex];
     if (!attachment || !attachment.data) {
       warnings.push({
         code: 'IMAGE_OCR_SKIPPED',
@@ -156,7 +222,7 @@ export async function extractOfficeDocument(
       continue;
     }
 
-    const cached = recognizedByAttachment.get(image.attachmentIndex as number);
+    const cached = recognizedByAttachment.get(attachmentIndex);
     if (cached !== undefined) {
       if (cached) {
         textsByImage.set(image.id, cached);
@@ -171,7 +237,7 @@ export async function extractOfficeDocument(
         imageId: image.id,
         message: '图片附件为空，已跳过 OCR',
       });
-      recognizedByAttachment.set(image.attachmentIndex as number, '');
+      recognizedByAttachment.set(attachmentIndex, '');
       continue;
     }
     if (imageBytes.byteLength > imageMaxBytes()) {
@@ -180,17 +246,31 @@ export async function extractOfficeDocument(
         imageId: image.id,
         message: '内嵌图片超过 OCR 大小限制，已跳过 OCR',
       });
-      recognizedByAttachment.set(image.attachmentIndex as number, '');
+      recognizedByAttachment.set(attachmentIndex, '');
+      continue;
+    }
+    if (
+      ocrImageCount >= MAX_OFFICE_OCR_IMAGES ||
+      ocrByteCount + imageBytes.byteLength > MAX_OFFICE_OCR_BYTES
+    ) {
+      warnings.push({
+        code: 'IMAGE_OCR_LIMIT_REACHED',
+        imageId: image.id,
+        message: 'Office 文档的内嵌图片 OCR 数量或总大小超过限制，已跳过后续图片',
+      });
+      recognizedByAttachment.set(attachmentIndex, '');
       continue;
     }
 
+    ocrImageCount += 1;
+    ocrByteCount += imageBytes.byteLength;
     const text = await recognizeImageText(
       imageBytes,
       image.attachmentName ?? attachment.name,
       mimeType,
       worker,
     );
-    recognizedByAttachment.set(image.attachmentIndex as number, text);
+    recognizedByAttachment.set(attachmentIndex, text);
     if (text) {
       textsByImage.set(image.id, text);
     }
@@ -201,6 +281,12 @@ export async function extractOfficeDocument(
     throw new DocumentContentError(
       'EMPTY_CONTENT',
       `${formatLabel(format)}中没有可提取的文本`,
+    );
+  }
+  if (document.rawText.length > MAX_OFFICE_TEXT_CHARS) {
+    throw new DocumentContentError(
+      'OFFICE_TEXT_TOO_LARGE',
+      `${formatLabel(format)}提取文本超过安全限制`,
     );
   }
   return { document, warnings };
