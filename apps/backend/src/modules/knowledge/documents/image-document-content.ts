@@ -44,6 +44,27 @@ export function assertImageUpload(filename: string, mimeType: string | undefined
 }
 
 /**
+ * Calls the shared OCR Worker image endpoint and validates its single-page response.
+ * Returns an empty string for an image without recognized text, so callers can decide
+ * whether that is an error (a standalone image upload) or merely an image with no text
+ * (an embedded Office picture).
+ */
+export async function recognizeImageText(
+  bytes: Uint8Array,
+  filename: string,
+  mimeType: string,
+  worker: Pick<OcrWorkerClient, 'recognizeImage'>,
+): Promise<string> {
+  const response: OcrWorkerResponse = await worker.recognizeImage(Buffer.from(bytes), filename, mimeType);
+  const page = response.pages?.[0];
+  if (response.status !== 'ok' || !Array.isArray(response.pages) || response.pages.length !== 1 ||
+      page?.pageNumber !== 1 || page?.method !== 'ocr' || typeof page?.text !== 'string') {
+    throw new OcrWorkerError('INVALID_RESPONSE', 'OCR Worker 返回的图片页码或内容无效');
+  }
+  return page.text.replace(/\r\n?/g, '\n').trim();
+}
+
+/**
  * Sends the original image bytes to the existing OCR Worker client and returns the
  * recognized text. The caller keeps using the shared Chunk / Embedding / Vector path.
  */
@@ -58,15 +79,7 @@ export async function extractImageDocumentText(
   const format = imageFormatFromFilename(documentFilename);
   if (!format) throw new DocumentContentError('UNSUPPORTED_FILE', '图片文档缺少有效的原始文件名');
 
-  const response: OcrWorkerResponse = await worker.recognizeImage(
-    Buffer.from(bytes), documentFilename, imageMimeType(format),
-  );
-  const page = response.pages?.[0];
-  if (response.status !== 'ok' || !Array.isArray(response.pages) || response.pages.length !== 1 ||
-      page?.pageNumber !== 1 || page?.method !== 'ocr' || typeof page?.text !== 'string') {
-    throw new OcrWorkerError('INVALID_RESPONSE', 'OCR Worker 返回的图片页码或内容无效');
-  }
-  const text = page.text.replace(/\r\n?/g, '\n').trim();
+  const text = await recognizeImageText(bytes, documentFilename, imageMimeType(format), worker);
   if (!text) throw new DocumentContentError('EMPTY_CONTENT', '图片中没有识别到有效文本');
   return text;
 }
