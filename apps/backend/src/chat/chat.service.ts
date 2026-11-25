@@ -16,6 +16,10 @@ import { AgentsService } from '../modules/agents/agents.service';
 import {
   attachmentHistorySummary,
   buildAttachmentMessage,
+  buildRecentAttachmentBlock,
+  MAX_TOTAL_RECENT_ATTACHMENT_CHARS,
+  MAX_TOTAL_SUMMARY_CHARS,
+  RECENT_ATTACHMENT_TURNS,
 } from './attachment-context';
 import {
   RuntimeClientService,
@@ -40,6 +44,20 @@ function historyExcerpt(content: string): string {
   const available = MAX_HISTORY_CONTENT - marker.length;
   const head = Math.ceil(available / 2);
   return chars.slice(0, head).join('') + marker + chars.slice(-(available - head)).join('');
+}
+
+interface HistoryAttachmentRow {
+  fileName: string;
+  sourceType: string;
+  extractedText: string | null;
+  status: string;
+}
+
+interface HistoryRow {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  attachments: HistoryAttachmentRow[];
 }
 
 export interface RunChatInput {
@@ -645,38 +663,99 @@ export class ChatService {
       orderBy: { seq: 'asc' },
       include: {
         attachments: {
-          select: { fileName: true, extractedText: true, status: true },
+          select: {
+            fileName: true,
+            sourceType: true,
+            extractedText: true,
+            status: true,
+          },
+          orderBy: { createdAt: 'asc' },
         },
       },
     });
 
     const excluded = new Set(excludeIds);
     // 存放已经配对成功的历史记录
-    const pairs: RuntimeHistoryMessage[] = [];
+    const pairs: HistoryRow[] = [];
     // 临时保存一条未找到助手回复的用户消息
-    let pendingUser: RuntimeHistoryMessage | null = null;
+    let pendingUser: HistoryRow | null = null;
 
     for (const row of rows) {
       if (excluded.has(row.id)) {
         continue;
       }
       if (row.role === 'user') {
-        // 历史只带附件摘要，避免把上一轮的附件全文再塞一遍
         pendingUser = {
           id: row.id,
           role: 'user',
-          content: row.content + attachmentHistorySummary(row.attachments),
+          content: row.content,
+          attachments: row.attachments,
         };
         continue;
       }
       if (pendingUser) {
-        pairs.push(pendingUser, { id: row.id, role: 'assistant', content: row.content });
+        pairs.push(pendingUser, {
+          id: row.id,
+          role: 'assistant',
+          content: row.content,
+          attachments: [],
+        });
         pendingUser = null;
       }
     }
 
     const turns = Math.min(contextLimit, MAX_HISTORY_TURNS);
-    return pairs.slice(-2 * turns).map((message) => ({
+    const selected = pairs.slice(-2 * turns);
+    // 从最新一轮往回数：最近 RECENT_ATTACHMENT_TURNS 轮注入全文，其余降级为摘要
+    const userPositions = selected
+      .map((row, index) => (row.role === 'user' ? index : -1))
+      .filter((index) => index >= 0);
+    const distance = new Map<number, number>();
+    userPositions.forEach((rowIndex, order) => {
+      distance.set(rowIndex, userPositions.length - 1 - order);
+    });
+
+    let fullBudget = MAX_TOTAL_RECENT_ATTACHMENT_CHARS;
+    let summaryBudget = MAX_TOTAL_SUMMARY_CHARS;
+    let fullTurns = 0;
+    let summaryTurns = 0;
+    let attachmentChars = 0;
+
+    const history = selected.map((row, index) => {
+      if (row.role !== 'user') {
+        return { id: row.id, role: 'assistant' as const, content: row.content };
+      }
+      // 单条历史有 8000 字符硬上限，先预留用户原文，避免 historyExcerpt 截掉附件中段
+      const room = MAX_HISTORY_CONTENT - row.content.length - 2;
+      const isRecent = (distance.get(index) ?? Number.MAX_SAFE_INTEGER) < RECENT_ATTACHMENT_TURNS;
+      let extra = '';
+      if (isRecent && room > 0 && fullBudget > 0) {
+        const block = buildRecentAttachmentBlock(row.attachments, Math.min(fullBudget, room));
+        if (block.used > 0) {
+          extra = `\n\n${block.text}`;
+          fullBudget -= block.used;
+          fullTurns += 1;
+          attachmentChars += block.used;
+        }
+      }
+      if (!extra && room > 0 && summaryBudget > 0) {
+        const summary = attachmentHistorySummary(row.attachments, {
+          total: Math.min(summaryBudget, room),
+        });
+        if (summary) {
+          extra = summary;
+          summaryBudget -= summary.length;
+          summaryTurns += 1;
+          attachmentChars += summary.length;
+        }
+      }
+      return { id: row.id, role: 'user' as const, content: row.content + extra };
+    });
+
+    this.logger.debug(
+      `history attachments fullTurns=${fullTurns} summaryTurns=${summaryTurns} chars=${attachmentChars}`,
+    );
+    return history.map((message) => ({
       ...message, content: historyExcerpt(message.content),
     }));
   }

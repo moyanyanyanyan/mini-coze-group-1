@@ -3,6 +3,7 @@ import { AttachmentError, type AttachmentInput } from '../attachment.types';
 import { isImageType, isOfficeType } from './file-type';
 import { parseImage } from './image.parser';
 import { OcrClient } from '../ocr.client';
+import { VisionClient } from '../vision.client';
 import { parseOffice } from './office.parser';
 import { parsePdf } from './pdf.parser';
 import { parseText } from './text.parser';
@@ -14,7 +15,10 @@ import { parseText } from './text.parser';
  */
 @Injectable()
 export class AttachmentParserRegistry {
-  constructor(private readonly ocr: OcrClient) {}
+  constructor(
+    private readonly ocr: OcrClient,
+    private readonly vision: VisionClient,
+  ) {}
 
   async parse(input: AttachmentInput): Promise<string> {
     const text = await this.dispatch(input);
@@ -33,7 +37,7 @@ export class AttachmentParserRegistry {
       return parseOffice(input);
     }
     if (isImageType(input.sourceType)) {
-      return parseImage(input, this.ocr);
+      return parseImage(input, this.ocr, this.vision);
     }
     return parseText(input);
   }

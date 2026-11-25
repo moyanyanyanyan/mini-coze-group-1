@@ -19,7 +19,8 @@ export type AttachmentErrorCode =
   | 'FILE_TOO_LARGE'
   | 'CORRUPT_FILE'
   | 'EMPTY_CONTENT'
-  | 'OCR_UNAVAILABLE';
+  | 'OCR_UNAVAILABLE'
+  | 'VISION_UNAVAILABLE';
 
 /**
  * 解析层统一错误。

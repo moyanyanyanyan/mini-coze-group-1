@@ -157,7 +157,13 @@ describe('ChatService.runOnce', () => {
       orderBy: { seq: 'asc' },
       include: {
         attachments: {
-          select: { fileName: true, extractedText: true, status: true },
+          select: {
+            fileName: true,
+            sourceType: true,
+            extractedText: true,
+            status: true,
+          },
+          orderBy: { createdAt: 'asc' },
         },
       },
     });

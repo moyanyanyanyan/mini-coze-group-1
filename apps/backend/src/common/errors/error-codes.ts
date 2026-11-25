@@ -57,6 +57,8 @@ export const ErrorCode = {
   EMPTY_CONTENT: 'EMPTY_CONTENT',
   /** OCR 服务未配置或不可用 */
   OCR_UNAVAILABLE: 'OCR_UNAVAILABLE',
+  /** 视觉理解服务未配置或不可用（图片仍会保留 OCR 结果） */
+  VISION_UNAVAILABLE: 'VISION_UNAVAILABLE',
   /** 附件不属于当前会话，或已被其他消息绑定 */
   ATTACHMENT_INVALID: 'ATTACHMENT_INVALID',
   /** 附件仍在解析或解析失败 */

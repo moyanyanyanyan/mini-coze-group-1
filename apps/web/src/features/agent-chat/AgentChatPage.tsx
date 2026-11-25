@@ -51,10 +51,15 @@ export function AgentChatPage() {
   const requestId = useRef(0);
   const [switching, setSwitching] = useState(false);
 
+  /** 切换会话后自增，用于丢弃旧会话的在途上传结果 */
+  const uploadEpoch = useRef(0);
+
   /** 切会话/切智能体/新建时，未发送的附件没有归属，直接丢掉 */
   const clearPendingAttachments = () => {
+    uploadEpoch.current += 1;
     setPendingAttachments([]);
     setAttachmentError('');
+    setAttaching(false);
   };
   // React 严格模式下 effect 会跑两次，没有这个闸门就会建出两个会话
   const booted = useRef(false);
@@ -216,18 +221,31 @@ export function AgentChatPage() {
       setAttachmentError('单条消息最多 5 个附件，超出的文件未添加');
     }
     // 串行上传：一次一个请求，失败只影响当前文件
+    const epoch = uploadEpoch.current;
+    const targetConversationId = conversationId;
     setAttaching(true);
     try {
       for (const file of files.slice(0, room)) {
+        if (epoch !== uploadEpoch.current) {
+          break;
+        }
         try {
-          const uploaded = await uploadAttachment(conversationId, file);
+          const uploaded = await uploadAttachment(targetConversationId, file);
+          if (epoch !== uploadEpoch.current) {
+            break;
+          }
           setPendingAttachments((prev) => [...prev, uploaded]);
         } catch (caught) {
+          if (epoch !== uploadEpoch.current) {
+            break;
+          }
           setAttachmentError(caught instanceof ApiError ? caught.message : `${file.name} 上传失败`);
         }
       }
     } finally {
-      setAttaching(false);
+      if (epoch === uploadEpoch.current) {
+        setAttaching(false);
+      }
     }
   };
 
