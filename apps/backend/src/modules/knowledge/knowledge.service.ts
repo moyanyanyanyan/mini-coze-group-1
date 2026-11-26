@@ -49,6 +49,17 @@ export class KnowledgeService {
     return this.prisma.knowledgeBase.findUniqueOrThrow({ where: { id } });
   }
 
+  async update(id: string, workspaceId: string, inputName: string, inputDescription: string) {
+    const name = inputName.trim();
+    const description = inputDescription.trim();
+    if (!name) throw new BadRequestException('名称不能为空');
+    const updated = await this.prisma.knowledgeBase.updateMany({
+      where: { id, workspaceId }, data: { name, description },
+    });
+    if (updated.count === 0) throw new NotFoundException('知识库不存在');
+    return this.prisma.knowledgeBase.findUniqueOrThrow({ where: { id } });
+  }
+
   async remove(id: string, workspaceId: string) {
     const deleted = await this.prisma.knowledgeBase.deleteMany({
       where: { id, workspaceId, documents: { none: { status: 'PROCESSING' } } },

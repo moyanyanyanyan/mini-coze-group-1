@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { KnowledgeRetrievalService } from '../retrieval/knowledge-retrieval.service';
+import { parseChunkSourceRanges } from '../documents/office-chunk-source';
 
 const PAGE_SIZE = 20;
 
@@ -19,10 +20,18 @@ export class KnowledgePreviewService {
       this.prisma.knowledgeChunk.count({ where }),
       this.prisma.knowledgeChunk.findMany({
         where, orderBy: { position: 'asc' }, skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE,
-        select: { id: true, position: true, content: true, startOffset: true, endOffset: true, enabled: true },
+        select: { id: true, position: true, content: true, startOffset: true, endOffset: true, enabled: true, sourceRanges: true },
       }),
     ]);
-    return { items: chunks, total, page, pageSize: PAGE_SIZE };
+    return {
+      items: chunks.map(({ sourceRanges, ...chunk }) => ({
+        ...chunk,
+        sourceRanges: parseChunkSourceRanges(sourceRanges),
+      })),
+      total,
+      page,
+      pageSize: PAGE_SIZE,
+    };
   }
 
   async search(knowledgeBaseId: string, workspaceId: string, query: string) {

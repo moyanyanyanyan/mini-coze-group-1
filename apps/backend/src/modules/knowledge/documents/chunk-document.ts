@@ -3,6 +3,8 @@ export interface DocumentChunkInput {
   content: string;
   startOffset: number;
   endOffset: number;
+  /** Raw-text offset where this chunk's non-overlap body begins. */
+  bodyStartOffset: number;
 }
 
 const BASE_LENGTH = 500;
@@ -56,15 +58,17 @@ export function chunkDocument(text: string): DocumentChunkInput[] {
   }
 
   return bases.map((base, position) => {
-    if (position === 0) {return { position, content: normalized.slice(base.start, base.end), startOffset: base.start, endOffset: base.end };}
+    if (position === 0) return { position, content: normalized.slice(base.start, base.end), startOffset: base.start, endOffset: base.end, bodyStartOffset: base.start };
     const previous = bases[position - 1];
     const overlapStart = Math.max(previous.start, previous.end - OVERLAP_LENGTH);
-    const prefix = normalized.slice(overlapStart, previous.end);
     return {
       position,
-      content: `${prefix}\n${normalized.slice(base.start, base.end)}`,
+      // Keep the exact source slice (including the original paragraph
+      // separator) so chunk offsets and content share one coordinate system.
+      content: normalized.slice(overlapStart, base.end),
       startOffset: overlapStart,
       endOffset: base.end,
+      bodyStartOffset: base.start,
     };
   });
 }

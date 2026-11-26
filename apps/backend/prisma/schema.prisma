@@ -266,4 +266,3 @@ model Plugin {
 
   @@map("plugins")
 }
-

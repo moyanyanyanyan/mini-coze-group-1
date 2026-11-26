@@ -1,11 +1,24 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { KnowledgeView } from '@minicoze/ui/knowledge';
+import { KnowledgeView, documentFormat } from '@minicoze/ui/knowledge';
 import { useConfirm } from '@minicoze/ui/hooks';
-import { createKnowledgeBase, createTextDocument, getKnowledgeWorkspaceId, deleteKnowledgeBase, deleteKnowledgeDocument, listDocumentChunks, listKnowledgeBases, listKnowledgeDocuments, previewKnowledgeSearch, retryKnowledgeDocument, updateKnowledgeBaseStatus, uploadDocumentFile, type KnowledgeBase, type KnowledgeChunkPage, type KnowledgeDocument, type KnowledgeSearchResult } from './knowledge.api';
+import { KnowledgeCenterPage } from './KnowledgeCenterPage';
+import { createKnowledgeBase, createTextDocument, getKnowledgeDocument, getKnowledgeDocumentContent, getKnowledgeDocumentContentPage, getKnowledgeWorkspaceId, deleteKnowledgeBase, deleteKnowledgeDocument, listDocumentChunks, listKnowledgeBases, listKnowledgeDocuments, previewKnowledgeSearch, retryKnowledgeDocument, updateKnowledgeBase, updateKnowledgeBaseStatus, uploadDocumentFile, type KnowledgeBase, type KnowledgeDocument, type KnowledgeSearchResult, type KnowledgeSourceRange } from './knowledge.api';
+import { navigate, usePathname } from '../../shared/routing/navigation';
+import { knowledgeUploadError } from './upload-validation';
 
 
 
 export function KnowledgePage() {
+  const pathname = usePathname();
+  const detailPrefix = '/workspace/knowledge/';
+  if (!pathname.startsWith(detailPrefix)) return <KnowledgeCenterPage />;
+  const segments = pathname.slice(detailPrefix.length).split('/').filter(Boolean).map((segment) => decodeURIComponent(segment));
+  if (segments.length === 3 && segments[1] === 'read') return <KnowledgeDocumentReaderPage knowledgeBaseId={segments[0]} documentId={segments[2]} />;
+  const knowledgeBaseId = segments[0];
+  return <KnowledgeDetailPage knowledgeBaseId={knowledgeBaseId} />;
+}
+
+function KnowledgeDetailPage({ knowledgeBaseId }: { knowledgeBaseId: string }) {
   const { confirm, confirmation } = useConfirm();
   const [workspaceId, setWorkspaceId] = useState('');
   const [items, setItems] = useState<KnowledgeBase[]>([]);
@@ -13,10 +26,14 @@ export function KnowledgePage() {
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
   const [creatingBase, setCreatingBase] = useState(false);
   const [error, setError] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'documents' | 'chunks' | 'search'>('documents');
+  const [activeTab, setActiveTab] = useState<'documents' | 'search'>('documents');
   const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
   const [documentError, setDocumentError] = useState('');
   const [documentLoading, setDocumentLoading] = useState(false);
@@ -30,12 +47,18 @@ export function KnowledgePage() {
   const [documentText, setDocumentText] = useState('');
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
-  const [chunkPage, setChunkPage] = useState(1);
-  const [chunks, setChunks] = useState<KnowledgeChunkPage | null>(null);
-  const [chunkLoading, setChunkLoading] = useState(false);
-  const [chunkError, setChunkError] = useState('');
+  const [documentDrawerOpen, setDocumentDrawerOpen] = useState(false);
+  const [documentContent, setDocumentContent] = useState<string | null>(null);
+  const [documentContentLoading, setDocumentContentLoading] = useState(false);
+  const [documentContentError, setDocumentContentError] = useState('');
+  const [documentContentHasMore, setDocumentContentHasMore] = useState(false);
+  const [documentContentTotalLength, setDocumentContentTotalLength] = useState<number | undefined>(undefined);
+  const [documentSourceRanges, setDocumentSourceRanges] = useState<KnowledgeSourceRange[]>([]);
+  const [documentSourceRangesLoading, setDocumentSourceRangesLoading] = useState(false);
+  const [documentSourceRangesError, setDocumentSourceRangesError] = useState('');
   const [query, setQuery] = useState('');
   const [searchResult, setSearchResult] = useState<KnowledgeSearchResult | null>(null);
+  const [contentByDocumentId, setContentByDocumentId] = useState<Record<string, string>>({});
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -55,17 +78,14 @@ export function KnowledgePage() {
     let active = true;
     listKnowledgeBases(workspaceId)
       .then((result) => { if (!active) return;
-        const params = new URLSearchParams(window.location.search);
-        const target = params.get('id');
         setItems(result);
-        const selected = target ? result.find(item => item.id === target) : result[0];
+        const selected = result.find(item => item.id === knowledgeBaseId);
         setSelectedId(selected?.id ?? null);
-        if (target && !selected) setError('知识库不存在或无权访问');
-        setCreatingBase(params.get('action') === 'new'); })
+        if (!selected) setError('知识库不存在或无权访问'); })
       .catch((cause: unknown) => { if (active) setError(getMessage(cause)); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [workspaceId]);
+  }, [workspaceId, knowledgeBaseId]);
 
   const hasProcessing = documents.some((document) => document.status === 'PROCESSING');
   useEffect(() => {
@@ -73,8 +93,11 @@ export function KnowledgePage() {
     setActiveTab('documents');
     setAddingDocument(false);
     setSelectedDocumentId(null);
-    setChunkPage(1);
-    setChunks(null);
+    setDocumentDrawerOpen(false);
+    setDocumentContent(null);
+    setDocumentContentError('');
+    setDocumentContentHasMore(false);
+    setDocumentContentTotalLength(undefined);
     setSearchResult(null);
     setSearchError('');
     setSearching(false);
@@ -93,8 +116,6 @@ export function KnowledgePage() {
     const refresh = () => listKnowledgeDocuments(selectedId, workspaceId)
       .then((result) => { if (active) {
         setDocuments(result);
-        setSelectedDocumentId((current) => current && result.some((document) => document.id === current && document.status === 'READY')
-          ? current : result.find((document) => document.status === 'READY')?.id ?? null);
         setDocumentError('');
       } })
       .catch((cause: unknown) => { if (active) setDocumentError(getMessage(cause)); })
@@ -105,21 +126,26 @@ export function KnowledgePage() {
   }, [workspaceId, selectedId, selectedBaseStatus, hasProcessing]);
 
   useEffect(() => {
-    if (!workspaceId || !selectedId || selectedBaseStatus !== 'ACTIVE' || !selectedDocumentId) {
-      setChunks(null);
-      setChunkLoading(false);
-      setChunkError('');
+    const selectedDocumentStatus = documents.find((document) => document.id === selectedDocumentId)?.status;
+    if (!workspaceId || !selectedDocumentId || !documentDrawerOpen || selectedDocumentStatus !== 'READY') {
+      setDocumentContent(null);
+      setDocumentContentLoading(false);
+      setDocumentContentError('');
+      setDocumentContentHasMore(false);
+      setDocumentContentTotalLength(undefined);
       return;
     }
     let active = true;
-    setChunkLoading(true);
-    setChunkError('');
-    listDocumentChunks(selectedId, selectedDocumentId, workspaceId, chunkPage)
-      .then((result) => { if (active) setChunks(result); })
-      .catch((cause: unknown) => { if (active) { setChunks(null); setChunkError(getMessage(cause)); } })
-      .finally(() => { if (active) setChunkLoading(false); });
+    setDocumentContentLoading(true);
+    setDocumentContentError('');
+    setDocumentContentHasMore(false);
+    setDocumentContentTotalLength(undefined);
+    getKnowledgeDocumentContentPage(selectedDocumentId, workspaceId, undefined, 1200)
+      .then((result) => { if (active) { setDocumentContent(result.content); setDocumentContentHasMore(result.hasMore); setDocumentContentTotalLength(result.totalLength); } })
+      .catch((cause: unknown) => { if (active) { setDocumentContent(null); setDocumentContentError(getMessage(cause)); } })
+      .finally(() => { if (active) setDocumentContentLoading(false); });
     return () => { active = false; };
-  }, [workspaceId, selectedId, selectedBaseStatus, selectedDocumentId, chunkPage]);
+  }, [workspaceId, selectedDocumentId, documentDrawerOpen, documents]);
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -150,7 +176,9 @@ export function KnowledgePage() {
       if (sourceMode === 'text') {
         await createTextDocument(selectedId, { workspaceId: workspaceId, title: documentTitle.trim(), text: documentText });
       } else {
-        if (!documentFile) throw new Error('请选择 TXT 或 JSON 文件');
+        if (!documentFile) throw new Error('请选择 TXT、JSON、MD、HTML、PDF、DOCX、PPTX 或图片文件');
+        const uploadError = knowledgeUploadError(documentFile);
+        if (uploadError) throw new Error(uploadError);
         await uploadDocumentFile(selectedId, { workspaceId: workspaceId, title: documentTitle, file: documentFile });
       }
       setDocuments(await listKnowledgeDocuments(selectedId, workspaceId));
@@ -162,6 +190,28 @@ export function KnowledgePage() {
       setDocumentError(getMessage(cause));
     } finally {
       setDocumentSaving(false);
+    }
+  }
+
+  function handleDocumentFileChange(file: File | null) {
+    setDocumentFile(file);
+    setDocumentError(file ? (knowledgeUploadError(file) ?? '') : '');
+  }
+
+  async function handleOpenDocument(id: string) {
+    setSelectedDocumentId(id);
+    setDocumentDrawerOpen(true);
+    setDocumentSourceRanges([]);
+    setDocumentSourceRangesError('');
+    if (!selectedId) return;
+    setDocumentSourceRangesLoading(true);
+    try {
+      const page = await listDocumentChunks(selectedId, id, workspaceId, 1);
+      setDocumentSourceRanges(page.items.flatMap((item) => item.sourceRanges?.ranges ?? []));
+    } catch (cause) {
+      setDocumentSourceRangesError(getMessage(cause));
+    } finally {
+      setDocumentSourceRangesLoading(false);
     }
   }
 
@@ -194,7 +244,7 @@ export function KnowledgePage() {
     if (!selectedId || deletingBase || updatingBaseStatus) return;
     const baseId = selectedId;
     const base = items.find((item) => item.id === baseId);
-    if (!await confirm(`确定删除知识库「${base?.name ?? '当前知识库'}」吗？其中的 ${documents.length} 份文档、切片和向量也会永久删除，无法恢复。`)) return;
+    if (!await confirm(`确定删除知识库「${base?.name ?? '当前知识库'}」吗？删除后无法恢复。`)) return;
     setDeletingBase(true);
     setError('');
     try {
@@ -212,7 +262,7 @@ export function KnowledgePage() {
 
   async function handleDeleteDocument(document: KnowledgeDocument) {
     if (deletingDocumentId || document.status === 'PROCESSING') return;
-    if (!await confirm(`确定删除文档「${document.title}」吗？其 ${document.chunkCount} 个切片和向量也会永久删除，无法恢复。`)) return;
+    if (!await confirm(`确定删除文档「${document.title}」吗？删除后无法恢复。`)) return;
     setDeletingDocumentId(document.id);
     setDocumentError('');
     try {
@@ -220,8 +270,8 @@ export function KnowledgePage() {
       if (selectedId === document.knowledgeBaseId) {
         const remaining = await listKnowledgeDocuments(selectedId, workspaceId);
         setDocuments(remaining);
-        setSelectedDocumentId((current) => current === document.id ? remaining.find((item) => item.status === 'READY')?.id ?? null : current);
-        setChunkPage(1);
+        setSelectedDocumentId((current) => current === document.id ? null : current);
+        setDocumentDrawerOpen((current) => current && selectedDocumentId !== document.id);
         searchGenerationRef.current += 1;
         setSearchResult(null);
         setSearching(false);
@@ -238,11 +288,18 @@ export function KnowledgePage() {
     if (!selectedId || selectedBaseStatus !== 'ACTIVE' || !query.trim() || searching) return;
     setSearching(true);
     setSearchError('');
-    setSearchResult(null);
     const generation = ++searchGenerationRef.current;
     try {
       const result = await previewKnowledgeSearch(selectedId, workspaceId, query.trim());
-      if (searchGenerationRef.current === generation) setSearchResult(result);
+      if (searchGenerationRef.current === generation) {
+        setSearchResult(result);
+        const documentIds = [...new Set(result.hits.map((hit) => hit.documentId))];
+        const contents = await Promise.all(documentIds.map(async (documentId) => {
+          try { return [documentId, (await getKnowledgeDocumentContent(documentId, workspaceId)).content] as const; }
+          catch { return null; }
+        }));
+        if (searchGenerationRef.current === generation) setContentByDocumentId(Object.fromEntries(contents.filter((entry): entry is readonly [string, string] => entry !== null)));
+      }
     } catch (cause) {
       if (searchGenerationRef.current === generation) setSearchError(getMessage(cause));
     } finally {
@@ -254,6 +311,34 @@ export function KnowledgePage() {
   const selectedBase = items.find((item) => item.id === selectedId);
   const readyDocuments = documents.filter((document) => document.status === 'READY');
 
+  function handleOpenEdit() {
+    if (!selectedBase) return;
+    setEditName(selectedBase.name);
+    setEditDescription(selectedBase.description);
+    setEditDialogOpen(true);
+  }
+
+  function handleCloseEdit() {
+    if (editSaving) return;
+    setEditDialogOpen(false);
+  }
+
+  async function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedId || !workspaceId || !editName.trim() || editSaving) return;
+    setEditSaving(true);
+    setError('');
+    try {
+      const updated = await updateKnowledgeBase(selectedId, { workspaceId, name: editName.trim(), description: editDescription.trim() });
+      setItems((current) => current.map((item) => item.id === updated.id ? updated : item));
+      setEditDialogOpen(false);
+    } catch (cause) {
+      setError(getMessage(cause));
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
   return (
     <KnowledgeView
       catalog={{
@@ -263,12 +348,26 @@ export function KnowledgePage() {
       documentState={{
         activeTab, documents, documentError, documentLoading, documentSaving, deletingDocumentId,
         addingDocument, sourceMode, documentTitle, documentText, selectedDocumentId, selectedDocument,
-        readyDocuments, hasProcessing,
+        documentDrawerOpen, readyDocuments, hasProcessing,
       }}
-      chunkState={{ chunkPage, chunks, chunkLoading, chunkError }}
-      searchState={{ query, searchResult, searching, searchError, canSearch: Boolean(query.trim()) }}
+      documentContentState={{
+        content: documentContent, loading: documentContentLoading, error: documentContentError,
+        hasMore: documentContentHasMore, totalLength: documentContentTotalLength,
+        sourceRanges: documentSourceRanges, sourceRangesLoading: documentSourceRangesLoading,
+        sourceRangesError: documentSourceRangesError,
+      }}
+      searchState={{ query, searchResult, contentByDocumentId, searching, searchError, canSearch: Boolean(query.trim()) }}
       confirmation={confirmation}
       fileInputRef={fileInputRef}
+      editDialogOpen={editDialogOpen}
+      editName={editName}
+      editDescription={editDescription}
+      editSaving={editSaving}
+      onEditNameChange={setEditName}
+      onEditDescriptionChange={setEditDescription}
+      onEditSubmit={handleEditSubmit}
+      onCloseEditDialog={handleCloseEdit}
+      onBackToCenter={() => navigate('/workspace/knowledge')}
       actions={{
         onSelectBase: setSelectedId,
         onToggleCreate: () => setCreatingBase((current) => !current),
@@ -277,22 +376,24 @@ export function KnowledgePage() {
         onDescriptionChange: setDescription,
         handleCreate,
         handleToggleBaseStatus,
+        onEditKnowledgeBase: handleOpenEdit,
         handleDeleteBase,
         onActiveTabChange: setActiveTab,
         onToggleDocumentForm: () => setAddingDocument(!addingDocument),
         onSourceModeChange: setSourceMode,
         onDocumentTitleChange: setDocumentTitle,
         onDocumentTextChange: setDocumentText,
-        onDocumentFileChange: setDocumentFile,
+        onDocumentFileChange: handleDocumentFileChange,
         handleDocumentSubmit,
         handleRetry,
-        onViewDocumentChunks: (id) => { setSelectedDocumentId(id); setChunkPage(1); setActiveTab('chunks'); },
+        onViewDocumentChunks: (id) => { void handleOpenDocument(id); },
+        onReadDocument: (id) => navigate(`/workspace/knowledge/${encodeURIComponent(knowledgeBaseId)}/read/${encodeURIComponent(id)}`),
+        onCloseDocumentDrawer: () => setDocumentDrawerOpen(false),
         handleDeleteDocument: (id) => {
           const document = documents.find((item) => item.id === id);
           if (document) void handleDeleteDocument(document);
         },
-        onSelectedDocumentChange: (id) => { setSelectedDocumentId(id); setChunkPage(1); },
-        onChunkPageChange: setChunkPage,
+        onSelectedDocumentChange: setSelectedDocumentId,
         onQueryChange: setQuery,
         handleSearch,
       }}
@@ -302,4 +403,65 @@ export function KnowledgePage() {
 
 function getMessage(cause: unknown): string {
   return cause instanceof Error ? cause.message : '请求失败，请稍后重试';
+}
+
+function KnowledgeDocumentReaderPage({ knowledgeBaseId, documentId }: { knowledgeBaseId: string; documentId: string }) {
+  const [workspaceId, setWorkspaceId] = useState('');
+  const [document, setDocument] = useState<KnowledgeDocument | null>(null);
+  const [content, setContent] = useState('');
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [totalLength, setTotalLength] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    getKnowledgeWorkspaceId()
+      .then((id) => { if (active) setWorkspaceId(id); })
+      .catch((cause: unknown) => { if (active) { setError(getMessage(cause)); setLoading(false); } });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!workspaceId) return;
+    let active = true;
+    setLoading(true);
+    Promise.all([
+      getKnowledgeDocument(documentId, workspaceId),
+      getKnowledgeDocumentContentPage(documentId, workspaceId, undefined, 4000),
+    ])
+      .then(([nextDocument, page]) => { if (active) { setDocument(nextDocument); setContent(page.content); setNextCursor(page.nextCursor); setTotalLength(page.totalLength); setError(''); } })
+      .catch((cause: unknown) => { if (active) setError(getMessage(cause)); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [workspaceId, documentId]);
+
+  async function loadMore() {
+    if (!workspaceId || !nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    setError('');
+    try {
+      const page = await getKnowledgeDocumentContentPage(documentId, workspaceId, nextCursor, 4000);
+      setContent((current) => current + page.content);
+      setNextCursor(page.nextCursor);
+      setTotalLength(page.totalLength);
+    } catch (cause) {
+      setError(getMessage(cause));
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  return <section className="feature-page knowledge-reading-page" aria-label="识别内容阅读页">
+    <div className="knowledge-reading-content">
+      <button type="button" className="knowledge-reading-back" onClick={() => navigate(`/workspace/knowledge/${encodeURIComponent(knowledgeBaseId)}`)}>← 返回知识库详情</button>
+      {loading ? <p className="knowledge-empty">正在加载识别内容…</p> : error && !document ? <div className="knowledge-error" role="alert">{error}</div> : document && <>
+        <header className="knowledge-reading-header"><h1>{document.title}</h1><p>{documentFormat(document)} · {totalLength?.toLocaleString('zh-CN') ?? '—'} 字 · {document.status === 'READY' ? '可检索' : document.status === 'PROCESSING' ? '处理中' : '处理失败'}</p></header>
+        {error && <p className="knowledge-error" role="alert">{error}</p>}
+        {content ? <div className="knowledge-reading-body">{content}</div> : <p className="knowledge-empty">这份资料没有可展示的识别内容。</p>}
+        {nextCursor && <button type="button" className="knowledge-reading-load-more" onClick={() => void loadMore()} disabled={loadingMore}>{loadingMore ? '加载中…' : '加载更多内容'}</button>}
+      </>}
+    </div>
+  </section>;
 }

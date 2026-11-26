@@ -2,6 +2,10 @@ import { BadRequestException, ForbiddenException, Injectable, ServiceUnavailable
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
 import { EmbeddingClient, EmbeddingUnavailableError } from '../../../integrations/embedding.client';
+import {
+  parseChunkSourceRanges,
+  type ChunkSourceRanges,
+} from '../documents/office-chunk-source';
 
 export interface KnowledgeHit {
   chunkId: string;
@@ -9,8 +13,15 @@ export interface KnowledgeHit {
   documentId: string;
   documentTitle: string;
   content: string;
+  startOffset: number;
+  endOffset: number;
+  sourceRanges: ChunkSourceRanges | null;
   score: number;
 }
+
+type RawKnowledgeHit = Omit<KnowledgeHit, 'sourceRanges'> & {
+  sourceRanges: unknown;
+};
 
 @Injectable()
 export class KnowledgeRetrievalService {
@@ -74,9 +85,10 @@ export class KnowledgeRetrievalService {
 
     const hits: KnowledgeHit[] = [];
     for (const knowledgeBaseId of ids) {
-      const rows = await this.prisma.$queryRaw<KnowledgeHit[]>(Prisma.sql`
+      const rows = await this.prisma.$queryRaw<RawKnowledgeHit[]>(Prisma.sql`
           SELECT c.id AS "chunkId", c."knowledgeBaseId", c."documentId",
-                 d.title AS "documentTitle", c.content,
+                 d.title AS "documentTitle", c.content, c."startOffset", c."endOffset",
+                 c."sourceRanges" AS "sourceRanges",
                  (1 - (${distance}))::double precision AS score
           FROM "KnowledgeChunk" c
           JOIN "KnowledgeChunkVector" v ON v."chunkId" = c.id
@@ -88,7 +100,10 @@ export class KnowledgeRetrievalService {
           ORDER BY ${distance}, c.id
           LIMIT ${topK}
       `);
-      hits.push(...rows);
+      hits.push(...rows.map((row) => ({
+        ...row,
+        sourceRanges: parseChunkSourceRanges(row.sourceRanges),
+      })));
     }
     hits.sort((a, b) => b.score - a.score || a.knowledgeBaseId.localeCompare(b.knowledgeBaseId) ||
       a.documentId.localeCompare(b.documentId) || a.chunkId.localeCompare(b.chunkId));
