@@ -1,15 +1,8 @@
 import type { ComponentType } from 'react';
 
-export type IconName =
-  | 'home'
-  | 'edit'
-  | 'chat'
-  | 'book'
-  | 'plug'
-  | 'workflow'
-  | 'send'
-  | 'api'
-  | 'user';
+import type { IconName } from '@minicoze/ui/components';
+
+export type { IconName };
 
 export interface FeatureManifest {
   id: string;

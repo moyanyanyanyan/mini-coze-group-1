@@ -1,12 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { WorkspaceLayoutView } from '@minicoze/ui/layouts';
 import { workspaceNavigation } from '../../app/feature-registry';
 import { getMe, logout } from '../../features/auth/api/auth-api';
 import { getCurrentUser, setCurrentUser, useCurrentUser } from '../user/current-user';
 import { AppLink } from '../routing/AppLink';
 import { navigate } from '../routing/navigation';
-import { Icon } from '../ui/Icon';
-import './workspace-layout.css';
 
 interface WorkspaceLayoutProps {
   pathname: string;
@@ -16,8 +14,6 @@ interface WorkspaceLayoutProps {
 export function WorkspaceLayout({ pathname, children }: WorkspaceLayoutProps) {
   // 底部头像区：共享全局用户快照，个人中心改名/换头像后这里会同步刷新
   const me = useCurrentUser();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (getCurrentUser()) return;
@@ -34,22 +30,7 @@ export function WorkspaceLayout({ pathname, children }: WorkspaceLayoutProps) {
     };
   }, []);
 
-  // 点到菜单外面就把它收起来
-  useEffect(() => {
-    if (!menuOpen) {
-      return;
-    }
-    const handlePointerDown = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handlePointerDown);
-    return () => document.removeEventListener('mousedown', handlePointerDown);
-  }, [menuOpen]);
-
   const handleLogout = async () => {
-    setMenuOpen(false);
     try {
       await logout();
     } catch {
@@ -58,109 +39,19 @@ export function WorkspaceLayout({ pathname, children }: WorkspaceLayoutProps) {
     navigate('/login');
   };
 
-  // displayName 没填过就退回邮箱，再不行显示「未登录」
-  const displayName = me ? me.displayName || me.email : '未登录';
-
   return (
-    <div className="workspace-shell">
-      <aside className="workspace-sidebar" aria-label="功能导航">
-        <AppLink className="workspace-brand" to="/" aria-label="返回 MiniCoze 首页">
-          <span className="workspace-brand-mark" aria-hidden="true">M</span>
-          <span>MiniCoze</span>
-        </AppLink>
-
-        <nav className="workspace-nav">
-          {workspaceNavigation.map((item) => {
-            const isActive = pathname === item.route;
-
-            return (
-              <AppLink
-                key={item.id}
-                className={`workspace-nav-item${isActive ? ' is-active' : ''}`}
-                to={item.route}
-                aria-current={isActive ? 'page' : undefined}
-              >
-                <Icon name={item.icon} />
-                <span>{item.navLabel}</span>
-              </AppLink>
-            );
-          })}
-        </nav>
-
-        <div className="workspace-sidebar-footer">
-          <div className="workspace-user" ref={menuRef}>
-            <button
-              type="button"
-              className="workspace-user-trigger"
-              onClick={() => setMenuOpen((open) => !open)}
-              aria-haspopup="menu"
-              aria-expanded={menuOpen}
-            >
-              <span className="workspace-avatar" aria-hidden="true">
-                {me?.avatarUrl ? (
-                  <img src={me.avatarUrl} alt="" />
-                ) : (
-                  displayName.trim().charAt(0).toUpperCase() || '?'
-                )}
-              </span>
-              <span className="workspace-user-name">{displayName}</span>
-              <svg
-                className="workspace-caret"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.7"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="m6 15 6-6 6 6" />
-              </svg>
-            </button>
-
-            {menuOpen ? (
-              <div className="workspace-user-menu" role="menu">
-                <div className="workspace-user-menu-info">
-                  <div className="workspace-user-menu-name">{displayName}</div>
-                  <div className="workspace-user-menu-email">{me?.email ?? ''}</div>
-                </div>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="workspace-user-menu-item"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    navigate('/workspace/profile');
-                  }}
-                >
-                  个人中心
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="workspace-user-menu-item"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    navigate('/workspace');
-                  }}
-                >
-                  工作台首页
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="workspace-user-menu-item"
-                  onClick={() => void handleLogout()}
-                >
-                  退出登录
-                </button>
-              </div>
-            ) : null}
-          </div>
-        </div>
-      </aside>
-
-      <main className="workspace-content">{children}</main>
-    </div>
+    <WorkspaceLayoutView
+      pathname={pathname}
+      navigation={workspaceNavigation}
+      user={me}
+      LinkComponent={AppLink}
+      onLogout={() => void handleLogout()}
+      onOpenWorkspace={() => navigate('/workspace')}
+      menuItems={[
+        { label: '个人中心', onClick: () => navigate('/workspace/profile') },
+      ]}
+    >
+      {children}
+    </WorkspaceLayoutView>
   );
 }

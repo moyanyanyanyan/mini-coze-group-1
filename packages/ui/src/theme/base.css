@@ -1,0 +1,231 @@
+:root {
+  font-family: Inter, "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", ui-sans-serif, system-ui, sans-serif;
+  color: var(--ink-900);
+  background: var(--surface);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+
+  /* —— 品牌紫 —— */
+  --violet-50: #f5f2fc;
+  --violet-100: #eee9fa;
+  --violet-200: #dfd7f3;
+  --violet-300: #c4b6e8;
+  --violet-400: #9c88d2;
+  --violet-500: #8269c9;
+  --violet-600: #6f56d9;
+  --violet-700: #5a42bd;
+  --violet-800: #49379a;
+  --violet-950: #241c40;
+
+  /* —— 墨色 —— */
+  --ink-900: #252232;
+  --ink-800: #373244;
+  --ink-700: #514b60;
+  --ink-600: #686273;
+  --ink-500: #746e80;
+  --ink-400: #787283;
+
+  /* —— 线与面 —— */
+  --line: #e4e4eb;
+  --line-strong: #c9cad6;
+  --line-soft: rgba(111, 86, 217, 0.055);
+  --surface: #faf9f5;
+  --surface-raised: #ffffff;
+  --surface-sunken: #f3f1ea;
+
+  /* —— 字体（衬线做标题点缀、等宽做小标签，编辑感的关键） —— */
+  --font-display: Georgia, "Times New Roman", "Songti SC", "STSong", "SimSun", serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, "Courier New", monospace;
+
+  /* —— 圆角 —— */
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* —— 阴影（多层复合：贴地 1px + 漫射，代替廉价单层投影） —— */
+  --shadow-xs: 0 1px 2px rgba(35, 31, 48, 0.06);
+  --shadow-sm: 0 1px 2px rgba(35, 31, 48, 0.05), 0 2px 10px rgba(35, 31, 48, 0.05);
+  --shadow-md: 0 1px 2px rgba(35, 31, 48, 0.05), 0 10px 28px rgba(35, 31, 48, 0.09);
+  --shadow-lg: 0 2px 6px rgba(35, 31, 48, 0.07), 0 20px 48px rgba(35, 31, 48, 0.16);
+
+  /* —— 交互 —— */
+  --focus-ring: rgba(111, 86, 217, 0.15);
+  --on-brand-border: rgba(255, 255, 255, 0.14);
+
+  /* —— 状态色 —— */
+  --danger-700: #9c2f23;
+  --danger-600: #b4372a;
+  --danger-200: #f0c9c4;
+  --danger-100: #fdf3f2;
+  --success-600: #2e7d5b;
+  --success-100: #eff7f2;
+
+  /* —— 产品工作区尺寸 —— */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --control-sm: 32px;
+  --control-md: 40px;
+  --control-lg: 44px;
+  --page-gutter: clamp(20px, 3vw, 40px);
+  --page-max: 1280px;
+  --editor-header: 56px;
+
+  /* —— 语义面/遮罩（浅色基线） —— */
+  color-scheme: light;
+  --surface-muted: #f7f7fa;
+  --panel-bg: rgba(255, 255, 255, 0.86);
+  --panel-bg-soft: rgba(255, 255, 255, 0.72);
+  --panel-bg-strong: rgba(255, 255, 255, 0.96);
+  --hover-bg: rgba(255, 255, 255, 0.6);
+  --overlay: rgba(37, 34, 50, 0.4);
+  --content-wash: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.35));
+  --empty-card-bg: rgba(255, 255, 255, 0.55);
+  --glass-bg: rgba(255, 255, 255, 0.82);
+  --code-bg: #252232;
+  --code-fg: #dfd7f3;
+  --code-keyword: #dfd7f3;
+  --accent-button-bg: #252232;
+  --accent-button-bg-hover: #373244;
+  --accent-button-fg: #ffffff;
+  --inverse-surface: #241c40;
+
+  /* —— 状态色补充 —— */
+  --success-700: #166534;
+  --success-200: #bbf7d0;
+  --warning-700: #a05a00;
+  --warning-100: #fef3c7;
+  --info-700: #1d4ed8;
+  --info-100: #dbeafe;
+}
+
+/* —— 深色主题：只覆盖语义变量，组件无需改结构 —— */
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --violet-50: #221d33;
+  --violet-100: #2b2540;
+  --violet-200: #3b3157;
+  --violet-300: #554675;
+  --violet-400: #7c66b8;
+  --violet-500: #9b86d6;
+  --violet-600: #7f6ae0;
+  --violet-700: #c0b0f2;
+  --violet-800: #d8cefb;
+  --violet-950: #efeaff;
+
+  --ink-900: #edeaf6;
+  --ink-800: #d9d5e6;
+  --ink-700: #bdb8cf;
+  --ink-600: #a49fb8;
+  --ink-500: #8f8aa3;
+  --ink-400: #6f6a83;
+
+  --line: #2e2a3d;
+  --line-strong: #413c55;
+  --line-soft: rgba(166, 149, 232, 0.09);
+
+  --surface: #131218;
+  --surface-raised: #1c1a24;
+  --surface-sunken: #0e0d13;
+  --surface-muted: #1a1822;
+
+  --panel-bg: rgba(28, 26, 36, 0.9);
+  --panel-bg-soft: rgba(28, 26, 36, 0.75);
+  --panel-bg-strong: #1c1a24;
+  --hover-bg: rgba(166, 149, 232, 0.12);
+  --overlay: rgba(5, 4, 10, 0.6);
+  --content-wash: linear-gradient(135deg, rgba(19, 18, 24, 0.92), rgba(19, 18, 24, 0.4));
+  --empty-card-bg: rgba(28, 26, 36, 0.55);
+  --glass-bg: rgba(24, 22, 31, 0.85);
+  --code-bg: #0b0a10;
+  --code-fg: #e6e1f5;
+  --code-keyword: #c0b0f2;
+  --accent-button-bg: #efeaff;
+  --accent-button-bg-hover: #d8cefb;
+  --accent-button-fg: #14131a;
+  --inverse-surface: #1d1830;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45), 0 2px 10px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.45), 0 10px 28px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 2px 6px rgba(0, 0, 0, 0.5), 0 20px 48px rgba(0, 0, 0, 0.65);
+
+  --focus-ring: rgba(166, 149, 232, 0.25);
+  --on-brand-border: rgba(10, 8, 16, 0.35);
+
+  --danger-700: #ffb3ab;
+  --danger-600: #ff8b80;
+  --danger-200: #5a2320;
+  --danger-100: #2c1512;
+  --success-600: #6fd6a8;
+  --success-700: #8fe3bd;
+  --success-200: #1e4a38;
+  --success-100: #14261f;
+  --warning-700: #f2c879;
+  --warning-100: #3a2c14;
+  --info-700: #a8c4ff;
+  --info-100: #16243f;
+}
+
+* { box-sizing: border-box; }
+
+html { min-width: 320px; scroll-behavior: smooth; }
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button, a { -webkit-tap-highlight-color: transparent; }
+
+button:not(:disabled),
+select:not(:disabled) {
+  cursor: pointer;
+}
+
+a:focus-visible, button:focus-visible, summary:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [role='listbox']:focus-visible {
+  outline: 3px solid var(--focus-ring-strong, rgba(111, 86, 217, 0.34));
+  outline-offset: 3px;
+}
+
+.ui-action-menu { position: relative; flex: none; }
+.ui-action-menu summary { list-style: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 8px; cursor: pointer; color: var(--ink-600); }
+.ui-action-menu summary::-webkit-details-marker { display: none; }
+.ui-action-menu summary:hover, .ui-action-menu[open] summary { background: var(--violet-50); }
+.ui-action-menu svg, .ui-icon-button svg { width: 18px; height: 18px; }
+.ui-menu-items { position: absolute; z-index: 60; right: 0; top: calc(100% + 4px); width: 160px; padding: 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-raised); box-shadow: var(--shadow-sm); }
+.ui-menu-items button { display: block; width: 100%; min-height: 40px; border: 0; border-radius: 6px; padding: 8px 12px; text-align: left; background: transparent; color: var(--ink-800); }
+.ui-menu-items button:hover { background: var(--violet-50); }
+.ui-confirm { width: min(440px, calc(100vw - 32px)); border: 1px solid var(--line); border-radius: 16px; padding: 24px; color: var(--ink-900); box-shadow: var(--shadow-lg); }
+.ui-confirm::backdrop { background: var(--overlay); }
+.ui-confirm h2 { margin: 0; font-size: 20px; }
+.ui-confirm p { line-height: 1.7; }
+.ui-confirm-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }
+.ui-confirm-actions button { min-height: 40px; padding: 0 18px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-raised); color: var(--ink-800); }
+.ui-confirm-actions .ui-danger { background: var(--danger-600); color: #fff; border-color: var(--danger-600); }
+.ui-icon-button { display: inline-grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--ink-600); }
+.ui-icon-button:hover { background: var(--violet-50); }
+input, select, textarea { accent-color: var(--violet-600); }
+
+::selection {
+  color: var(--ink-900);
+  background: var(--violet-200);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
