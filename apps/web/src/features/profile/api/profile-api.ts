@@ -12,6 +12,15 @@ export interface ProfileUser extends AuthUser {
   googleLinked: boolean;
   hasPassword: boolean;
   globalPrompt: string | null;
+  /** 个人简介，最多 120 字，未填为 null */
+  bio: string | null;
+  /** 注册时间（ISO 字符串），前端只展示 YYYY-MM */
+  createdAt: string;
+  /** 后端按当前登录用户统计 */
+  stats: {
+    agentCount: number;
+    conversationCount: number;
+  };
 }
 
 export const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
@@ -36,6 +45,10 @@ export async function changePassword(input: ChangePasswordInput): Promise<void> 
 
 export async function saveGlobalPrompt(globalPrompt: string): Promise<ProfileUser> {
   return (await patch<Envelope<ProfileUser>>('/api/users/me', { globalPrompt })).data;
+}
+
+export async function saveBio(bio: string): Promise<ProfileUser> {
+  return (await patch<Envelope<ProfileUser>>('/api/users/me', { bio })).data;
 }
 
 export async function uploadAvatar(file: File): Promise<AuthUser> {

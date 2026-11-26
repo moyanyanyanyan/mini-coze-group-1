@@ -1,33 +1,74 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { logout } from '../auth/api/auth-api';
 import { ApiError } from '../../shared/api/http';
-import { getProfile, saveDisplayName, saveGlobalPrompt, uploadAvatar, AVATAR_MIME_TYPES, MAX_AVATAR_BYTES } from './api/profile-api';
+import { getProfile, saveBio, saveDisplayName, saveGlobalPrompt, uploadAvatar, AVATAR_MIME_TYPES, MAX_AVATAR_BYTES } from './api/profile-api';
 import { AccountSecurity } from './AccountSecurity';
+import { ProfileParticles } from './ProfileParticles';
 import type { ProfileUser } from './api/profile-api';
 import { navigate } from '../../shared/routing/navigation';
 import { setCurrentUser } from '../../shared/user/current-user';
+import {
+  useAppearance,
+  setTheme,
+  setAccent,
+  setFontSize,
+  setDensity,
+  type AccentColor,
+  type Appearance,
+  type DensityPreference,
+  type FontSizePreference,
+  type ThemePreference,
+} from '../../shared/theme/theme-store';
+import { Icon } from '../../shared/ui/Icon';
 import './profile.css';
 
-type ProfileSection = 'profile' | 'personalization' | 'security' | 'account';
+type ProfileSection = 'profile' | 'security' | 'account' | 'appearance' | 'personalization';
 
 interface Feedback {
   type: 'ok' | 'error';
   text: string;
 }
 
-const profileSections: Array<{
-  id: ProfileSection;
+const NAV_GROUPS: Array<{
+  id: string;
   label: string;
-  description: string;
+  items: Array<{ id: ProfileSection; label: string; short: string }>;
 }> = [
-  { id: 'profile', label: '个人资料', description: '头像与公开资料' },
-  { id: 'personalization', label: '个性化', description: '全局 Prompt 偏好' },
-  { id: 'security', label: '账号安全', description: '密码与登录方式' },
-  { id: 'account', label: '账户信息', description: '账号标识与时间' },
+  {
+    id: 'account',
+    label: '账户信息',
+    items: [
+      { id: 'profile', label: '个人资料', short: '资料' },
+      { id: 'security', label: '账户安全', short: '安全' },
+      { id: 'account', label: '账户信息', short: '信息' },
+    ],
+  },
+  {
+    id: 'appearance',
+    label: '个性化设置',
+    items: [
+      { id: 'appearance', label: '外观', short: '外观' },
+      { id: 'personalization', label: '全局 Prompt', short: 'Prompt' },
+    ],
+  },
 ];
+
+const SECTION_TITLES: Record<ProfileSection, string> = {
+  profile: '个人资料',
+  security: '账户安全',
+  account: '账户信息',
+  appearance: '外观',
+  personalization: '全局 Prompt',
+};
+
+const PROMPT_MAX_LENGTH = 4000;
+const BIO_MAX_LENGTH = 120;
+const NAV_STORAGE_KEY = 'minicoze-profile-nav-collapsed';
 
 export function ProfilePage() {
   const [activeSection, setActiveSection] = useState<ProfileSection>('profile');
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(NAV_STORAGE_KEY) === '1');
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [user, setUser] = useState<ProfileUser | null>(null);
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(true);
@@ -41,11 +82,17 @@ export function ProfilePage() {
   const [globalPrompt, setGlobalPrompt] = useState('');
   const [savingPrompt, setSavingPrompt] = useState(false);
   const [promptFeedback, setPromptFeedback] = useState<Feedback | null>(null);
+  const [bio, setBio] = useState('');
+  const [savingBio, setSavingBio] = useState(false);
+  const [bioFeedback, setBioFeedback] = useState<Feedback | null>(null);
+
+  const appearance = useAppearance();
 
   const applyUser = (profile: ProfileUser) => {
     setUser(profile);
     setDisplayName(profile.displayName);
     setGlobalPrompt(profile.globalPrompt ?? '');
+    setBio(profile.bio ?? '');
     setCurrentUser(profile);
   };
 
@@ -66,6 +113,19 @@ export function ProfilePage() {
     };
   }, []);
 
+  const toggleCollapsed = () => {
+    setCollapsed((current) => {
+      const next = !current;
+      localStorage.setItem(NAV_STORAGE_KEY, next ? '1' : '0');
+      return next;
+    });
+  };
+
+  const selectSection = (section: ProfileSection) => {
+    setActiveSection(section);
+    setMobileOpen(false);
+  };
+
   const copyUserId = async () => {
     if (!user) return;
     try {
@@ -76,27 +136,49 @@ export function ProfilePage() {
     }
   };
 
-  const handleSaveName = async () => {
-    if (!user || savingName) return;
+  const handleSaveName = async (): Promise<boolean> => {
+    if (!user || savingName) return false;
     const next = displayName.trim();
     if (!next) {
       setNameFeedback({ type: 'error', text: '昵称不能为空' });
-      return;
+      return false;
     }
     setSavingName(true);
     setNameFeedback(null);
     try {
       const updated = await saveDisplayName(next);
-      // 页面数据以接口响应为准，同时写回全局用户快照（左下角、下拉菜单一起更新）
       const merged = { ...user, ...updated };
       setUser(merged);
       setCurrentUser(merged);
       setDisplayName(updated.displayName);
       setNameFeedback({ type: 'ok', text: '昵称已保存' });
+      return true;
     } catch (cause) {
       setNameFeedback({ type: 'error', text: errorText(cause, '保存失败，请稍后再试') });
+      return false;
     } finally {
       setSavingName(false);
+    }
+  };
+
+  const handleSaveBio = async (value: string): Promise<boolean> => {
+    if (!user || savingBio) return false;
+    const next = value.trim();
+    setSavingBio(true);
+    setBioFeedback(null);
+    try {
+      const updated = await saveBio(next);
+      const merged = { ...user, ...updated };
+      setUser(merged);
+      setCurrentUser(merged);
+      setBio(updated.bio ?? '');
+      setBioFeedback({ type: 'ok', text: '简介已保存' });
+      return true;
+    } catch (cause) {
+      setBioFeedback({ type: 'error', text: errorText(cause, '保存失败，请稍后再试') });
+      return false;
+    } finally {
+      setSavingBio(false);
     }
   };
 
@@ -114,7 +196,6 @@ export function ProfilePage() {
     setAvatarFeedback(null);
     try {
       const updated = await uploadAvatar(file);
-      // 上传失败时不会走到这里，原头像保持不变
       const merged = { ...user, ...updated };
       setUser(merged);
       setCurrentUser(merged);
@@ -137,7 +218,6 @@ export function ProfilePage() {
       setGlobalPrompt(updated.globalPrompt ?? '');
       setPromptFeedback({ type: 'ok', text: successText });
     } catch (cause) {
-      // 失败时保留当前输入，避免用户内容丢失
       setPromptFeedback({ type: 'error', text: errorText(cause, '保存失败，请稍后再试') });
     } finally {
       setSavingPrompt(false);
@@ -163,103 +243,192 @@ export function ProfilePage() {
   };
 
   return (
-    <section className="feature-page profile-page" aria-labelledby="profile-title">
-      <header className="profile-header">
-        <p>Account / Profile</p>
-        <h1 id="profile-title">个人中心</h1>
-        <span>管理你的 MiniCoze 账户资料与安全设置。</span>
-      </header>
+    <section className="feature-page profile-page" aria-labelledby="profile-page-title">
+      <div className={`profile-shell${collapsed ? ' is-collapsed' : ''}${mobileOpen ? ' is-mobile-open' : ''}`}>
+        <button
+          type="button"
+          className="profile-backdrop"
+          aria-label="关闭导航"
+          onClick={() => setMobileOpen(false)}
+        />
 
-      <div className="profile-layout">
-        <nav className="profile-nav" aria-label="个人中心分类">
-          {profileSections.map((section) => (
+        <aside className="profile-sidebar" aria-label="个人中心导航">
+          <div className="profile-sidebar-top">
             <button
               type="button"
-              className={activeSection === section.id ? 'is-active' : ''}
-              aria-current={activeSection === section.id ? 'page' : undefined}
-              onClick={() => setActiveSection(section.id)}
-              key={section.id}
+              className="profile-icon-btn"
+              aria-label={collapsed ? '展开导航' : '收起导航'}
+              title={collapsed ? '展开导航' : '收起导航'}
+              onClick={toggleCollapsed}
             >
-              <span>{section.label}</span>
-              <small>{section.description}</small>
+              <Icon name={collapsed ? 'arrow-right' : 'arrow-left'} />
             </button>
-          ))}
-        </nav>
+            {!collapsed ? (
+              <button type="button" className="profile-link-btn" onClick={() => navigate('/workspace')}>
+                返回工作台
+              </button>
+            ) : null}
+          </div>
 
-        <div className="profile-panel">
-          {loading ? (
-            <div className="profile-state">正在加载账户信息…</div>
-          ) : loadError || !user ? (
-            <div className="profile-state profile-state--error">
-              <strong>账户信息不可用</strong>
-              <p>{loadError || '请重新登录后再试。'}</p>
-              <button type="button" onClick={() => navigate('/login')}>前往登录</button>
+          <nav className="profile-nav">
+            {NAV_GROUPS.map((group) => (
+              <div className="profile-nav-group" key={group.id}>
+                {!collapsed ? <p className="profile-nav-group-title">{group.label}</p> : null}
+                {group.items.map((item) => (
+                  <button
+                    type="button"
+                    key={item.id}
+                    className={`profile-nav-item${activeSection === item.id ? ' is-active' : ''}`}
+                    aria-current={activeSection === item.id ? 'page' : undefined}
+                    title={item.label}
+                    onClick={() => selectSection(item.id)}
+                  >
+                    {collapsed ? item.short : item.label}
+                  </button>
+                ))}
+              </div>
+            ))}
+          </nav>
+        </aside>
+
+        <div className="profile-body">
+          <ProfileParticles />
+
+          <div className="profile-mobile-bar">
+            <button
+              type="button"
+              className="profile-icon-btn"
+              aria-label="打开导航"
+              onClick={() => setMobileOpen(true)}
+            >
+              <Icon name="menu" />
+            </button>
+            <span>{SECTION_TITLES[activeSection]}</span>
+          </div>
+
+          <div className="profile-scroll">
+            <div
+              className={`profile-content${activeSection === 'profile' ? ' is-identity' : ''}${activeSection === 'security' ? ' is-narrow' : ''}`}
+            >
+              {activeSection !== 'profile' ? (
+                <h1 className="profile-title" id="profile-page-title">{SECTION_TITLES[activeSection]}</h1>
+              ) : null}
+              {activeSection === 'security' ? (
+                <p className="profile-subtitle">管理您的登录凭证与第三方账号绑定</p>
+              ) : null}
+
+              {loading ? (
+                <p className="profile-state">正在加载账户信息…</p>
+              ) : loadError || !user ? (
+                <div className="profile-state profile-state--error">
+                  <strong>账户信息不可用</strong>
+                  <p>{loadError || '请重新登录后再试。'}</p>
+                  <button type="button" className="profile-btn is-secondary" onClick={() => navigate('/login')}>
+                    前往登录
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {activeSection === 'profile' && (
+                    <ProfileIdentity
+                      user={user}
+                      displayName={displayName}
+                      onDisplayNameChange={(value) => {
+                        setDisplayName(value);
+                        setNameFeedback(null);
+                      }}
+                      onSave={handleSaveName}
+                      saving={savingName}
+                      feedback={nameFeedback}
+                      bio={bio}
+                      onBioChange={(value) => {
+                        setBio(value);
+                        setBioFeedback(null);
+                      }}
+                      onSaveBio={handleSaveBio}
+                      savingBio={savingBio}
+                      bioFeedback={bioFeedback}
+                      avatarUploading={avatarUploading}
+                      avatarFeedback={avatarFeedback}
+                      onAvatarFile={(file) => void handleAvatarFile(file)}
+                      copyLabel={copyLabel}
+                      onCopyUserId={() => void copyUserId()}
+                    />
+                  )}
+                  {activeSection === 'account' && (
+                    <AccountInformation
+                      user={user}
+                      copyLabel={copyLabel}
+                      onCopyUserId={() => void copyUserId()}
+                    />
+                  )}
+                  {activeSection === 'security' && (
+                    <AccountSecurity
+                      user={user}
+                      loggingOut={loggingOut}
+                      onLogout={() => void handleLogout()}
+                      onPasswordChanged={refreshProfile}
+                    />
+                  )}
+                  {activeSection === 'appearance' && (
+                    <AppearanceSection appearance={appearance} />
+                  )}
+                  {activeSection === 'personalization' && (
+                    <PersonalizationSection
+                      prompt={globalPrompt}
+                      saving={savingPrompt}
+                      dirty={globalPrompt !== (user.globalPrompt ?? '')}
+                      feedback={promptFeedback}
+                      onChange={(value) => {
+                        setGlobalPrompt(value);
+                        setPromptFeedback(null);
+                      }}
+                      onSave={() => void persistPrompt(globalPrompt, '全局 Prompt 已保存')}
+                      onClear={() => void persistPrompt('', '全局 Prompt 已清空')}
+                    />
+                  )}
+                </>
+              )}
             </div>
-          ) : (
-            <>
-              {activeSection === 'profile' && (
-                <ProfileDetails
-                  user={user}
-                  displayName={displayName}
-                  onDisplayNameChange={(value) => {
-                    setDisplayName(value);
-                    setNameFeedback(null);
-                  }}
-                  onSave={() => void handleSaveName()}
-                  saving={savingName}
-                  dirty={displayName.trim() !== user.displayName}
-                  feedback={nameFeedback}
-                  avatarUploading={avatarUploading}
-                  avatarFeedback={avatarFeedback}
-                  onAvatarFile={(file) => void handleAvatarFile(file)}
-                  copyLabel={copyLabel}
-                  onCopyUserId={() => void copyUserId()}
-                />
-              )}
-              {activeSection === 'personalization' && (
-                <PersonalizationSection
-                  prompt={globalPrompt}
-                  saving={savingPrompt}
-                  dirty={globalPrompt !== (user.globalPrompt ?? '')}
-                  feedback={promptFeedback}
-                  onChange={(value) => {
-                    setGlobalPrompt(value);
-                    setPromptFeedback(null);
-                  }}
-                  onSave={() => void persistPrompt(globalPrompt, '全局 Prompt 已保存')}
-                  onClear={() => void persistPrompt('', '全局 Prompt 已清空')}
-                />
-              )}              {activeSection === 'security' && (
-                <AccountSecurity
-                  user={user}
-                  loggingOut={loggingOut}
-                  onLogout={() => void handleLogout()}
-                  onPasswordChanged={refreshProfile}
-                />
-              )}
-              {activeSection === 'account' && (
-                <AccountInformation
-                  user={user}
-                  copyLabel={copyLabel}
-                  onCopyUserId={() => void copyUserId()}
-                />
-              )}
-            </>
-          )}
+          </div>
         </div>
       </div>
     </section>
   );
 }
 
-function ProfileDetails({
+function SettingsRow({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="settings-row">
+      <div className="settings-label">
+        <span>{label}</span>
+        {hint ? <p>{hint}</p> : null}
+      </div>
+      <div className="settings-value">{children}</div>
+    </div>
+  );
+}
+
+function ProfileIdentity({
   user,
   displayName,
   onDisplayNameChange,
   onSave,
   saving,
-  dirty,
   feedback,
+  bio,
+  onBioChange,
+  onSaveBio,
+  savingBio,
+  bioFeedback,
   avatarUploading,
   avatarFeedback,
   onAvatarFile,
@@ -269,66 +438,69 @@ function ProfileDetails({
   user: ProfileUser;
   displayName: string;
   onDisplayNameChange: (value: string) => void;
-  onSave: () => void;
+  onSave: () => Promise<boolean>;
   saving: boolean;
-  dirty: boolean;
   feedback: Feedback | null;
+  bio: string;
+  onBioChange: (value: string) => void;
+  onSaveBio: (value: string) => Promise<boolean>;
+  savingBio: boolean;
+  bioFeedback: Feedback | null;
   avatarUploading: boolean;
   avatarFeedback: Feedback | null;
   onAvatarFile: (file: File) => void;
   copyLabel: string;
   onCopyUserId: () => void;
 }) {
+  const [editingName, setEditingName] = useState(false);
+  const [editingBio, setEditingBio] = useState(false);
   const initial = (displayName || user.email).trim().charAt(0).toUpperCase() || '?';
   const avatarInput = useRef<HTMLInputElement>(null);
+
   const openAvatarPicker = () => {
     if (!avatarUploading) avatarInput.current?.click();
   };
-  return (
-    <section className="profile-section" aria-labelledby="profile-details-title">
-      <div className="profile-section-heading">
-        <div>
-          <p>PROFILE</p>
-          <h2 id="profile-details-title">个人资料</h2>
-        </div>
-      </div>
 
-      <div className="profile-identity">
-        <input
-          ref={avatarInput}
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          className="profile-avatar-input"
-          disabled={avatarUploading}
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            // 清空 value，保证连续选择同一张图也会触发 onChange
-            event.target.value = '';
-            if (file) onAvatarFile(file);
-          }}
-        />
-        <div
-          className={`profile-avatar${avatarUploading ? ' is-uploading' : ''}`}
-          role="button"
-          tabIndex={0}
-          aria-label="更换头像"
-          title="点击更换头像"
+  const submitName = async () => {
+    if (await onSave()) {
+      setEditingName(false);
+    }
+  };
+
+  const submitBio = async () => {
+    if (await onSaveBio(bio)) {
+      setEditingBio(false);
+    }
+  };
+
+  const joinedAt = user.createdAt?.slice(0, 7) || '—';
+
+  return (
+    <div className="identity-card">
+      <input
+        ref={avatarInput}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        className="profile-avatar-input"
+        disabled={avatarUploading}
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = '';
+          if (file) onAvatarFile(file);
+        }}
+      />
+
+      <div className={`identity-avatar${avatarUploading ? ' is-uploading' : ''}`}>
+        {user.avatarUrl ? <img src={user.avatarUrl} alt="用户头像" /> : <span>{initial}</span>}
+        <button
+          type="button"
+          className="identity-camera"
+          aria-label={avatarUploading ? '正在上传头像' : '更换头像'}
+          title={avatarUploading ? '正在上传头像' : '更换头像'}
           onClick={openAvatarPicker}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault();
-              openAvatarPicker();
-            }
-          }}
+          disabled={avatarUploading}
         >
-          {user.avatarUrl ? <img src={user.avatarUrl} alt="用户头像" /> : initial}
-        </div>
-        <div className="profile-identity-copy">
-          <strong>{displayName || user.email}</strong>
-          <span>{user.email}</span>
-        </div>
-        <button type="button" onClick={openAvatarPicker} disabled={avatarUploading}>
-          {avatarUploading ? '上传中…' : '更换头像'}
+          <Icon name="camera" />
         </button>
       </div>
       {avatarFeedback ? (
@@ -337,44 +509,242 @@ function ProfileDetails({
         </p>
       ) : null}
 
-      <div className="profile-form">
-        <label>
-          <span>昵称</span>
+      {editingName ? (
+        <div className="identity-name-edit">
           <input
+            className="profile-input"
             value={displayName}
             maxLength={20}
+            autoFocus
             onChange={(event) => onDisplayNameChange(event.target.value)}
           />
-        </label>
-        <label>
-          <span>邮箱</span>
-          <input value={user.email} readOnly />
-        </label>
-        <label>
-          <span>用户 ID</span>
-          <div className="profile-copy-row">
-            <input value={user.id} readOnly />
-            <button type="button" onClick={onCopyUserId}>{copyLabel}</button>
+          <div className="identity-name-actions">
+            <button type="button" className="profile-btn is-primary" onClick={() => void submitName()} disabled={saving}>
+              {saving ? '保存中…' : '保存'}
+            </button>
+            <button
+              type="button"
+              className="profile-btn is-secondary"
+              onClick={() => setEditingName(false)}
+              disabled={saving}
+            >
+              取消
+            </button>
           </div>
-        </label>
-        <div className="profile-form-actions">
-          <button type="button" onClick={onSave} disabled={saving || !dirty}>
-            {saving ? '保存中…' : '保存资料'}
-          </button>
-          {feedback ? (
-            <span className={`profile-form-message profile-form-message--${feedback.type}`} role="status">
-              {feedback.text}
-            </span>
-          ) : (
-            <span>昵称长度 1–20 字。</span>
-          )}
         </div>
+      ) : (
+        <div className="identity-name">
+          <h2 className="identity-name-text" id="profile-page-title">{displayName}</h2>
+          <button
+            type="button"
+            className="identity-icon-btn"
+            aria-label="编辑昵称"
+            title="编辑昵称"
+            onClick={() => setEditingName(true)}
+          >
+            <Icon name="edit" />
+          </button>
+        </div>
+      )}
+      {feedback ? (
+        <p className={`profile-form-message profile-form-message--${feedback.type}`} role="status">
+          {feedback.text}
+        </p>
+      ) : null}
+
+      <p className="identity-email">{user.email}</p>
+
+      {editingBio ? (
+        <div className="identity-bio-edit">
+          <input
+            className="profile-input"
+            value={bio}
+            maxLength={BIO_MAX_LENGTH}
+            placeholder="用一句话介绍自己"
+            autoFocus
+            onChange={(event) => onBioChange(event.target.value)}
+          />
+          <div className="identity-name-actions">
+            <button type="button" className="profile-btn is-primary" onClick={() => void submitBio()} disabled={savingBio}>
+              {savingBio ? '保存中…' : '保存'}
+            </button>
+            <button
+              type="button"
+              className="profile-btn is-secondary"
+              onClick={() => setEditingBio(false)}
+              disabled={savingBio}
+            >
+              取消
+            </button>
+          </div>
+          <span className="identity-bio-count">
+            {bio.trim().length} / {BIO_MAX_LENGTH}
+          </span>
+        </div>
+      ) : (
+        <div className="identity-bio">
+          <p className={`identity-bio-text${user.bio ? '' : ' is-empty'}`}>{user.bio || '暂无简介'}</p>
+          <button
+            type="button"
+            className="identity-icon-btn"
+            aria-label="编辑简介"
+            title="编辑简介"
+            onClick={() => setEditingBio(true)}
+          >
+            <Icon name="edit" />
+          </button>
+        </div>
+      )}
+      {bioFeedback ? (
+        <p className={`profile-form-message profile-form-message--${bioFeedback.type}`} role="status">
+          {bioFeedback.text}
+        </p>
+      ) : null}
+
+      <div className="identity-id">
+        <span className="identity-id-value">{user.id}</span>
+        <button
+          type="button"
+          className="identity-icon-btn"
+          aria-label={`复制用户 ID（${copyLabel}）`}
+          title={copyLabel === '复制' ? '复制用户 ID' : copyLabel}
+          onClick={onCopyUserId}
+        >
+          <Icon name="clipboard" />
+        </button>
+        <span className="visually-hidden" role="status">{copyLabel}</span>
       </div>
-    </section>
+
+      <dl className="identity-stats">
+        <div className="identity-stat">
+          <dt>加入时间</dt>
+          <dd>{joinedAt}</dd>
+        </div>
+        <div className="identity-stat">
+          <dt>创建 Agent</dt>
+          <dd>{user.stats.agentCount}</dd>
+        </div>
+        <div className="identity-stat">
+          <dt>累计对话</dt>
+          <dd>{user.stats.conversationCount}</dd>
+        </div>
+      </dl>
+    </div>
   );
 }
 
-const PROMPT_MAX_LENGTH = 4000;
+function AccountInformation({
+  user,
+  copyLabel,
+  onCopyUserId,
+}: {
+  user: ProfileUser;
+  copyLabel: string;
+  onCopyUserId: () => void;
+}) {
+  return (
+    <div className="settings-list">
+      <SettingsRow label="邮箱">
+        <span className="settings-current">{user.email}</span>
+      </SettingsRow>
+      <SettingsRow label="用户 ID">
+        <span className="settings-current settings-mono">{user.id}</span>
+        <button type="button" className="profile-link-btn" onClick={onCopyUserId}>{copyLabel}</button>
+      </SettingsRow>
+      <SettingsRow label="登录方式">
+        <span className="settings-current">
+          {user.hasPassword ? (user.googleLinked ? '邮箱密码 + Google' : '邮箱密码') : 'Google'}
+        </span>
+      </SettingsRow>
+    </div>
+  );
+}
+
+const THEME_OPTIONS: ReadonlyArray<{ value: ThemePreference; label: string }> = [
+  { value: 'light', label: '浅色' },
+  { value: 'dark', label: '深色' },
+  { value: 'system', label: '跟随系统' },
+];
+
+const ACCENT_OPTIONS: ReadonlyArray<{ value: AccentColor; label: string }> = [
+  { value: 'purple', label: '紫色' },
+  { value: 'blue', label: '蓝色' },
+  { value: 'green', label: '绿色' },
+  { value: 'red', label: '红色' },
+];
+
+const FONT_SIZE_OPTIONS: ReadonlyArray<{ value: FontSizePreference; label: string }> = [
+  { value: 'small', label: '小' },
+  { value: 'normal', label: '标准' },
+  { value: 'large', label: '大' },
+];
+
+const DENSITY_OPTIONS: ReadonlyArray<{ value: DensityPreference; label: string }> = [
+  { value: 'compact', label: '紧凑' },
+  { value: 'comfortable', label: '舒适' },
+];
+
+function Segmented<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: ReadonlyArray<{ value: T; label: string }>;
+  onChange: (next: T) => void;
+}) {
+  return (
+    <div className="settings-segmented" role="group" aria-label={label}>
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          aria-pressed={value === option.value}
+          className={value === option.value ? 'is-active' : ''}
+          onClick={() => onChange(option.value)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function AppearanceSection({ appearance }: { appearance: Appearance }) {
+  return (
+    <div className="settings-list">
+      <SettingsRow label="主题模式">
+        <Segmented label="主题模式" value={appearance.theme} options={THEME_OPTIONS} onChange={setTheme} />
+      </SettingsRow>
+      <SettingsRow label="强调色">
+        <div className="accent-swatches" role="group" aria-label="强调色">
+          {ACCENT_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={`accent-swatch${appearance.accent === option.value ? ' is-active' : ''}`}
+              data-swatch={option.value}
+              aria-pressed={appearance.accent === option.value}
+              aria-label={option.label}
+              title={option.label}
+              onClick={() => setAccent(option.value)}
+            >
+              <span className="accent-swatch-dot" aria-hidden="true" />
+            </button>
+          ))}
+        </div>
+      </SettingsRow>
+      <SettingsRow label="字号">
+        <Segmented label="字号" value={appearance.fontSize} options={FONT_SIZE_OPTIONS} onChange={setFontSize} />
+      </SettingsRow>
+      <SettingsRow label="界面密度">
+        <Segmented label="界面密度" value={appearance.density} options={DENSITY_OPTIONS} onChange={setDensity} />
+      </SettingsRow>
+    </div>
+  );
+}
 
 function PersonalizationSection({
   prompt,
@@ -394,91 +764,38 @@ function PersonalizationSection({
   onClear: () => void;
 }) {
   return (
-    <section className="profile-section" aria-labelledby="profile-personalization-title">
-      <div className="profile-section-heading">
-        <div>
-          <p>PERSONALIZATION</p>
-          <h2 id="profile-personalization-title">个性化</h2>
-        </div>
-      </div>
-
-      <div className="profile-security-card profile-security-card--stack">
-        <div>
-          <strong>全局 Prompt</strong>
-          <p>
-            全局 Prompt 是你对 AI 助手的长期偏好设置。保存后会在每次运行 Agent 时自动生效，
-            不会替代 Agent 自身的人设指令。
-          </p>
-        </div>
-        <label className="profile-prompt-field">
-          <span>你的偏好</span>
-          <textarea
-            className="profile-prompt-input"
-            rows={7}
-            maxLength={PROMPT_MAX_LENGTH}
-            placeholder="例如：我是初学者，请用简单易懂的语言回答。"
-            value={prompt}
-            disabled={saving}
-            onChange={(event) => onChange(event.target.value)}
-          />
-        </label>
-        <div className="profile-form-actions">
-          <button type="button" onClick={onSave} disabled={saving || !dirty}>
-            {saving ? '保存中…' : '保存'}
-          </button>
-          <button type="button" className="profile-prompt-clear" onClick={onClear} disabled={saving || !prompt}>
-            清空
-          </button>
-          <span className="profile-prompt-count">
-            {prompt.length} / {PROMPT_MAX_LENGTH}
+    <div className="settings-list">
+      <p className="settings-description">
+        全局 Prompt 是你对 AI 助手的长期偏好设置。保存后会在每次运行 Agent 时自动生效，
+        不会替代 Agent 自身的人设指令。
+      </p>
+      <label className="profile-prompt-field">
+        <span className="profile-prompt-label">全局 Prompt</span>
+        <textarea
+          className="profile-prompt-input"
+          rows={8}
+          maxLength={PROMPT_MAX_LENGTH}
+          placeholder="例如：我是初学者，请用简单易懂的语言回答。"
+          value={prompt}
+          disabled={saving}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      </label>
+      <div className="profile-prompt-footer">
+        <button type="button" className="profile-btn is-primary" onClick={onSave} disabled={saving || !dirty}>
+          {saving ? '保存中…' : '保存'}
+        </button>
+        <button type="button" className="profile-link-btn is-danger" onClick={onClear} disabled={saving || !prompt}>
+          清空
+        </button>
+        <span className="profile-prompt-count">{prompt.length} / {PROMPT_MAX_LENGTH}</span>
+        {feedback ? (
+          <span className={`profile-form-message profile-form-message--${feedback.type}`} role="status">
+            {feedback.text}
           </span>
-          {feedback ? (
-            <span className={`profile-form-message profile-form-message--${feedback.type}`} role="status">
-              {feedback.text}
-            </span>
-          ) : null}
-        </div>
+        ) : null}
       </div>
-    </section>
-  );
-}
-
-function AccountInformation({
-  user,
-  copyLabel,
-  onCopyUserId,
-}: {
-  user: ProfileUser;
-  copyLabel: string;
-  onCopyUserId: () => void;
-}) {
-  return (
-    <section className="profile-section" aria-labelledby="profile-account-title">
-      <div className="profile-section-heading">
-        <div>
-          <p>ACCOUNT</p>
-          <h2 id="profile-account-title">账户信息</h2>
-        </div>
-      </div>
-
-      <dl className="profile-info-list">
-        <div>
-          <dt>邮箱</dt>
-          <dd>{user.email}</dd>
-        </div>
-        <div>
-          <dt>用户 ID</dt>
-          <dd className="profile-info-id">
-            <code>{user.id}</code>
-            <button type="button" onClick={onCopyUserId}>{copyLabel}</button>
-          </dd>
-        </div>
-        <div>
-          <dt>登录方式</dt>
-          <dd>{user.hasPassword ? (user.googleLinked ? '邮箱密码 + Google' : '邮箱密码') : 'Google'}</dd>
-        </div>
-      </dl>
-    </section>
+    </div>
   );
 }
 
