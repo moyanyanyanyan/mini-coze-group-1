@@ -8,6 +8,7 @@ class DTO(BaseModel):
 
 
 Identifier = Annotated[str, Field(min_length=1, max_length=200)]
+GlobalPrompt = Annotated[str, Field(strict=True, max_length=4000)]
 
 
 class ChatMessage(DTO):
@@ -59,6 +60,7 @@ class HistoryMessage(DTO):
 class RuntimeRequest(DTO):
     runId: Identifier
     actor: Actor
+    globalPrompt: GlobalPrompt = ""
     conversationId: Identifier
     userMessageId: Identifier
     assistantMessageId: Identifier
