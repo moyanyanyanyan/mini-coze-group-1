@@ -73,7 +73,7 @@
   min-height: 44px;
   margin: 0 8px 34px;
   color: var(--ink-900);
-  font-size: 20px;
+  font-size: var(--fs-600);
   font-weight: 700;
   letter-spacing: -0.035em;
   text-decoration: none;
@@ -99,14 +99,14 @@
 
 .workspace-nav-item {
   position: relative;
-  min-height: 42px;
+  min-height: var(--row-height);
   display: flex;
   align-items: center;
   gap: 13px;
   padding: 0 11px;
   border-radius: var(--radius-sm);
   color: var(--ink-700);
-  font-size: 14px;
+  font-size: var(--fs-400);
   font-weight: 540;
   text-decoration: none;
   transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
@@ -155,13 +155,13 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  min-height: 44px;
+  min-height: calc(44px * var(--ui-space-scale));
   padding: 6px 10px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--ink-800);
-  font-size: 14px;
+  font-size: var(--fs-400);
   font-weight: 540;
   cursor: pointer;
   transition: background-color 160ms ease, border-color 160ms ease;
@@ -234,7 +234,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--ink-900);
-  font-size: 13px;
+  font-size: var(--fs-300);
   font-weight: 640;
 }
 
@@ -244,20 +244,20 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--ink-500);
-  font-size: 12px;
+  font-size: var(--fs-200);
 }
 
 .workspace-user-menu-item {
   display: flex;
   align-items: center;
   width: 100%;
-  min-height: 38px;
+  min-height: calc(38px * var(--ui-space-scale));
   padding: 0 10px;
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--ink-700);
-  font-size: 13px;
+  font-size: var(--fs-300);
   font-weight: 540;
   text-align: left;
   cursor: pointer;
@@ -275,7 +275,7 @@
   background: var(--surface);
 }
 
-.workspace-sidebar { background: var(--surface-muted); padding: 12px; }
+.workspace-sidebar { background: var(--surface-muted); padding: var(--gutter-block) var(--gutter-inline); }
 .workspace-sidebar::after { display: none; }
 .workspace-nav-item.is-active { box-shadow: none; }
 .workspace-sidebar-footer { padding-bottom: 0; }

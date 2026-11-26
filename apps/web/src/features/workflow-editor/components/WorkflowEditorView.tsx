@@ -16,6 +16,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { navigate } from '../../../shared/routing/navigation';
+import { useTheme } from '../../../shared/theme/theme-store';
 import { getWorkflow, saveDraft } from '../services/workflow';
 import type {
   NodeData,
@@ -94,6 +95,7 @@ function defaultDataFor(type: NodeType): NodeData {
 
 function WorkflowEditorInner({ workflowId }: Props) {
   const reactFlow = useReactFlow();
+  const theme = useTheme();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [workflowName, setWorkflowName] = useState('');
@@ -456,8 +458,9 @@ function WorkflowEditorInner({ workflowId }: Props) {
             onNodeClick={(_, node) => setSelectedId(node.id)}
             onPaneClick={() => setSelectedId(null)}
             nodeTypes={nodeTypes}
+            colorMode={theme}
           >
-            <Background gap={22} size={1} color="#dcdee5" />
+            <Background gap={22} size={1} color={theme === 'dark' ? '#3a3d4d' : '#dcdee5'} />
             <Controls />
             <MiniMap />
           </ReactFlow>

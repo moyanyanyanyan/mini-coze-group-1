@@ -58,7 +58,7 @@
   color: var(--ink-700);
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.76);
+  background: var(--panel-bg-soft);
   font: inherit;
   font-size: 12px;
   font-weight: 600;
@@ -83,7 +83,7 @@
 .api-key-refresh:hover:not(:disabled) {
   color: var(--violet-700);
   border-color: var(--violet-300);
-  background: #fff;
+  background: var(--surface-raised);
 }
 
 .api-key-refresh:disabled {
@@ -119,7 +119,7 @@
 }
 
 .api-key-button--primary {
-  color: #fff;
+  color: var(--surface-raised);
   background: var(--violet-600);
 }
 
@@ -130,7 +130,7 @@
 .api-key-button--secondary {
   color: var(--ink-700);
   border-color: var(--line-strong);
-  background: #fff;
+  background: var(--surface-raised);
 }
 
 .api-key-button--secondary:hover:not(:disabled) {
@@ -140,12 +140,12 @@
 }
 
 .api-key-button--danger {
-  color: #fff;
-  background: #c73e52;
+  color: var(--surface-raised);
+  background: var(--danger-600);
 }
 
 .api-key-button--danger:hover:not(:disabled) {
-  background: #aa2f43;
+  background: var(--danger-700);
 }
 
 .api-key-create-button {
@@ -163,8 +163,8 @@
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 18px 48px rgba(72, 52, 126, 0.055);
+  background: var(--surface-raised);
+  box-shadow: 0 18px 48px var(--line-soft);
 }
 
 .api-key-table-scroll {
@@ -183,14 +183,14 @@
 .api-key-table th,
 .api-key-table td {
   padding: 17px 20px;
-  border-bottom: 1px solid #ebe7f4;
+  border-bottom: 1px solid var(--violet-100);
   text-align: left;
   vertical-align: middle;
 }
 
 .api-key-table th {
   color: var(--ink-500);
-  background: #faf8fd;
+  background: var(--surface);
   font-size: 11px;
   font-weight: 650;
   letter-spacing: 0.045em;
@@ -208,12 +208,12 @@
 }
 
 .api-key-table tbody tr:not(.api-key-skeleton-row) {
-  background: #fff;
+  background: var(--surface-raised);
   transition: background-color 180ms ease;
 }
 
 .api-key-table tbody tr:not(.api-key-skeleton-row):hover {
-  background: rgba(245, 242, 252, 0.78);
+  background: var(--violet-50);
 }
 
 .api-key-table__name {
@@ -257,7 +257,7 @@
   display: block;
   height: 13px;
   border-radius: 5px;
-  background: linear-gradient(90deg, #f0ecf7 20%, #f8f6fb 48%, #f0ecf7 76%);
+  background: linear-gradient(90deg, var(--violet-100) 20%, var(--surface-sunken) 48%, var(--violet-100) 76%);
   background-size: 220% 100%;
   animation: api-key-skeleton 1.25s ease-in-out infinite;
 }
@@ -329,11 +329,11 @@
 }
 
 .api-key-row-action--delete {
-  color: #c54256;
+  color: var(--danger-600);
 }
 
 .api-key-row-action--delete:hover:not(:disabled) {
-  background: #fff1f3;
+  background: var(--surface-raised)1f3;
 }
 
 .api-key-row-action:disabled {
@@ -349,7 +349,7 @@
   place-items: center;
   overflow-y: auto;
   padding: 24px;
-  background: rgba(37, 34, 50, 0.34);
+  background: var(--ink-400);
   backdrop-filter: blur(3px);
   animation: api-key-fade-in 160ms ease both;
 }
@@ -360,8 +360,8 @@
   overflow-y: auto;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: #fff;
-  box-shadow: 0 28px 80px rgba(38, 28, 69, 0.2);
+  background: var(--surface-raised);
+  box-shadow: 0 28px 80px var(--line);
   animation: api-key-dialog-in 180ms ease both;
 }
 
@@ -427,7 +427,7 @@
   gap: 10px;
   padding: 17px 24px 21px;
   border-top: 1px solid var(--line);
-  background: #fdfcff;
+  background: var(--surface-raised);
 }
 
 .api-key-field {
@@ -447,7 +447,7 @@
   border: 1px solid var(--line-strong);
   border-radius: 8px;
   outline: 0;
-  background: #fff;
+  background: var(--surface-raised);
   font: inherit;
   font-weight: 450;
   transition: border-color 160ms ease, box-shadow 160ms ease;
@@ -456,29 +456,29 @@
 .api-key-field input:focus,
 .api-key-field select:focus {
   border-color: var(--violet-400);
-  box-shadow: 0 0 0 3px rgba(111, 86, 217, 0.12);
+  box-shadow: 0 0 0 3px var(--violet-100);
 }
 
 .api-key-field input[aria-invalid="true"] {
-  border-color: #d65568;
+  border-color: var(--danger-600);
 }
 
 .api-key-field input:disabled,
 .api-key-field select:disabled {
   color: var(--ink-500);
-  background: #f7f5fa;
+  background: var(--surface-sunken);
 }
 
 .api-key-field__error {
   margin: 8px 0 0;
-  color: #bb3045;
+  color: var(--danger-700);
   font-size: 12px;
   line-height: 1.5;
 }
 
 .api-key-secret-warning {
   margin: 1px 0 13px;
-  color: #9b5b18;
+  color: var(--warning-700);
   font-size: 13px;
   line-height: 1.65;
 }
@@ -492,7 +492,7 @@
   border: 1px solid var(--line-strong);
   border-radius: 8px;
   outline: 0;
-  background: #faf8fd;
+  background: var(--surface);
   font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
   font-size: 13px;
   line-height: 1.7;
@@ -501,7 +501,7 @@
 
 .api-key-secret:focus {
   border-color: var(--violet-400);
-  box-shadow: 0 0 0 3px rgba(111, 86, 217, 0.12);
+  box-shadow: 0 0 0 3px var(--violet-100);
 }
 
 .api-key-delete-target {
@@ -528,7 +528,7 @@
 
 .api-key-delete-warning {
   margin: 14px 0 1px;
-  color: #be3046;
+  color: var(--danger-700);
   font-size: 12px;
   font-weight: 600;
 }

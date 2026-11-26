@@ -16,7 +16,7 @@
   top: 0;
   z-index: 20;
   border-bottom: 1px solid var(--line);
-  background: rgb(253 252 255 / 0.92);
+  background: var(--panel-bg-strong);
   backdrop-filter: blur(8px);
 }
 
@@ -57,7 +57,7 @@
 }
 
 .pm-status-error {
-  color: #b3261e;
+  color: var(--danger-700);
 }
 
 .pm-section {
@@ -84,15 +84,15 @@
   flex-direction: column;
   border: 1px solid var(--line);
   border-radius: 12px;
-  background: #fff;
+  background: var(--surface-raised);
   padding: 16px;
-  box-shadow: 0 1px 2px rgb(37 34 50 / 0.04);
+  box-shadow: 0 1px 2px var(--line-soft);
   transition: border-color 180ms ease, box-shadow 180ms ease;
 }
 
 .pm-card:hover {
   border-color: var(--violet-300);
-  box-shadow: 0 4px 16px rgb(111 86 217 / 0.08);
+  box-shadow: 0 4px 16px var(--line-soft);
 }
 
 .pm-card-head {
@@ -142,18 +142,18 @@
 .pm-tag-warning {
   border-radius: 3px;
   padding: 0 6px;
-  color: #a05a00;
-  background: #fef3c7;
+  color: var(--warning-700);
+  background: var(--warning-100);
   font-size: 12px;
   line-height: 20px;
 }
 
 .pm-tag-info {
-  border: 1px solid rgb(29 78 216 / 0.35);
+  border: 1px solid var(--info-100);
   border-radius: 3px;
   padding: 0 6px;
-  color: #1d4ed8;
-  background: rgb(219 234 254 / 0.6);
+  color: var(--info-700);
+  background: var(--info-100);
   font-size: 12px;
   line-height: 20px;
 }
@@ -262,7 +262,7 @@
 }
 
 .pm-button-primary {
-  color: #fff;
+  color: var(--surface-raised);
   background: var(--violet-600);
 }
 
@@ -313,8 +313,8 @@
   border-radius: 10px;
   padding: 9px 14px;
   color: var(--ink-800);
-  background: #fff;
-  box-shadow: 0 8px 24px rgb(37 34 50 / 0.12);
+  background: var(--surface-raised);
+  box-shadow: 0 8px 24px var(--line);
   font-size: 13px;
 }
 
@@ -327,7 +327,7 @@
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgb(37 34 50 / 0.35);
+  background: var(--ink-400);
 }
 
 .pm-modal {
@@ -340,8 +340,8 @@
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 20px;
-  background: #fff;
-  box-shadow: 0 16px 48px rgb(37 34 50 / 0.16);
+  background: var(--surface-raised);
+  box-shadow: 0 16px 48px var(--line);
 }
 
 .pm-modal-header {
@@ -426,7 +426,7 @@
 
 .pm-req {
   margin-left: 2px;
-  color: #b3261e;
+  color: var(--danger-700);
   font-style: normal;
 }
 
@@ -447,7 +447,7 @@
   border-radius: 6px;
   padding: 6px 8px;
   color: var(--ink-800);
-  background: #fff;
+  background: var(--surface-raised);
   font: inherit;
   font-size: 13px;
 }
@@ -455,7 +455,7 @@
 .pm-field input:focus {
   outline: none;
   border-color: var(--violet-400);
-  box-shadow: 0 0 0 3px rgb(111 86 217 / 0.14);
+  box-shadow: 0 0 0 3px var(--violet-100);
 }
 
 .pm-result {
@@ -473,12 +473,12 @@
 }
 
 .pm-result.is-succeeded {
-  color: #1a7f37;
+  color: var(--success-700);
 }
 
 .pm-result.is-failed,
 .pm-result.is-error {
-  color: #b3261e;
+  color: var(--danger-700);
 }
 
 /* ---------- 响应式 ---------- */

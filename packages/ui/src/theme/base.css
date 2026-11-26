@@ -69,6 +69,20 @@
   --space-5: 24px;
   --space-6: 32px;
 
+  /* —— 外观偏好（字号 / 密度）：由 data-font-size、data-density 覆盖 —— */
+  --ui-font-scale: 1;
+  --ui-space-scale: 1;
+  --fs-100: calc(11px * var(--ui-font-scale));
+  --fs-200: calc(12px * var(--ui-font-scale));
+  --fs-300: calc(13px * var(--ui-font-scale));
+  --fs-400: calc(14px * var(--ui-font-scale));
+  --fs-500: calc(16px * var(--ui-font-scale));
+  --fs-600: calc(20px * var(--ui-font-scale));
+  --fs-700: calc(24px * var(--ui-font-scale));
+  --fs-800: calc(34px * var(--ui-font-scale));
+  --row-height: calc(42px * var(--ui-space-scale));
+  --gutter-block: calc(12px * var(--ui-space-scale));
+  --gutter-inline: calc(12px * var(--ui-space-scale));
   --control-sm: 32px;
   --control-md: 40px;
   --control-lg: 44px;
@@ -173,6 +187,107 @@
   --info-100: #16243f;
 }
 
+/* —— Accent 预设：只换 violet 语义色阶，所有组件自动跟随 —— */
+[data-accent='blue'] {
+  --violet-50: #f2f6fd;
+  --violet-100: #e6eefb;
+  --violet-200: #cddef7;
+  --violet-300: #a8c5ef;
+  --violet-400: #78a2e2;
+  --violet-500: #5685d6;
+  --violet-600: #3f6fd0;
+  --violet-700: #345bb0;
+  --violet-800: #2c4c92;
+  --violet-950: #17223c;
+}
+
+[data-accent='green'] {
+  --violet-50: #f2f8f3;
+  --violet-100: #e4f1e7;
+  --violet-200: #c9e5cf;
+  --violet-300: #a1d2ab;
+  --violet-400: #71ba80;
+  --violet-500: #4fa262;
+  --violet-600: #3d8a52;
+  --violet-700: #327144;
+  --violet-800: #2a5d39;
+  --violet-950: #142c1c;
+}
+
+[data-accent='red'] {
+  --violet-50: #fdf3f3;
+  --violet-100: #fbe7e7;
+  --violet-200: #f6cccc;
+  --violet-300: #eda4a4;
+  --violet-400: #e27575;
+  --violet-500: #d55858;
+  --violet-600: #c94141;
+  --violet-700: #a93535;
+  --violet-800: #8b2c2c;
+  --violet-950: #3d1616;
+}
+
+[data-theme='dark'][data-accent='blue'] {
+  --violet-50: #1b2233;
+  --violet-100: #212a3f;
+  --violet-200: #2b3752;
+  --violet-300: #3d5075;
+  --violet-400: #5b78b4;
+  --violet-500: #7e9bd8;
+  --violet-600: #8aa8e6;
+  --violet-700: #b4cbf5;
+  --violet-800: #d2e0fb;
+  --violet-950: #e8f0ff;
+}
+
+[data-theme='dark'][data-accent='green'] {
+  --violet-50: #17251b;
+  --violet-100: #1d2f22;
+  --violet-200: #263c2c;
+  --violet-300: #365841;
+  --violet-400: #4f7f5f;
+  --violet-500: #6fa67f;
+  --violet-600: #7fbf90;
+  --violet-700: #b1dcbd;
+  --violet-800: #d0ecd8;
+  --violet-950: #e7f7ec;
+}
+
+[data-theme='dark'][data-accent='red'] {
+  --violet-50: #2a1b1c;
+  --violet-100: #361f20;
+  --violet-200: #4a2729;
+  --violet-300: #6b3436;
+  --violet-400: #9e5052;
+  --violet-500: #c46d6f;
+  --violet-600: #d98082;
+  --violet-700: #f0b3b4;
+  --violet-800: #f8d2d3;
+  --violet-950: #fdeaea;
+}
+
+/* 非紫色强调色需要同步焦点环，否则仍是紫光 */
+[data-accent='blue'],
+[data-accent='green'],
+[data-accent='red'] {
+  --focus-ring: color-mix(in srgb, var(--violet-500) 22%, transparent);
+  --focus-ring-strong: color-mix(in srgb, var(--violet-600) 42%, transparent);
+}
+
+/* —— 字号三档 —— */
+[data-font-size='small'] {
+  --ui-font-scale: 0.93;
+}
+
+[data-font-size='large'] {
+  --ui-font-scale: 1.08;
+}
+
+/* —— UI 密度两档 —— */
+[data-density='compact'] {
+  --ui-space-scale: 0.84;
+}
+
 * { box-sizing: border-box; }
 
 html { min-width: 320px; scroll-behavior: smooth; }
@@ -180,6 +295,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
+  font-size: calc(16px * var(--ui-font-scale));
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
