@@ -106,6 +106,23 @@ export class UsersService{
         })
     }
 
+    async updateBio(userId:string,bio:string|null):Promise<User>{
+        return this.prisma.user.update({
+            where:{id:userId},
+            data:{bio},
+        })
+    }
+
+    // 个人资料统计：只统计当前用户自己的数据
+    // Agent 按 ownerId 计（含归档，属于「创建过多少个」），会话按 userId 计
+    async getProfileStats(userId:string):Promise<{agentCount:number;conversationCount:number}>{
+        const [agentCount,conversationCount]=await this.prisma.$transaction([
+            this.prisma.agent.count({where:{ownerId:userId}}),
+            this.prisma.conversation.count({where:{userId}}),
+        ])
+        return {agentCount,conversationCount}
+    }
+
     async updateAvatar(userId:string,avatarUrl:string):Promise<User>{
         return this.prisma.user.update({
             where:{id:userId},

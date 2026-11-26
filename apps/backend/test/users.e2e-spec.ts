@@ -68,10 +68,13 @@ describe('Users (e2e)', () => {
         id: expect.any(String),
         email,
         displayName: '资料用户',
+        bio: null,
+        createdAt: expect.any(String),
         avatarUrl: null,
         googleLinked: false,
         hasPassword: true,
         globalPrompt: null,
+        stats: { agentCount: 0, conversationCount: 0 },
       });
       expect(res.body.data.passwordHash).toBeUndefined();
     });
@@ -315,6 +318,64 @@ describe('Users (e2e)', () => {
       expect(me.body.data.globalPrompt).toBe('保留这段');
     });
   });
+
+  describe('个人资料 Bio 与统计', () => {
+    it('保存、读取、清空简介', async () => {
+      const { token } = await registerUser('简介用户');
+
+      const saved = await request(app.getHttpServer())
+        .patch('/api/users/me')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ bio: '  在做 Agent 的小团队  ' })
+        .expect(200);
+      expect(saved.body.data.bio).toBe('在做 Agent 的小团队');
+
+      const me = await request(app.getHttpServer())
+        .get('/api/users/me')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(me.body.data.bio).toBe('在做 Agent 的小团队');
+
+      const cleared = await request(app.getHttpServer())
+        .patch('/api/users/me')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ bio: '   ' })
+        .expect(200);
+      expect(cleared.body.data.bio).toBeNull();
+    });
+
+    it('超过 120 字拒绝保存', async () => {
+      const { token } = await registerUser('长简介用户');
+
+      const res = await request(app.getHttpServer())
+        .patch('/api/users/me')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ bio: 'a'.repeat(121) })
+        .expect(400);
+
+      expect(String(res.body.message)).toContain('120');
+    });
+
+    it('统计只计算当前用户自己的 Agent 与会话', async () => {
+      const owner = await registerUser('统计用户');
+      const other = await registerUser('旁观用户');
+
+      await prisma.agent.create({ data: { ownerId: owner.userId, name: '统计用 Agent', systemPrompt: '' } });
+      await prisma.conversation.create({ data: { userId: owner.userId } });
+      await prisma.conversation.create({ data: { userId: other.userId } });
+
+      const me = await request(app.getHttpServer())
+        .get('/api/users/me')
+        .set('Authorization', `Bearer ${owner.token}`)
+        .expect(200);
+      expect(me.body.data.stats).toEqual({ agentCount: 1, conversationCount: 1 });
+      expect(me.body.data.createdAt).toEqual(expect.any(String));
+
+      // Agent 没有对 User 的外键级联，测试结束需要自己清理
+      await prisma.agent.deleteMany({ where: { ownerId: owner.userId } });
+    });
+  });
+
   describe('未登录', () => {
     it('三个个人中心接口都返回 401', async () => {
       await request(app.getHttpServer()).get('/api/users/me').expect(401);

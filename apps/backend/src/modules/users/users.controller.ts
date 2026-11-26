@@ -45,12 +45,13 @@ export class UsersController {
         message: "登录状态无效",
       });
     }
-    return this.toProfile(user);
+    const stats = await this.users.getProfileStats(current.id);
+    return this.toProfile(user, stats);
   }
 
   @Patch("me")
   async update(@CurrentUser() current: CurrentUserPayload, @Body() dto: UpdateProfileDto) {
-    if (dto.displayName === undefined && dto.globalPrompt === undefined) {
+    if (dto.displayName === undefined && dto.globalPrompt === undefined && dto.bio === undefined) {
       throw new BadRequestException("没有可更新的字段");
     }
 
@@ -60,6 +61,12 @@ export class UsersController {
         throw new BadRequestException("昵称不能为空");
       }
       await this.users.updateDisplayName(current.id, displayName);
+    }
+
+    if (dto.bio !== undefined) {
+      const bio = dto.bio.trim();
+      // 空串或纯空白统一清空，前端展示「暂无简介」
+      await this.users.updateBio(current.id, bio === "" ? null : bio);
     }
 
     if (dto.globalPrompt !== undefined) {
@@ -75,27 +82,36 @@ export class UsersController {
         message: "登录状态无效",
       });
     }
-    return this.toProfile(user);
+    const stats = await this.users.getProfileStats(current.id);
+    return this.toProfile(user, stats);
   }
 
-  private toProfile(user: {
-    id: string;
-    email: string;
-    displayName: string;
-    avatarUrl: string | null;
-    googleId: string | null;
-    passwordHash: string | null;
-    globalPrompt: string | null;
-  }) {
+  private toProfile(
+    user: {
+      id: string;
+      email: string;
+      displayName: string;
+      bio: string | null;
+      avatarUrl: string | null;
+      googleId: string | null;
+      passwordHash: string | null;
+      globalPrompt: string | null;
+      createdAt: Date;
+    },
+    stats: { agentCount: number; conversationCount: number },
+  ) {
     return {
       id: user.id,
       email: user.email,
       displayName: user.displayName,
+      bio: user.bio,
+      createdAt: user.createdAt.toISOString(),
       avatarUrl: user.avatarUrl,
       // 只暴露布尔值，不把 googleId 这种外部账号 ID 发给前端
       googleLinked: user.googleId !== null,
       hasPassword: user.passwordHash !== null,
       globalPrompt: user.globalPrompt,
+      stats,
     };
   }
 

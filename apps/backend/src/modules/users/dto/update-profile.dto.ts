@@ -8,6 +8,12 @@ export class UpdateProfileDto {
     @MaxLength(20, { message: "昵称最大不能超过20个字" })
     displayName?: string;
 
+    // 个人资料简介：允许清空，最长 120 字
+    @IsOptional()
+    @IsString()
+    @MaxLength(120, { message: "简介不能超过 120 个字符" })
+    bio?: string;
+
     // 纯空白由 service/controller 统一清空为 null；这里只卡上限
     @IsOptional()
     @IsString()
