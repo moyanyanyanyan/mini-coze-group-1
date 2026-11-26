@@ -9,6 +9,7 @@ from pydantic import ValidationError
 
 from app.config import Settings, get_settings
 from app.runtime.errors import ModelError
+from app.runtime.images import budget_messages
 from app.runtime.schemas import (
     ChatMessage,
     ModelConnection,
@@ -52,9 +53,11 @@ def validate_model(value: ModelInput, settings: Settings, connection: ModelConne
 
 def check_budget(messages: list[ChatMessage], max_tokens: int, settings: Settings) -> None:
     # 以 UTF-8 字节数保守估计输入上界；不是供应商的精确 token 计数。
-    upper_bound = sum(len(m.content.encode("utf-8")) + 16 for m in messages) + 32
+    text_messages, has_images = budget_messages([m.model_dump() for m in messages])
+    upper_bound = sum(len(m['content'].encode("utf-8")) + 16 for m in text_messages) + 32
     if upper_bound + max_tokens > settings.context_token_limit:
-        raise ModelError("INVALID_REQUEST", "上下文超出本服务预算，请缩短输入", 400)
+        raise ModelError("IMAGE_CONTEXT_LIMIT" if has_images else "INVALID_REQUEST",
+                         "上下文超出本服务预算，请缩短输入", 422 if has_images else 400)
 
 
 @asynccontextmanager

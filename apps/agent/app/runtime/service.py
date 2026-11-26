@@ -11,6 +11,7 @@ from app.runtime.deepseek import check_budget, stream_model, validate_model
 from app.runtime.tool_loop import check_tool_budget, stream_tool_loop
 from app.runtime.errors import ModelError
 from app.runtime.prompts import prompt_prefix
+from app.runtime.images import check_images, fetch_images, image_refs, image_content
 from app.runtime.providers import KnowledgeContextProvider, PluginToolProvider, UnconfiguredKnowledgeProvider, UnconfiguredPluginProvider
 from app.runtime.schemas import ChatMessage, KnowledgeRequest, KnowledgeResult, ModelInput, RuntimeRequest, RuntimeResult
 
@@ -19,18 +20,22 @@ logger = logging.getLogger(__name__)
 
 class RuntimeService:
     def __init__(self, settings: Settings, *, knowledge: KnowledgeContextProvider | None = None,
-                 plugins: PluginToolProvider | None = None, client: httpx.AsyncClient | None = None):
+                 plugins: PluginToolProvider | None = None, client: httpx.AsyncClient | None = None,
+                 image_client: httpx.AsyncClient | None = None):
         self.settings = settings
         self.knowledge = knowledge or UnconfiguredKnowledgeProvider()
         self.plugins = plugins or UnconfiguredPluginProvider()
         self.client = client
+        self.image_client = image_client
 
     def preflight(self, request: RuntimeRequest) -> None:
-        validate_model(ModelInput(model=request.agentConfig.model, messages=[ChatMessage(role="user", content=request.message)],
+        check_images(request.agentConfig, image_refs(request), self.settings)
+        validate_model(ModelInput(model=request.agentConfig.model, messages=[ChatMessage(role="user", content=request.message or "图片")],
                                   temperature=request.agentConfig.temperature, max_tokens=request.agentConfig.maxTokens), self.settings,
                        request.agentConfig.connection)
 
-    def context(self, request: RuntimeRequest, knowledge: KnowledgeResult) -> list[ChatMessage]:
+    def context(self, request: RuntimeRequest, knowledge: KnowledgeResult, urls=None) -> list[ChatMessage]:
+        urls = urls or {}
         prefix = prompt_prefix(request.agentConfig.systemPrompt, request.globalPrompt)
         # RAG 是参考数据而非系统指令；权限仍由 Provider/业务服务校验。
         if knowledge.chunks:
@@ -40,15 +45,15 @@ class RuntimeService:
             if len(reference) > 12000:
                 raise ModelError("INVALID_REQUEST", "检索上下文超过本服务上限", 400)
             prefix.append(ChatMessage(role="user", content=reference))
-        history = [ChatMessage(role=m.role, content=m.content) for m in request.history]
-        current = [ChatMessage(role="user", content=request.message)]
+        history = [ChatMessage(role=m.role, content=image_content(m.content, m.images, urls)) for m in request.history]
+        current = [ChatMessage(role="user", content=image_content(request.message, request.images, urls))]
         while True:
             messages = prefix + history + current
             try:
                 check_budget(messages, request.agentConfig.maxTokens, self.settings)
                 return messages
             except ModelError:
-                if not history:
+                if not history or image_refs(request):
                     raise
                 # 只能成对删除最旧历史，不丢失当前问题或系统约束。
                 history = history[2:]
@@ -67,7 +72,9 @@ class RuntimeService:
             async with asyncio.timeout(self.settings.run_timeout):
                 knowledge = KnowledgeResult(status="no_match", chunks=[])
                 config = request.agentConfig
-                if config.knowledgeBaseIds:
+                check_images(config, image_refs(request), self.settings)
+                urls = await fetch_images(request, self.settings, self.image_client)
+                if config.knowledgeBaseIds and request.message.strip():
                     knowledge = await self.knowledge.get_context(KnowledgeRequest(
                         runId=request.runId, actorId=request.actor.id, agentId=config.id,
                         knowledgeBaseIds=config.knowledgeBaseIds, query=request.message,
@@ -79,7 +86,7 @@ class RuntimeService:
                     tools = await self.plugins.list_tools(request.actor.id, config.id, config.pluginIds)
                     if not tools or len(tools) > 128 or any(t.pluginId not in config.pluginIds for t in tools) or len({t.name for t in tools}) != len(tools):
                         raise ModelError("TOOL_PROTOCOL_ERROR", "插件定义为空、重复或不属于本轮绑定", 502)
-                value = ModelInput(model=config.model, messages=self.context(request, knowledge),
+                value = ModelInput(model=config.model, messages=self.context(request, knowledge, urls),
                                    temperature=config.temperature, max_tokens=config.maxTokens)
                 if tools:
                     check_tool_budget(value, tools, [m.model_dump() for m in value.messages], self.settings)

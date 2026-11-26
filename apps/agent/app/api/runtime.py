@@ -6,12 +6,14 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, Response
 
 from app.config import get_settings
 from app.runtime.errors import ModelError
 from app.runtime.deepseek import test_model_connection
-from app.runtime.schemas import ModelTestRequest, RuntimeRequest
+from app.runtime.schemas import ModelTestRequest, RuntimeRequest, VisionPreflight, ModelInput, ChatMessage
+from app.runtime.images import check_images, image_refs
+from app.runtime.deepseek import validate_model
 from app.runtime.service import RuntimeService
 from app.runtime.providers import HttpKnowledgeProvider
 from app.runtime.http_providers import HttpPluginProvider
@@ -34,8 +36,20 @@ def internal_auth(request: Request) -> None:
 router = APIRouter(prefix="/internal/runtime", dependencies=[Depends(internal_auth)])
 
 
+@router.post("/preflight", status_code=204)
+def preflight(body: VisionPreflight):
+    settings = get_settings()
+    check_images(body.agentConfig, body.images, settings)
+    config = body.agentConfig
+    validate_model(ModelInput(model=config.model, messages=[ChatMessage(role="user", content="预检")],
+                              temperature=config.temperature, max_tokens=config.maxTokens), settings, config.connection)
+    return Response(status_code=204)
+
+
 @router.post("/run")
 async def run(body: RuntimeRequest, runtime: RuntimeService = Depends(get_runtime)):
+    if image_refs(body):
+        raise ModelError("IMAGE_STREAM_ONLY", "图片请求请使用流式入口", 422)
     runtime.preflight(body)
     return await runtime.run(body)
 

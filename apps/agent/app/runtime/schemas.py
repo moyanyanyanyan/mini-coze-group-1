@@ -19,9 +19,23 @@ class ModelConnection(DTO):
     apiKey: str = Field(min_length=1, max_length=500)
 
 
+class TextPart(DTO):
+    type: Literal["text"] = "text"
+    text: str = Field(min_length=1, max_length=32000)
+
+
+class ImageUrl(DTO):
+    url: str
+
+
+class ImagePart(DTO):
+    type: Literal["image_url"] = "image_url"
+    image_url: ImageUrl
+
+
 class ChatMessage(DTO):
     role: Literal["system", "user", "assistant"]
-    content: str = Field(min_length=1, max_length=32000)
+    content: str | list[TextPart | ImagePart] = Field(min_length=1, max_length=32000)
 
 
 class ModelInput(DTO):
@@ -61,10 +75,35 @@ class Actor(DTO):
     id: Identifier
 
 
+class ImageRef(DTO):
+    id: str = Field(min_length=1, max_length=200, pattern=r"^[A-Za-z0-9_-]+$")
+    mimeType: Literal["image/png", "image/jpeg", "image/webp"]
+
+
+class ImageMetadata(ImageRef):
+    width: int = Field(gt=0)
+    height: int = Field(gt=0)
+    byteSize: int = Field(gt=0)
+
+
+class VisionPreflight(DTO):
+    agentConfig: AgentConfig
+    images: list[ImageMetadata] = Field(default_factory=list)
+
+
 class HistoryMessage(DTO):
     id: Identifier
     role: Literal["user", "assistant"]
-    content: str = Field(min_length=1, max_length=8000)
+    content: str = Field(max_length=8000)
+    images: list[ImageRef] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_images(self) -> Self:
+        if self.role == "assistant" and self.images:
+            raise ValueError("助手消息不能包含图片")
+        if not self.content.strip() and not self.images:
+            raise ValueError("历史消息不能为空")
+        return self
 
 
 class RuntimeRequest(DTO):
@@ -76,12 +115,16 @@ class RuntimeRequest(DTO):
     assistantMessageId: Identifier
     agentConfig: AgentConfig
     history: list[HistoryMessage] = Field(max_length=20)
-    message: str = Field(min_length=1, max_length=8000)
+    message: str = Field(max_length=8000)
+    images: list[ImageRef] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_history(self) -> Self:
-        if not self.message.strip():
+        if not self.message.strip() and not self.images:
             raise ValueError("消息不能为空")
+        image_ids = [image.id for message in self.history for image in message.images] + [image.id for image in self.images]
+        if len(image_ids) != len(set(image_ids)):
+            raise ValueError("图片 ID 必须唯一")
         ids = [item.id for item in self.history]
         if self.userMessageId == self.assistantMessageId or len(set(ids)) != len(ids):
             raise ValueError("消息 ID 必须唯一")

@@ -4,6 +4,7 @@ from contextlib import aclosing
 
 from app.runtime.deepseek import stream_model
 from app.runtime.errors import ModelError
+from app.runtime.images import budget_messages
 from app.runtime.schemas import ModelResult, ToolCallBatch, ToolRequest, ToolSuccess, ToolFailure, Usage
 
 MAX_TOOL_ROUNDS = 4
@@ -16,10 +17,12 @@ class ToolLoopResult(ModelResult):
 
 def check_tool_budget(value, tools, messages, settings):
     # 工具定义、调用参数与结果都占用上下文；不截断协议消息或执行结果。
-    size = len(json.dumps({"messages": messages, "tools": [t.model_dump() for t in tools]},
+    text_messages, has_images = budget_messages(messages)
+    size = len(json.dumps({"messages": text_messages, "tools": [t.model_dump() for t in tools]},
                           ensure_ascii=False).encode("utf-8"))
     if size + value.max_tokens > settings.context_token_limit:
-        raise ModelError("INVALID_REQUEST", "工具上下文超过本服务预算", 400)
+        raise ModelError("IMAGE_CONTEXT_LIMIT" if has_images else "INVALID_REQUEST",
+                         "工具上下文超过本服务预算", 422 if has_images else 400)
 
 
 async def stream_tool_loop(value, tools, request, settings, plugins, client, connection=None):

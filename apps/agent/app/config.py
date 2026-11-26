@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     backend_service_url: str | None = Field(default=None, validation_alias="BACKEND_SERVICE_URL")
     plugins_service_token: SecretStr = Field(default="", validation_alias="PLUGINS_SERVICE_TOKEN")
     provider_timeout: float = Field(default=15, gt=0, validation_alias="PROVIDER_TIMEOUT_SECONDS")
+    image_fetch_timeout: float = Field(default=10, gt=0, validation_alias="IMAGE_FETCH_TIMEOUT_SECONDS")
     model_timeout: float = Field(default=60, gt=0, validation_alias="MODEL_TIMEOUT_SECONDS")
     run_timeout: float = Field(default=180, gt=0, validation_alias="RUN_TIMEOUT_SECONDS")
     workflow_run_timeout: float = Field(
