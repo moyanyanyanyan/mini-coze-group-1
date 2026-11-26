@@ -12,7 +12,7 @@ export class KnowledgeRetrievalController {
   @HttpCode(200)
   async search(@Body() input: KnowledgeRetrievalDto, @Headers('authorization') authorization = '') {
     const token = process.env.INTERNAL_SERVICE_TOKEN;
-    if (!token || !sameToken(authorization, `Bearer ${token}`)) throw new UnauthorizedException('内部服务凭证无效');
+    if (!token || !sameToken(authorization, `Bearer ${token}`)) {throw new UnauthorizedException('内部服务凭证无效');}
 
     const allowedIds = await this.access.allowedIds(input.actorId, input.agentId, input.knowledgeBaseIds);
     const data = allowedIds.length

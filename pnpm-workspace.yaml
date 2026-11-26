@@ -9,5 +9,6 @@ allowBuilds:
   '@prisma/engines': true
   esbuild: true
   prisma: true
+  tesseract.js: false
   unrs-resolver: true
   workerd: true

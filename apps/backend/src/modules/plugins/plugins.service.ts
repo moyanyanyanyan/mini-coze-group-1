@@ -70,7 +70,7 @@ export class PluginsService {
     // 工具名全局唯一（不能和内置 echo_text / current_time，以及已有自定义插件撞）
     const existingToolNames = new Set<string>();
     for (const item of this.registry.listCatalog()) {
-      for (const t of item.tools) existingToolNames.add(t.name);
+      for (const t of item.tools) {existingToolNames.add(t.name);}
     }
     for (const tool of req.tools) {
       if (existingToolNames.has(tool.name)) {
@@ -155,12 +155,12 @@ export class PluginsService {
     const req = body as ConnectMcpRequest;
 
     const urlError = this.validateEndpoint(req.endpoint);
-    if (urlError) return { code: 400, message: urlError, data: null };
+    if (urlError) {return { code: 400, message: urlError, data: null };}
 
     const authType: PluginAuthType =
       req.authType && VALID_AUTH_TYPES.includes(req.authType) ? req.authType : 'none';
     const credentialError = this.validateCredential(authType, req.authCredential);
-    if (credentialError) return { code: 400, message: credentialError, data: null };
+    if (credentialError) {return { code: 400, message: credentialError, data: null };}
 
     const probe = await this.probeMcpConnection(req.endpoint, authType, req.authCredential);
     if (!probe.ok) {
@@ -218,7 +218,7 @@ export class PluginsService {
   }
 
   private validateCredential(authType: PluginAuthType, credential: unknown): string | null {
-    if (authType === 'none') return null;
+    if (authType === 'none') {return null;}
     if (typeof credential !== 'string' || credential.trim() === '') {
       return authType === 'bearer'
         ? '选择 Bearer Token 授权时必须填写 Token'
@@ -263,20 +263,20 @@ export class PluginsService {
       return 'kind 仅支持 http 或 mcp';
     }
     const urlError = this.validateEndpoint(req.endpoint);
-    if (urlError) return urlError;
+    if (urlError) {return urlError;}
 
     const authType: PluginAuthType =
       req.authType && VALID_AUTH_TYPES.includes(req.authType as PluginAuthType)
         ? (req.authType as PluginAuthType)
         : 'none';
     const credentialError = this.validateCredential(authType, req.authCredential);
-    if (credentialError) return credentialError;
+    if (credentialError) {return credentialError;}
 
     if (!Array.isArray(req.tools) || req.tools.length === 0) {
       return 'tools 必须为非空数组';
     }
     for (const [i, tool] of req.tools.entries()) {
-      if (typeof tool !== 'object' || tool === null) return `tools[${i}] 必须为对象`;
+      if (typeof tool !== 'object' || tool === null) {return `tools[${i}] 必须为对象`;}
       const t = tool as Record<string, unknown>;
       if (typeof t.name !== 'string' || !TOOL_NAME_RE.test(t.name)) {
         return `tools[${i}].name 必须为小写下划线风格标识符`;
@@ -298,7 +298,7 @@ export class PluginsService {
   ): ApiResponse<PluginToolDefinition[]> {
     // 0. 服务凭证校验
     const authError = this.checkServiceToken(serviceToken);
-    if (authError) return authError;
+    if (authError) {return authError;}
 
     if (rawPluginIds === undefined || rawPluginIds === null) {
       return {
@@ -343,7 +343,7 @@ export class PluginsService {
   ): Promise<ApiResponse<PluginToolResult>> {
     // 0. 服务凭证校验
     const authError = this.checkServiceToken(serviceToken);
-    if (authError) return authError;
+    if (authError) {return authError;}
 
     // 1. 请求结构校验
     const badRequest = this.validateExecuteRequest(body);
@@ -418,7 +418,7 @@ export class PluginsService {
     serviceToken: string | undefined,
   ): Promise<ApiResponse<PluginTestResult>> {
     const authError = this.checkServiceToken(serviceToken);
-    if (authError) return authError;
+    if (authError) {return authError;}
 
     if (typeof body !== 'object' || body === null || Array.isArray(body)) {
       return { code: 400, message: '请求体必须是 JSON 对象', data: null };

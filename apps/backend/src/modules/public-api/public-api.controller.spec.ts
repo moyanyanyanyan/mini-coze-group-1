@@ -163,7 +163,7 @@ describe('PublicApiController stream cleanup', () => {
       firstWritten = resolve;
     });
     const response = new FakeResponse(undefined, (chunk) => {
-      if (chunk.includes('event: run.started')) firstWritten();
+      if (chunk.includes('event: run.started')) {firstWritten();}
     });
 
     const pending = controllerWith(service).stream(

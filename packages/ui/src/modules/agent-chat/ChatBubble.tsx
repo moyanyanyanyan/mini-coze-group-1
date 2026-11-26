@@ -68,6 +68,19 @@ export const ChatBubble = memo(function ChatBubble({ message, agentName, avatarU
           aria-live={generating && !isUser ? 'polite' : undefined}
         >
           {body}
+          {isUser && message.attachments?.length ? (
+            <div className={styles.bubbleAttachments}>
+              {message.attachments.map((attachment) => (
+                <span
+                  key={attachment.id}
+                  className={`${styles.bubbleAttachment}${attachment.status === 'FAILED' ? ` ${styles.bubbleAttachmentFailed}` : ''}`}
+                  title={attachment.status === 'FAILED' ? attachment.errorCode ?? '解析失败' : attachment.fileName}
+                >
+                  {attachment.fileName} · {formatFileSize(attachment.byteSize)}
+                </span>
+              ))}
+            </div>
+          ) : null}
           {!isUser && generating && message.content ? <span className={styles.generationCursor} aria-label="正在生成" /> : null}
           {!waiting && message.status === 'cancelled' && message.content ? <span className={styles.bubbleHint}>已停止</span> : null}
           {!waiting && message.status === 'failed' && message.content ? <span className={styles.bubbleHint}>生成中断，请重新发送</span> : null}
@@ -98,3 +111,9 @@ export const ChatBubble = memo(function ChatBubble({ message, agentName, avatarU
     </div>
   );
 });
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}

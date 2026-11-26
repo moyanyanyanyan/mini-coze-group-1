@@ -8,7 +8,9 @@ import {
   listConversations,
   listMessages,
   streamMessage,
+  uploadAttachment,
   type ChatCitation,
+  type PendingAttachment,
 } from './api/chat-api';
 import { AppLink } from '../../shared/routing/AppLink';
 import { useConfirm } from '@minicoze/ui/hooks';
@@ -21,6 +23,8 @@ const SUGGESTED_PROMPTS = [
 ];
 
 const CONTEXT_HISTORY_ROUND_LIMIT = 10;
+/** 与后端 SendMessageDto 的 ArrayMaxSize(5) 保持一致 */
+const MAX_ATTACHMENTS = 5;
 
 export function AgentChatPage() {
   const { confirm, confirmation } = useConfirm();
@@ -35,6 +39,10 @@ export function AgentChatPage() {
   const [generationPhase, setGenerationPhase] = useState<'connecting' | 'thinking' | 'generating' | null>(null);
   const [preparingMessage, setPreparingMessage] = useState(false);
   const [sendError, setSendError] = useState('');
+  /** 待发送附件：上传成功即进列表，发送后清空 */
+  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
+  const [attaching, setAttaching] = useState(false);
+  const [attachmentError, setAttachmentError] = useState('');
   const [needsAgent, setNeedsAgent] = useState(false);
   const [bootError, setBootError] = useState('');
   const selectedAgent = agents.find(agent => agent.id === selectedAgentId);
@@ -45,6 +53,17 @@ export function AgentChatPage() {
   const { following, setAwayFromBottom, jumpToLatest, closeConversationDrawer } = viewport;
   const requestId = useRef(0);
   const [switching, setSwitching] = useState(false);
+
+  /** 切换会话后自增，用于丢弃旧会话的在途上传结果 */
+  const uploadEpoch = useRef(0);
+
+  /** 切会话/切智能体/新建时，未发送的附件没有归属，直接丢掉 */
+  const clearPendingAttachments = () => {
+    uploadEpoch.current += 1;
+    setPendingAttachments([]);
+    setAttachmentError('');
+    setAttaching(false);
+  };
   // React 严格模式下 effect 会跑两次，没有这个闸门就会建出两个会话
   const booted = useRef(false);
   // C4 接缝：同一个 AbortController 贯穿整轮。
@@ -91,16 +110,34 @@ export function AgentChatPage() {
     }
   }, []);
 
-  const handleAgentChange = (agentId: string) => {
+  const handleAgentChange = async (agentId: string) => {
     if (sendingRef.current || switching) return;
-    requestId.current += 1;
-    setSelectedAgentId(agentId);
-    setConversationId(null);
-    setMessages([]);
-    setCitationsByMessage({});
+    const request = ++requestId.current;
+    setSwitching(true);
     setSendError('');
     setBootError('');
-    jumpToLatest();
+    clearPendingAttachments();
+    try {
+      const existing = await listConversations();
+      const conversation = existing.find((item) => item.agentId === agentId)
+        ?? (await createConversation(agentId));
+      const history = await listMessages(conversation.id);
+      if (request !== requestId.current) return;
+      following.current = true;
+      setAwayFromBottom(false);
+      setSelectedAgentId(agentId);
+      setConversationId(conversation.id);
+      setConversations(existing.some((item) => item.id === conversation.id)
+        ? existing
+        : [conversation, ...existing]);
+      setMessages(history);
+      setCitationsByMessage({});
+      jumpToLatest();
+    } catch (caught) {
+      if (request === requestId.current) setBootError(caught instanceof Error ? caught.message : '切换智能体失败');
+    } finally {
+      if (request === requestId.current) setSwitching(false);
+    }
   };
 
   const handleConversationChange = async (conversation: ConversationSummary) => {
@@ -109,6 +146,7 @@ export function AgentChatPage() {
     }
     setBootError('');
     setSendError('');
+    clearPendingAttachments();
     const request = ++requestId.current;
     setSwitching(true);
     try {
@@ -128,16 +166,27 @@ export function AgentChatPage() {
     }
   };
 
-  const handleNewConversation = () => {
+  const handleNewConversation = async () => {
     if (!selectedAgentId || sendingRef.current || streamingId || switching) return;
-    requestId.current += 1;
+    const request = ++requestId.current;
     setBootError('');
     setSendError('');
-    setConversationId(null);
-    setMessages([]);
-    setCitationsByMessage({});
-    jumpToLatest();
-    closeConversationDrawer();
+    clearPendingAttachments();
+    setSwitching(true);
+    try {
+      const conversation = await createConversation(selectedAgentId);
+      if (request !== requestId.current) return;
+      setConversations((items) => [conversation, ...items]);
+      setConversationId(conversation.id);
+      setMessages([]);
+      jumpToLatest();
+      closeConversationDrawer();
+      setCitationsByMessage({});
+    } catch (caught) {
+      if (request === requestId.current) setBootError(caught instanceof Error ? caught.message : '新建会话失败');
+    } finally {
+      if (request === requestId.current) setSwitching(false);
+    }
   };
 
   const handleDeleteConversation = async (conversation: ConversationSummary) => {
@@ -172,13 +221,74 @@ export function AgentChatPage() {
     void boot();
   }, [boot]);
 
+  const handleSelectFiles = async (files: File[]) => {
+    if (!conversationId || files.length === 0) {
+      return;
+    }
+    const room = MAX_ATTACHMENTS - pendingAttachments.length;
+    if (room <= 0) {
+      setAttachmentError('单条消息最多 5 个附件');
+      return;
+    }
+    setAttachmentError('');
+    if (files.length > room) {
+      setAttachmentError('单条消息最多 5 个附件，超出的文件未添加');
+    }
+    // 串行上传：一次一个请求，失败只影响当前文件
+    const epoch = uploadEpoch.current;
+    const targetConversationId = conversationId;
+    setAttaching(true);
+    try {
+      for (const file of files.slice(0, room)) {
+        if (epoch !== uploadEpoch.current) {
+          break;
+        }
+        try {
+          const uploaded = await uploadAttachment(targetConversationId, file);
+          if (epoch !== uploadEpoch.current) {
+            break;
+          }
+          setPendingAttachments((prev) => [...prev, uploaded]);
+        } catch (caught) {
+          if (epoch !== uploadEpoch.current) {
+            break;
+          }
+          setAttachmentError(caught instanceof ApiError ? caught.message : `${file.name} 上传失败`);
+        }
+      }
+    } finally {
+      if (epoch === uploadEpoch.current) {
+        setAttaching(false);
+      }
+    }
+  };
+
+  const handleRemoveAttachment = (id: string) => {
+    setPendingAttachments((prev) => prev.filter((item) => item.id !== id));
+    setAttachmentError('');
+  };
+
   const handleSend = async (content: string) => {
     if (streamingId || sendingRef.current || switching || !selectedAgentId) {
       return;
     }
+    if (attaching) {
+      setSendError('附件还在解析中，请稍候再发送');
+      return;
+    }
+    const blocked = pendingAttachments.find((attachment) => attachment.status !== 'READY');
+    if (blocked) {
+      setSendError('请先移除解析失败的附件');
+      return;
+    }
+
+    // 本轮要绑定的附件；发送失败（HTTP 层）时恢复，便于重试
+    const sendingAttachments = pendingAttachments;
+    const attachmentIds = sendingAttachments.map((attachment) => attachment.id);
     sendingRef.current = true;
     setPreparingMessage(true);
     setSendError('');
+    setAttachmentError('');
     following.current = true;
     setAwayFromBottom(false);
 
@@ -198,6 +308,16 @@ export function AgentChatPage() {
         seq: -2,
         content,
         createdAt: now,
+        attachments: sendingAttachments.length > 0
+          ? sendingAttachments.map((attachment) => ({
+              id: attachment.id,
+              fileName: attachment.fileName,
+              sourceType: attachment.sourceType,
+              byteSize: attachment.byteSize,
+              status: 'READY' as const,
+              errorCode: attachment.errorCode,
+            }))
+          : undefined,
       },
       {
         id: assistantKey,
@@ -209,7 +329,8 @@ export function AgentChatPage() {
         createdAt: now,
       },
     ]);
-    following.current = true;
+    // 发送即清空输入区；失败时再恢复
+    setPendingAttachments([]);
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -324,6 +445,7 @@ export function AgentChatPage() {
           },
         },
         controller.signal,
+        attachmentIds.length > 0 ? { attachmentIds } : undefined,
       );
     } catch (caught) {
       // 主动停止是正常路径，不弹错误
@@ -332,6 +454,10 @@ export function AgentChatPage() {
       } else {
         terminalStatus = 'failed';
         setSendError(caught instanceof ApiError ? caught.message : '发送失败，请稍后再试');
+        // 只有请求在 SSE 建立前就被拒（400/413…）时附件仍未绑定，才值得恢复
+        if (caught instanceof ApiError) {
+          setPendingAttachments(sendingAttachments);
+        }
       }
     } finally {
       if (frameRef.current !== null) {
@@ -419,6 +545,11 @@ export function AgentChatPage() {
       handleSend={handleSend}
       handleStop={handleStop}
       onRetry={() => { setBootError(''); void boot(); }}
+      pendingAttachments={pendingAttachments}
+      attaching={attaching}
+      attachmentError={attachmentError}
+      onSelectFiles={(files) => void handleSelectFiles(files)}
+      onRemoveAttachment={handleRemoveAttachment}
     />
   );
 }

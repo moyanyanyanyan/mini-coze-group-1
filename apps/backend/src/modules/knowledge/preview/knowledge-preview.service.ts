@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { KnowledgeRetrievalService } from '../retrieval/knowledge-retrieval.service';
+import { parseChunkSourceRanges } from '../documents/office-chunk-source';
 
 const PAGE_SIZE = 20;
 
@@ -13,16 +14,24 @@ export class KnowledgePreviewService {
     const document = await this.prisma.knowledgeDocument.findFirst({
       where: { id: documentId, knowledgeBaseId }, select: { id: true },
     });
-    if (!document) throw new NotFoundException('文档不存在');
+    if (!document) {throw new NotFoundException('文档不存在');}
     const where = { documentId, knowledgeBaseId };
     const [total, chunks] = await this.prisma.$transaction([
       this.prisma.knowledgeChunk.count({ where }),
       this.prisma.knowledgeChunk.findMany({
         where, orderBy: { position: 'asc' }, skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE,
-        select: { id: true, position: true, content: true, startOffset: true, endOffset: true, enabled: true },
+        select: { id: true, position: true, content: true, startOffset: true, endOffset: true, enabled: true, sourceRanges: true },
       }),
     ]);
-    return { items: chunks, total, page, pageSize: PAGE_SIZE };
+    return {
+      items: chunks.map(({ sourceRanges, ...chunk }) => ({
+        ...chunk,
+        sourceRanges: parseChunkSourceRanges(sourceRanges),
+      })),
+      total,
+      page,
+      pageSize: PAGE_SIZE,
+    };
   }
 
   async search(knowledgeBaseId: string, workspaceId: string, query: string) {
@@ -32,6 +41,6 @@ export class KnowledgePreviewService {
 
   private async assertBase(id: string, workspaceId: string) {
     const base = await this.prisma.knowledgeBase.findUnique({ where: { id }, select: { workspaceId: true, status: true } });
-    if (!base || base.workspaceId !== workspaceId || base.status !== 'ACTIVE') throw new NotFoundException('知识库不存在或不可用');
+    if (!base || base.workspaceId !== workspaceId || base.status !== 'ACTIVE') {throw new NotFoundException('知识库不存在或不可用');}
   }
 }

@@ -5,7 +5,7 @@ import { AgentSwitcher } from './AgentSwitcher';
 import { Icon, ActionMenu } from '../../components';
 import type { LinkComponentType } from '../../layouts/types';
 import type { ChatViewport } from './useChatViewport';
-import type { ChatMessageView, ChatAgentOption, ChatConversationItem } from './types';
+import type { ChatMessageView, ChatAgentOption, ChatConversationItem, ComposerAttachment } from './types';
 import styles from './agent-chat.module.css';
 
 export interface AgentChatViewProps {
@@ -35,6 +35,11 @@ export interface AgentChatViewProps {
   handleSend: (content: string) => void;
   handleStop: () => void;
   onRetry: () => void;
+  pendingAttachments: ComposerAttachment[];
+  attaching: boolean;
+  attachmentError: string;
+  onSelectFiles: (files: File[]) => void;
+  onRemoveAttachment: (id: string) => void;
 }
 
 export function AgentChatView({
@@ -42,6 +47,7 @@ export function AgentChatView({
   streamingId, generationPhase, contextRemaining, contextMax, sendError, needsAgent, bootError, switching, suggestedPrompts, viewport,
   confirmation, LinkComponent, createAgentRoute, handleNewConversation, handleConversationChange,
   handleDeleteConversation, handleAgentChange, handleSend, handleStop, onRetry,
+  pendingAttachments, attaching, attachmentError, onSelectFiles, onRemoveAttachment,
 }: AgentChatViewProps) {
   const selectedAgent = agents.find(agent => agent.id === selectedAgentId);
   const { conversationsOpen, setConversationsOpen, conversationPanelRef, conversationDrawer,
@@ -224,6 +230,11 @@ export function AgentChatView({
               streaming={streamingId !== null}
               onStop={handleStop}
               onSend={(content) => void handleSend(content)}
+              attachments={pendingAttachments}
+              uploading={attaching}
+              attachmentError={attachmentError}
+              onSelectFiles={onSelectFiles}
+              onRemoveAttachment={onRemoveAttachment}
             />
             <span className={styles.composerHint}>输入想法，妙搭负责把能力拼起来 · Enter 发送</span>
           </>

@@ -3,6 +3,8 @@ export interface DocumentChunkInput {
   content: string;
   startOffset: number;
   endOffset: number;
+  /** Raw-text offset where this chunk's non-overlap body begins. */
+  bodyStartOffset: number;
 }
 
 const BASE_LENGTH = 500;
@@ -12,7 +14,7 @@ interface Span { start: number; end: number }
 
 export function chunkDocument(text: string): DocumentChunkInput[] {
   const normalized = text.replace(/\r\n?/g, '\n').trim();
-  if (!normalized) return [];
+  if (!normalized) {return [];}
 
   const units: Span[] = [];
   const paragraphBreaks = /\n\s*\n/g;
@@ -25,8 +27,8 @@ export function chunkDocument(text: string): DocumentChunkInput[] {
   addParagraph(paragraphStart, normalized.length);
 
   function addParagraph(start: number, end: number) {
-    while (start < end && /\s/.test(normalized[start])) start++;
-    while (end > start && /\s/.test(normalized[end - 1])) end--;
+    while (start < end && /\s/.test(normalized[start])) {start++;}
+    while (end > start && /\s/.test(normalized[end - 1])) {end--;}
     while (start < end) {
       if (end - start <= BASE_LENGTH) {
         units.push({ start, end });
@@ -44,27 +46,29 @@ export function chunkDocument(text: string): DocumentChunkInput[] {
       }
       units.push({ start, end: boundary });
       start = boundary;
-      while (start < end && /\s/.test(normalized[start])) start++;
+      while (start < end && /\s/.test(normalized[start])) {start++;}
     }
   }
 
   const bases: Span[] = [];
   for (const unit of units) {
     const current = bases[bases.length - 1];
-    if (current && unit.end - current.start <= BASE_LENGTH) current.end = unit.end;
-    else bases.push({ ...unit });
+    if (current && unit.end - current.start <= BASE_LENGTH) {current.end = unit.end;}
+    else {bases.push({ ...unit });}
   }
 
   return bases.map((base, position) => {
-    if (position === 0) return { position, content: normalized.slice(base.start, base.end), startOffset: base.start, endOffset: base.end };
+    if (position === 0) return { position, content: normalized.slice(base.start, base.end), startOffset: base.start, endOffset: base.end, bodyStartOffset: base.start };
     const previous = bases[position - 1];
     const overlapStart = Math.max(previous.start, previous.end - OVERLAP_LENGTH);
-    const prefix = normalized.slice(overlapStart, previous.end);
     return {
       position,
-      content: `${prefix}\n${normalized.slice(base.start, base.end)}`,
+      // Keep the exact source slice (including the original paragraph
+      // separator) so chunk offsets and content share one coordinate system.
+      content: normalized.slice(overlapStart, base.end),
       startOffset: overlapStart,
       endOffset: base.end,
+      bodyStartOffset: base.start,
     };
   });
 }

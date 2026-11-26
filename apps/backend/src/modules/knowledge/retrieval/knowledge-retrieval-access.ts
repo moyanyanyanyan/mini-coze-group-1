@@ -9,7 +9,7 @@ export class KnowledgeRetrievalAccess {
 
   async allowedIds(actorId: string, agentId: string, knowledgeBaseIds: string[]): Promise<string[]> {
     const actor = await this.prisma.user.findUnique({ where: { id: actorId }, select: { id: true } });
-    if (!actor) throw new UnauthorizedException('用户身份无效');
+    if (!actor) {throw new UnauthorizedException('用户身份无效');}
 
     const agent = await this.prisma.agent.findUnique({
       where: { id: agentId },
@@ -31,7 +31,7 @@ export class KnowledgeRetrievalAccess {
     const available = new Set(bases.filter((base) => base.status === 'ACTIVE' && base.workspaceId === actorId).map((base) => base.id));
     const allowed = knowledgeBaseIds.filter((id) => bindings.get(id)?.enabled && available.has(id));
     for (const id of knowledgeBaseIds) {
-      if (!allowed.includes(id)) this.logger.warn(`Skipping disabled or unavailable knowledge base ${id} for agent ${agentId}`);
+      if (!allowed.includes(id)) {this.logger.warn(`Skipping disabled or unavailable knowledge base ${id} for agent ${agentId}`);}
     }
     return allowed;
   }

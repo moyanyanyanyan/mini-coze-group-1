@@ -461,6 +461,7 @@
 /* 输入区：一张浮在页面上的纸 */
 .composer {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   gap: 10px;
   padding: 10px 10px 10px 16px;
@@ -531,6 +532,132 @@
 .send:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.attachButton {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--ink-500);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.attachButton svg {
+  width: 18px;
+  height: 18px;
+}
+
+.attachButton:hover:not(:disabled) {
+  color: var(--violet-600);
+  background: var(--violet-50);
+}
+
+.attachButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.fileInput {
+  display: none;
+}
+
+.composerAttachments {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.attachmentChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 280px;
+  padding: 5px 8px 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--violet-50);
+  color: var(--ink-700);
+  font-size: 12px;
+}
+
+.attachmentChipFailed {
+  border-color: #e6b4b4;
+  background: #fdf1f1;
+  color: #b42318;
+}
+
+.attachmentName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachmentMeta {
+  flex: none;
+  color: var(--ink-500);
+}
+
+.attachmentChipFailed .attachmentMeta {
+  color: #b42318;
+}
+
+.attachmentRemove {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: inherit;
+  background: transparent;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.attachmentRemove:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.attachmentError {
+  flex-basis: 100%;
+  margin: 0;
+  color: #b42318;
+  font-size: 12px;
+}
+
+.bubbleAttachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.bubbleAttachment {
+  display: inline-flex;
+  align-items: center;
+  max-width: 260px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.24);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bubbleAttachmentFailed {
+  background: rgba(0, 0, 0, 0.14);
+  opacity: 0.85;
 }
 
 .alert {
@@ -725,6 +852,13 @@
 }
 .send { border-radius: 11px; background: linear-gradient(145deg,var(--block-violet),#5136aa); }
 .composerHint { color: var(--ink-400); font-size: 10px; letter-spacing: .02em; }
+
+.composerDragging {
+  border-color: var(--violet-500);
+  border-style: dashed;
+  background: var(--violet-50);
+  box-shadow: 0 0 0 3px var(--focus-ring), var(--shadow-md);
+}
 
 @media (max-width: 760px) {
   .page {

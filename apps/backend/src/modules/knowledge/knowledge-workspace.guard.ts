@@ -8,7 +8,7 @@ export class KnowledgeWorkspaceGuard extends AuthGuard('jwt') {
   canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<Request>();
     const workspaceId = request.query?.workspaceId ?? request.body?.workspaceId;
-    if (isLocalDemoRequest(request, typeof workspaceId === 'string' ? workspaceId : undefined)) return true;
+    if (isLocalDemoRequest(request, typeof workspaceId === 'string' ? workspaceId : undefined)) {return true;}
     return super.canActivate(context);
   }
 }

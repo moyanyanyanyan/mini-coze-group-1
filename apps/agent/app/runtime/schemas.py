@@ -74,7 +74,7 @@ class RuntimeRequest(DTO):
     assistantMessageId: Identifier
     agentConfig: AgentConfig
     history: list[HistoryMessage] = Field(max_length=20)
-    message: str = Field(min_length=1, max_length=8000)
+    message: str = Field(min_length=1, max_length=20000)
 
     @model_validator(mode="after")
     def validate_history(self) -> Self:

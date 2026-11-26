@@ -67,7 +67,7 @@ export function validateAgainstSchema(
     for (const [key, childSchema] of Object.entries(s.properties)) {
       if (key in obj) {
         const childError = validateAgainstSchema(obj[key], childSchema, `${path}.${key}`);
-        if (childError) return childError;
+        if (childError) {return childError;}
       }
     }
   }

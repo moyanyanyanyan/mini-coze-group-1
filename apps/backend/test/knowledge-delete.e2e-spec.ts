@@ -11,12 +11,12 @@ describe('Knowledge deletion cascade (e2e)', () => {
   let knowledgeBaseId: string | undefined;
 
   afterAll(async () => {
-    if (knowledgeBaseId) await prisma.knowledgeBase.deleteMany({ where: { id: knowledgeBaseId } });
+    if (knowledgeBaseId) {await prisma.knowledgeBase.deleteMany({ where: { id: knowledgeBaseId } });}
     if (agentId) {
       await prisma.knowledgeBaseAgentBinding.deleteMany({ where: { agentId } });
       await prisma.agent.delete({ where: { id: agentId } });
     }
-    if (remainingBaseId) await prisma.knowledgeBase.deleteMany({ where: { id: remainingBaseId } });
+    if (remainingBaseId) {await prisma.knowledgeBase.deleteMany({ where: { id: remainingBaseId } });}
     await prisma.$disconnect();
   });
 
@@ -39,7 +39,7 @@ describe('Knowledge deletion cascade (e2e)', () => {
     };
 
     const first = await createIndexedDocument();
-    const documentService = new KnowledgeDocumentService(prisma as never, {} as never);
+    const documentService = new KnowledgeDocumentService(prisma as never, {} as never, {} as never);
     await documentService.remove(first.documentId, workspaceId);
     expect(await prisma.knowledgeDocument.count({ where: { id: first.documentId } })).toBe(0);
     expect(await prisma.knowledgeChunk.count({ where: { id: first.chunkId } })).toBe(0);
