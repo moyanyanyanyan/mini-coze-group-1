@@ -151,12 +151,18 @@ export class MessagesService {
         },
       });
 
-      // 首轮用第一句话当前 20 字当标题；
+      // 首轮仅在仍为默认标题时用第一句话前 20 字命名；
       // 非首轮只强制刷新 updatedAt，否则会话列表的排序不会动
-      await tx.conversation.update({
-        where: { id: conversationId },
-        data: isFirstTurn ? { title: content.slice(0, 20) } : { updatedAt: new Date() },
-      });
+      const titled = isFirstTurn ? await tx.conversation.updateMany({
+        where: { id: conversationId, title: '新对话' },
+        data: { title: content.slice(0, 20) },
+      }) : null;
+      if (!titled?.count) {
+        await tx.conversation.update({
+          where: { id: conversationId },
+          data: { updatedAt: new Date() },
+        });
+      }
 
       return {
         userMessage: this.toChatMessage(userMessage),

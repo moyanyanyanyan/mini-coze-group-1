@@ -34,7 +34,7 @@ function createHarness() {
   const prisma = {
     $transaction: (callback: (tx: unknown) => Promise<unknown>) => callback({
       message: { findFirst: jest.fn().mockResolvedValue(null), create },
-      conversation: { update: jest.fn().mockResolvedValue({}) },
+      conversation: { update: jest.fn().mockResolvedValue({}), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       messageAttachment: {
         findMany: attachmentFindMany,
         updateMany: attachmentUpdateMany,

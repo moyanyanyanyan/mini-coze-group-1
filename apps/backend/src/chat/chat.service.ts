@@ -559,12 +559,16 @@ export class ChatService {
         },
       });
 
-      await tx.conversation.update({
-        where: { id: input.conversationId },
-        data: isFirstTurn
-          ? { title: input.content.slice(0, 20) }
-          : { updatedAt: new Date() },
-      });
+      const titled = isFirstTurn ? await tx.conversation.updateMany({
+        where: { id: input.conversationId, title: '新对话' },
+        data: { title: input.content.slice(0, 20) },
+      }) : null;
+      if (!titled?.count) {
+        await tx.conversation.update({
+          where: { id: input.conversationId },
+          data: { updatedAt: new Date() },
+        });
+      }
 
       return { userMessage, assistantMessage, attachments };
     });

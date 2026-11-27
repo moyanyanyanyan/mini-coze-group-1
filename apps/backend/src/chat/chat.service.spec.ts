@@ -24,7 +24,7 @@ it.each([[0, 0], [5, 5], [100, 10]])('配置 %i 轮时只向 Runtime 发送最�
   const prisma = {
     $transaction: (callback: (tx: unknown) => Promise<unknown>) => callback({
       message: { findFirst: jest.fn().mockResolvedValue(null), create },
-      conversation: { update: jest.fn().mockResolvedValue({}) },
+      conversation: { update: jest.fn().mockResolvedValue({}), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
     }),
     message: { findMany, update },
   } as unknown as PrismaService;
