@@ -1,5 +1,41 @@
 -- 模型管理：服务商、模型配置，以及 Agent 的模型配置绑定
 
+-- 20261112120000_add_model_config created a legacy, global ModelConfig table.
+-- Keep its rows available for manual migration while freeing the name for the
+-- owner-scoped model management schema below.
+DO $$
+BEGIN
+    IF to_regclass('"ModelConfig"') IS NOT NULL
+       AND EXISTS (
+           SELECT 1
+           FROM information_schema.columns
+           WHERE table_schema = current_schema()
+             AND table_name = 'ModelConfig'
+             AND column_name = 'key'
+       )
+       AND NOT EXISTS (
+           SELECT 1
+           FROM information_schema.columns
+           WHERE table_schema = current_schema()
+             AND table_name = 'ModelConfig'
+             AND column_name = 'ownerId'
+       ) THEN
+        ALTER TABLE "ModelConfig" RENAME TO "LegacyModelConfig";
+
+        IF to_regclass('"ModelConfig_pkey"') IS NOT NULL THEN
+            ALTER TABLE "LegacyModelConfig"
+                RENAME CONSTRAINT "ModelConfig_pkey" TO "LegacyModelConfig_pkey";
+        END IF;
+        IF to_regclass('"ModelConfig_key_key"') IS NOT NULL THEN
+            ALTER INDEX "ModelConfig_key_key" RENAME TO "LegacyModelConfig_key_key";
+        END IF;
+        IF to_regclass('"ModelConfig_enabled_sortOrder_idx"') IS NOT NULL THEN
+            ALTER INDEX "ModelConfig_enabled_sortOrder_idx"
+                RENAME TO "LegacyModelConfig_enabled_sortOrder_idx";
+        END IF;
+    END IF;
+END $$;
+
 CREATE TYPE "ModelType" AS ENUM ('CHAT', 'EMBEDDING');
 
 CREATE TABLE "ModelProvider" (
