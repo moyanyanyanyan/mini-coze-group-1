@@ -12,13 +12,15 @@ describe('authentication views', () => {
     const html = renderToStaticMarkup(
       <LoginView email="test@example.com" password="" formError="登录失败"
         submitting onEmailChange={noop} onPasswordChange={noop} handleSubmit={noop}
-        handleGoogleLogin={noop} LinkComponent={Link} footerRoute="/custom-register" />,
+        handleGoogleLogin={noop} LinkComponent={Link} footerRoute="/custom-register" homeRoute="/" />,
     );
     expect(html).toContain('role="alert">登录失败');
     expect(html).toMatch(/type="submit" disabled="">登录中…/);
     expect(html).toContain('href="/custom-register"');
     expect(html).toContain('autoComplete="current-password"');
     expect(html).toContain('使用 Google 账号继续');
+    expect(html).toContain('返回首页');
+    expect(html).toContain('href="/"');
   });
 
   it('renders registration field errors separately from server errors', () => {

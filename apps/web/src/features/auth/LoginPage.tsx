@@ -57,6 +57,7 @@ export function LoginPage() {
       LinkComponent={AppLink}
       footerRoute="/register"
       handleGoogleLogin={handleGoogleLogin}
+      homeRoute="/"
     />
   );
 }

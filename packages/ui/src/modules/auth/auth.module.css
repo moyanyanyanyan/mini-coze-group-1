@@ -48,6 +48,80 @@
   opacity: .82;
 }
 
+/* 左上角：返回首页 + 品牌，竖向一组，不改变面板原先的上中下三段布局 */
+.panelTop {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 22px;
+}
+
+/* 「返回首页」：深色面板上的半透明胶囊，保持轻量、不抢品牌 */
+.homeLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px 7px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-pill);
+  color: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.07);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  backdrop-filter: blur(6px);
+  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
+}
+
+.homeLink:hover {
+  border-color: rgba(255, 255, 255, 0.34);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.homeLink:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.55);
+  outline-offset: 2px;
+}
+
+.homeIcon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+/* 移动端（隐藏左侧面板时）用的浅色版本 */
+.homeLinkMobile {
+  display: none;
+  align-self: flex-start;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px 8px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  color: var(--ink-700);
+  background: var(--surface-raised);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  box-shadow: var(--shadow-xs);
+  transition: color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.homeLinkMobile:hover {
+  border-color: var(--ink-400);
+  color: var(--ink-900);
+  box-shadow: var(--shadow-sm);
+}
+
+.homeLinkMobile:focus-visible {
+  outline: 2px solid var(--violet-300);
+  outline-offset: 2px;
+}
+
 .panelBrand {
   position: relative;
   display: flex;
@@ -336,8 +410,19 @@
     display: none;
   }
 
+  /* 面板隐藏后，返回首页入口回到表单区顶部；卡片仍尽量垂直居中 */
   .main {
-    padding: 32px 20px;
+    display: flex;
+    flex-direction: column;
+    padding: 24px 20px 32px;
+  }
+
+  .homeLinkMobile {
+    display: inline-flex;
+  }
+
+  .card {
+    margin: auto;
   }
 }
 
