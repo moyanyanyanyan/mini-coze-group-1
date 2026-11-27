@@ -635,6 +635,13 @@
   font-size: 12px;
 }
 
+.attachmentProgress {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--ink-500);
+  font-size: 12px;
+}
+
 .bubbleAttachments {
   display: flex;
   flex-wrap: wrap;

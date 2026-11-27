@@ -69,7 +69,9 @@ class RuntimeService:
                 if config.knowledgeBaseIds:
                     knowledge = await self.knowledge.get_context(KnowledgeRequest(
                         runId=request.runId, actorId=request.actor.id, agentId=config.id,
-                        knowledgeBaseIds=config.knowledgeBaseIds, query=request.message,
+                        knowledgeBaseIds=config.knowledgeBaseIds,
+                        # 旧调用方可能不传检索问题，回退时也要遵守知识库查询长度限制。
+                        query=request.retrievalQuery or request.message.strip()[:8000],
                     ))
                     if any(chunk.citation.knowledgeBaseId not in config.knowledgeBaseIds for chunk in knowledge.chunks):
                         raise ModelError("KNOWLEDGE_UNAVAILABLE", "检索返回了未绑定的知识库", 502)

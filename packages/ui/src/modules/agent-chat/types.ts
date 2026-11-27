@@ -8,6 +8,7 @@ export interface ChatAttachmentView {
   byteSize: number;
   status: ChatAttachmentStatus;
   errorCode?: string | null;
+  errorMessage?: string | null;
 }
 
 export type ComposerAttachment = ChatAttachmentView;

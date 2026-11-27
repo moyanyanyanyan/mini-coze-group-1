@@ -5,14 +5,29 @@ import {
   IsString,
   IsUUID,
   MaxLength,
-  MinLength,
+  Validate,
+  ValidatorConstraint,
+  type ValidationArguments,
+  type ValidatorConstraintInterface,
 } from 'class-validator';
 
+@ValidatorConstraint({ name: 'contentOrAttachment', async: false })
+class ContentOrAttachment implements ValidatorConstraintInterface {
+  validate(value: unknown, args: ValidationArguments): boolean {
+    const { attachmentIds } = args.object as SendMessageDto;
+    return typeof value === 'string'
+      && (value.trim().length > 0 || (Array.isArray(attachmentIds) && attachmentIds.length > 0));
+  }
+
+  defaultMessage(): string {
+    return '请输入消息或上传附件';
+  }
+}
+
 export class SendMessageDto {
-  // 非空用 MinLength(1) 而不是 IsNotEmpty：
-  // IsNotEmpty 会把纯空格也算通过，但这里纯空格确实不该放行
+  // 附件状态/归属由服务校验；类型和长度校验在附件存在时仍必须执行。
   @IsString()
-  @MinLength(1)
+  @Validate(ContentOrAttachment)
   // 上限随手定的：DeepSeek 单次输入远不止这点，
   // 但 MVP 阶段先卡住，避免有人一次贴进一整本书
   @MaxLength(4000)

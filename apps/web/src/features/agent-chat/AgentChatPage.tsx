@@ -81,10 +81,12 @@ export function AgentChatPage() {
 
   /** 切换会话后自增，用于丢弃旧会话的在途上传结果 */
   const uploadEpoch = useRef(0);
+  const uploadingRef = useRef(false);
 
   /** 切会话/切智能体/新建时，未发送的附件没有归属，直接丢掉 */
   const clearPendingAttachments = () => {
     uploadEpoch.current += 1;
+    uploadingRef.current = false;
     setPendingAttachments([]);
     setAttachmentError('');
     setAttaching(false);
@@ -142,7 +144,7 @@ export function AgentChatPage() {
   }, []);
 
   const handleAgentChange = async (agentId: string) => {
-    if (sendingRef.current || switching) return;
+    if (sendingRef.current || switching || uploadingRef.current) return;
     const request = ++requestId.current;
     setSwitching(true);
     setSendError('');
@@ -175,7 +177,7 @@ export function AgentChatPage() {
   };
 
   const handleConversationChange = async (conversation: ConversationSummary) => {
-    if (sendingRef.current || streamingId || (conversation.id === conversationId && !switching)) {
+    if (sendingRef.current || uploadingRef.current || streamingId || (conversation.id === conversationId && !switching)) {
       return;
     }
     setBootError('');
@@ -204,7 +206,7 @@ export function AgentChatPage() {
   };
 
   const handleNewConversation = async () => {
-    if (!selectedAgent || selectedAgent.status === 'ARCHIVED' || sendingRef.current || streamingId || switching) return;
+    if (!selectedAgent || selectedAgent.status === 'ARCHIVED' || sendingRef.current || uploadingRef.current || streamingId || switching) return;
     const request = ++requestId.current;
     setBootError('');
     setSendError('');
@@ -229,7 +231,7 @@ export function AgentChatPage() {
   };
 
   const handleDeleteConversation = async (conversation: ConversationSummary) => {
-    if (sendingRef.current || streamingId || switching) {
+    if (sendingRef.current || uploadingRef.current || streamingId || switching) {
       return;
     }
     if (!await confirm(`确定删除“${conversation.title || '新对话'}”吗？删除后无法恢复。`)) {
@@ -244,6 +246,7 @@ export function AgentChatPage() {
         if (fallback) {
           await handleConversationChange(fallback);
         } else {
+          clearPendingAttachments();
           const agentId = agents.find((agent) => agent.id === selectedAgentId && agent.status !== 'ARCHIVED')?.id
             ?? agents.find((agent) => agent.status !== 'ARCHIVED')?.id ?? '';
           setConversationId(null);
@@ -280,7 +283,8 @@ export function AgentChatPage() {
   }, [boot]);
 
   const handleSelectFiles = async (files: File[]) => {
-    if (!conversationId || files.length === 0) {
+    if (files.length === 0 || !selectedAgent || selectedAgent.status === 'ARCHIVED'
+      || switching || streamingId || sendingRef.current || uploadingRef.current) {
       return;
     }
     const room = MAX_ATTACHMENTS - pendingAttachments.length;
@@ -294,9 +298,19 @@ export function AgentChatPage() {
     }
     // 串行上传：一次一个请求，失败只影响当前文件
     const epoch = uploadEpoch.current;
-    const targetConversationId = conversationId;
+    uploadingRef.current = true;
     setAttaching(true);
     try {
+      let targetConversationId = conversationId;
+      if (!targetConversationId) {
+        const created = await createConversation(selectedAgent.id);
+        if (epoch !== uploadEpoch.current) return;
+        targetConversationId = created.id;
+        setConversationId(created.id);
+        setConversations((prev) => [created, ...prev]);
+        setTokenUsage({ conversationId: created.id, usedTokens: 0, source: 'estimated' });
+        rememberChatLocation(created.agentId, created.id);
+      }
       for (const file of files.slice(0, room)) {
         if (epoch !== uploadEpoch.current) {
           break;
@@ -307,6 +321,9 @@ export function AgentChatPage() {
             break;
           }
           setPendingAttachments((prev) => [...prev, uploaded]);
+          if (uploaded.status === 'FAILED') {
+            setAttachmentError(uploaded.errorMessage || `${file.name} 解析失败，请移除后重试`);
+          }
         } catch (caught) {
           if (epoch !== uploadEpoch.current) {
             break;
@@ -314,8 +331,13 @@ export function AgentChatPage() {
           setAttachmentError(caught instanceof ApiError ? caught.message : `${file.name} 上传失败`);
         }
       }
+    } catch (caught) {
+      if (epoch === uploadEpoch.current) {
+        setAttachmentError(caught instanceof Error ? caught.message : '创建会话失败，无法上传附件');
+      }
     } finally {
       if (epoch === uploadEpoch.current) {
+        uploadingRef.current = false;
         setAttaching(false);
       }
     }
@@ -330,7 +352,8 @@ export function AgentChatPage() {
     if (streamingId || sendingRef.current || switching || !selectedAgent || selectedAgent.status === 'ARCHIVED') {
       return;
     }
-    if (attaching) {
+    if (!content.trim() && pendingAttachments.length === 0) return;
+    if (attaching || uploadingRef.current) {
       setSendError('附件还在解析中，请稍候再发送');
       return;
     }
@@ -343,6 +366,7 @@ export function AgentChatPage() {
     // 本轮要绑定的附件；发送失败（HTTP 层）时恢复，便于重试
     const sendingAttachments = pendingAttachments;
     const attachmentIds = sendingAttachments.map((attachment) => attachment.id);
+    const retryHint = attachmentIds.length > 0 ? ' 如需重试，请重新上传附件。' : '';
     sendingRef.current = true;
     setPreparingMessage(true);
     setSendError('');
@@ -377,6 +401,7 @@ export function AgentChatPage() {
               byteSize: attachment.byteSize,
               status: 'READY' as const,
               errorCode: attachment.errorCode,
+              errorMessage: attachment.errorMessage,
             }))
           : undefined,
       },
@@ -510,7 +535,7 @@ export function AgentChatPage() {
             const rest = deltaBuffer.current;
             deltaBuffer.current = '';
             const id = targetIdRef.current;
-            setSendError(message);
+            setSendError(`${message}${retryHint}`);
             setMessages((prev) =>
               prev.map((item) =>
                 item.id === id ? { ...item, content: item.content + rest, status: 'failed' } : item,
@@ -529,7 +554,7 @@ export function AgentChatPage() {
         terminalStatus = 'cancelled';
       } else {
         terminalStatus = 'failed';
-        setSendError(caught instanceof ApiError ? caught.message : '发送失败，请稍后再试');
+        setSendError(caught instanceof ApiError ? caught.message : `发送失败，请稍后再试。${retryHint}`);
         // 只有请求在 SSE 建立前就被拒（400/413…）时附件仍未绑定，才值得恢复
         if (caught instanceof ApiError) {
           setPendingAttachments(sendingAttachments);
@@ -554,7 +579,7 @@ export function AgentChatPage() {
           return { ...item, content: nextContent, status: nextStatus };
         }),
       );
-      if (!terminalStatus) setSendError('连接中断，请重试发送');
+      if (!terminalStatus) setSendError(`连接中断，请重试发送。${retryHint}`);
       abortRef.current = null;
       targetIdRef.current = null;
       setStreamingId(null);

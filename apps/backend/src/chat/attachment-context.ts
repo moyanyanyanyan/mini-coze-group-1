@@ -28,6 +28,14 @@ export interface AttachmentContextInput {
   extractedText: string | null;
 }
 
+/** 知识库查询最多 8000 个字符，和发给模型的消息长度分开限制。 */
+export function buildRetrievalQuery(content: string, attachments: AttachmentContextInput[]): string {
+  const query = content.trim()
+    || attachments.map((attachment) => (attachment.extractedText ?? '').trim()).filter(Boolean).join('\n\n')
+    || '请分析上传的附件';
+  return sliceChars(query, 8000);
+}
+
 export interface HistoryAttachmentInput {
   fileName: string;
   sourceType: string;

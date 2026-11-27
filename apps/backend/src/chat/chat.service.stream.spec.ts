@@ -31,10 +31,11 @@ function createHarness() {
   const update = jest.fn().mockResolvedValue({});
   const attachmentFindMany = jest.fn().mockResolvedValue([]);
   const attachmentUpdateMany = jest.fn().mockResolvedValue({ count: 0 });
+  const titleUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
   const prisma = {
     $transaction: (callback: (tx: unknown) => Promise<unknown>) => callback({
       message: { findFirst: jest.fn().mockResolvedValue(null), create },
-      conversation: { update: jest.fn().mockResolvedValue({}), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      conversation: { update: jest.fn().mockResolvedValue({}), updateMany: titleUpdateMany },
       messageAttachment: {
         findMany: attachmentFindMany,
         updateMany: attachmentUpdateMany,
@@ -69,6 +70,7 @@ function createHarness() {
     create,
     attachmentFindMany,
     attachmentUpdateMany,
+    titleUpdateMany,
   };
 }
 
@@ -92,12 +94,13 @@ async function collect(
   service: ChatService,
   agentSnapshot = true,
   attachmentIds?: string[],
+  content = '问题',
 ) {
   const events: RuntimeSseEvent[] = [];
   for await (const item of service.run({
     conversationId: 'conversation-1',
     userId: 'owner-1',
-    content: '问题',
+    content,
     attachmentIds,
     signal: new AbortController().signal,
     agentId: agentSnapshot ? 'agent-1' : undefined,
@@ -380,7 +383,7 @@ describe('ChatService stream persistence', () => {
     errorSpy.mockRestore();
   });
 
-  it('injects attachment text into this turn but stores the raw content', async () => {
+  it.each(['问题', '', '  '])('injects attachment text while preserving raw content %j', async (content) => {
     const harness = createHarness();
     harness.attachmentFindMany.mockResolvedValue([
       {
@@ -388,7 +391,7 @@ describe('ChatService stream persistence', () => {
         fileName: '季度报表.xlsx',
         sourceType: 'XLSX',
         status: 'READY',
-        extractedText: '资产编号 ZC-001',
+        extractedText: '资产编号 ZC-001\n' + 'A'.repeat(9000),
       },
     ]);
     harness.attachmentUpdateMany.mockResolvedValue({ count: 1 });
@@ -409,7 +412,7 @@ describe('ChatService stream persistence', () => {
       });
     });
 
-    await collect(harness.service, true, ['attachment-1']);
+    await collect(harness.service, true, ['attachment-1'], content);
 
     expect(harness.attachmentUpdateMany).toHaveBeenCalledWith({
       where: {
@@ -421,9 +424,20 @@ describe('ChatService stream persistence', () => {
     });
     expect(request?.message).toContain('不可信资料');
     expect(request?.message).toContain('ZC-001');
+    expect(request?.message.length).toBeGreaterThan(8000);
+    if (content.trim()) {
+      expect(request?.retrievalQuery).toBe(content);
+    } else {
+      expect(request?.retrievalQuery).toContain('ZC-001');
+      expect(Array.from(request!.retrievalQuery!)).toHaveLength(8000);
+    }
+    expect(harness.titleUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'conversation-1', title: '新对话' },
+      data: { title: content.trim() || '季度报表.xlsx' },
+    });
     // 数据库只存用户原文，附件正文留在 MessageAttachment
     expect(harness.create).toHaveBeenNthCalledWith(1, {
-      data: expect.objectContaining({ content: '问题', role: 'user' }),
+      data: expect.objectContaining({ content, role: 'user' }),
     });
   });
 

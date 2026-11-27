@@ -102,39 +102,40 @@ export function AgentChatView({
           <button
             type="button"
             className={styles.newConversation}
-            disabled={!agents.some((agent) => agent.id === selectedAgentId && agent.status !== 'ARCHIVED') || streamingId !== null || switching}
+            disabled={!agents.some((agent) => agent.id === selectedAgentId && agent.status !== 'ARCHIVED') || streamingId !== null || switching || attaching}
             onClick={() => void handleNewConversation()}
           >
             <Icon name="plus" /> 新建对话
           </button>
         <ConversationHistory conversations={conversations} agents={agents} conversationId={conversationId}
-          disabled={switching || streamingId !== null} onSelect={handleConversationChange}
+          disabled={switching || attaching || streamingId !== null} onSelect={handleConversationChange}
           onDelete={handleDeleteConversation} onRename={handleRenameConversation} />
       </aside>
 
       <div className={styles.chatMain}>
         <header className={styles.header}>
           <button className={styles.panelToggle} aria-label="历史对话" title="历史对话" aria-expanded={conversationsOpen} onClick={() => setConversationsOpen(!conversationsOpen)}><Icon name="panel" /></button>
-          <AgentSwitcher agents={agents} value={selectedAgentId} disabled={streamingId !== null || switching}
+          <AgentSwitcher agents={agents} value={selectedAgentId} disabled={streamingId !== null || switching || attaching}
             fallbackName={fallbackAgentName} onChange={(id) => void handleAgentChange(id)} />
           {(switching || streamingId) && <span className={styles.activity} role="status">{generationPhase === 'connecting' ? '正在连接…' : generationPhase === 'thinking' ? '正在思考…' : generationPhase === 'generating' ? '正在生成…' : '正在加载…'}</span>}
         </header>
 
         <div className={styles.streamFrame}>
           <nav className={styles.turnRail} aria-label="本轮对话提问">
-            {userPrompts.map((message, index) => (
-              <button key={message.id} type="button"
+            {userPrompts.map((message, index) => {
+              const promptLabel = message.content.trim() || message.attachments?.map((attachment) => attachment.fileName).join('、') || '附件';
+              return <button key={message.id} type="button"
                 ref={(element) => {
                   if (element) promptMarkRefs.current.set(message.id, element);
                   else promptMarkRefs.current.delete(message.id);
                 }}
                 className={`${styles.turnMark}${activePromptId === message.id ? ` ${styles.turnMarkActive}` : ''}`}
-                title={`第 ${index + 1} 轮：${message.content}`}
-                aria-label={`跳转到第 ${index + 1} 轮提问：${message.content}`}
+                title={`第 ${index + 1} 轮：${promptLabel}`}
+                aria-label={`跳转到第 ${index + 1} 轮提问：${promptLabel}`}
                 aria-current={activePromptId === message.id ? 'location' : undefined}
                 onClick={() => promptRefs.current.get(message.id)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-              />
-            ))}
+              />;
+            })}
           </nav>
         <div className={styles.stream} ref={streamRef} onScroll={() => { onScroll(); updateTurnRail(); }}>
         {bootError && agents.length === 0 ? (
@@ -184,7 +185,7 @@ export function AgentChatView({
             <ChatBubble message={message} agentName={selectedAgent?.name} avatarUrl={selectedAgent?.avatarUrl}
               active={message.id === streamingId}
               phase={message.id === streamingId ? generationPhase ?? undefined : undefined}
-              onRetry={(message.status === 'failed' || ((message.status === 'running' || message.status === 'pending') && message.id !== streamingId)) && messages[index - 1]?.role === 'user' && !switching && !streamingId
+              onRetry={(message.status === 'failed' || ((message.status === 'running' || message.status === 'pending') && message.id !== streamingId)) && messages[index - 1]?.role === 'user' && !messages[index - 1].attachments?.length && pendingAttachments.length === 0 && !attaching && !switching && !streamingId
                 ? () => handleSend(messages[index - 1].content) : undefined}
             />
             {citationsByMessage[message.id]?.length ? (

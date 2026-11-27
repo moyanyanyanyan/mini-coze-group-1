@@ -51,12 +51,12 @@ export function MessageComposer({
 
   // 附件没解析完/解析失败时不允许发送，避免把「半个附件」带进上下文
   const hasBlockingAttachment = attachments.some((attachment) => attachment.status !== 'READY');
-  const canSend = !disabled && !uploading && !hasBlockingAttachment && draft.trim().length > 0;
+  const canSend = !disabled && !uploading && !hasBlockingAttachment && (draft.trim().length > 0 || attachments.length > 0);
 
   const send = () => {
     const content = draft.trim();
-    // 纯空格不算一条消息，直接吃掉
-    if (!content || !canSend) {
+    // 没有文字时仍可发送已解析完成的附件。
+    if (!canSend) {
       return;
     }
     onSend(content);
@@ -80,14 +80,14 @@ export function MessageComposer({
     const files = Array.from(event.target.files ?? []);
     // 清空 value，下一次选同一个文件才会再次触发 change
     event.target.value = '';
-    if (files.length > 0) {
+    if (!disabled && !streaming && !uploading && files.length > 0) {
       onSelectFiles?.(files);
     }
   };
 
   const handleDragOver = (event: DragEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setDragActive(true);
+    if (!disabled && !streaming && !uploading) setDragActive(true);
   };
 
   const handleDragLeave = () => {
@@ -98,7 +98,7 @@ export function MessageComposer({
     event.preventDefault();
     setDragActive(false);
     const files = Array.from(event.dataTransfer.files ?? []);
-    if (files.length > 0) {
+    if (!disabled && !streaming && !uploading && files.length > 0) {
       onSelectFiles?.(files);
     }
   };
@@ -108,7 +108,7 @@ export function MessageComposer({
     const files = Array.from(event.clipboardData.files ?? []);
     if (files.length > 0) {
       event.preventDefault();
-      onSelectFiles?.(files);
+      if (!disabled && !streaming && !uploading) onSelectFiles?.(files);
     }
   };
 
@@ -153,7 +153,7 @@ export function MessageComposer({
             >
               <span className={styles.attachmentName} title={attachment.fileName}>{attachment.fileName}</span>
               <span className={styles.attachmentMeta}>
-                {attachment.status === 'PARSING' ? '解析中' : attachment.status === 'FAILED' ? '解析失败' : formatFileSize(attachment.byteSize)}
+                {attachment.status === 'PARSING' ? '解析中' : attachment.status === 'FAILED' ? attachment.errorMessage || '解析失败' : formatFileSize(attachment.byteSize)}
               </span>
               {onRemoveAttachment && (
                 <button
@@ -169,6 +169,7 @@ export function MessageComposer({
           ))}
         </div>
       )}
+      {uploading ? <p className={styles.attachmentProgress} role="status">附件上传并解析中…</p> : null}
       {attachmentError ? <p className={styles.attachmentError} role="alert">{attachmentError}</p> : null}
       <input
         ref={fileRef}

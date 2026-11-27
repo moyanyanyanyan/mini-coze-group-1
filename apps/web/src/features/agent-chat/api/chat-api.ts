@@ -34,6 +34,7 @@ export interface PendingAttachment {
   byteSize: number;
   status: 'PARSING' | 'READY' | 'FAILED';
   errorCode?: string | null;
+  errorMessage?: string | null;
 }
 
 interface AttachmentUploadResult {

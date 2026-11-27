@@ -23,6 +23,10 @@ class RetrievalHit(DTO):
     content: str = Field(min_length=1)
     score: float = Field(allow_inf_nan=False)
     position: dict[str, JsonValue] | None = None
+    # 后端检索响应会带原文偏移和 Office 来源范围，保留它们以兼容真实响应。
+    startOffset: int | None = None
+    endOffset: int | None = None
+    sourceRanges: dict[str, JsonValue] | None = None
 
 
 class RetrievalResult(DTO):

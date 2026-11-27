@@ -80,6 +80,7 @@ export class MessagesService {
     // 不然网络一断就留下「问了但没答」的半截对话
     return this.prisma.$transaction(async (tx) => {
       const uniqueAttachmentIds = Array.from(new Set(attachmentIds ?? []));
+      let firstAttachmentName: string | undefined;
       if (uniqueAttachmentIds.length > 0) {
         const attachments = await tx.messageAttachment.findMany({
           where: {
@@ -87,7 +88,7 @@ export class MessagesService {
             conversationId,
             messageId: null,
           },
-          select: { id: true, status: true },
+          select: { id: true, status: true, fileName: true },
         });
         if (attachments.length !== uniqueAttachmentIds.length) {
           throw new HttpException(
@@ -101,6 +102,7 @@ export class MessagesService {
             HttpStatus.BAD_REQUEST,
           );
         }
+        firstAttachmentName = attachments.find((attachment) => attachment.id === uniqueAttachmentIds[0])?.fileName;
       }
 
       // 读取上一条消息
@@ -155,7 +157,7 @@ export class MessagesService {
       // 非首轮只强制刷新 updatedAt，否则会话列表的排序不会动
       const titled = isFirstTurn ? await tx.conversation.updateMany({
         where: { id: conversationId, title: '新对话' },
-        data: { title: content.slice(0, 20) },
+        data: { title: (content.trim() || firstAttachmentName || '新对话').slice(0, 20) },
       }) : null;
       if (!titled?.count) {
         await tx.conversation.update({
