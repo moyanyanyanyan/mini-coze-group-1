@@ -31,6 +31,16 @@ function responses(rows = [run], summary = stats) {
 const Link = ({ to, children }: { to: string; children?: React.ReactNode }) => <a href={to}>{children}</a>;
 beforeEach(() => vi.resetAllMocks());
 describe('原运行页面内接入采集数据', () => {
+  it('已完成的新聊天进入最新运行，并点亮当天 Token 格子', async () => {
+    responses([{ ...run, question: '累累', totalTokens: 2793, inputTokens: 2000, outputTokens: 793 }]);
+    const data = await loadOperations('/workspace/operations', '', 'owner');
+    const html = renderToStaticMarkup(<OperationsView data={data} pathname="/workspace/operations" search="" LinkComponent={Link} />);
+    const today = new Date(now);
+    const key = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    expect(html).toContain('>累累</a>');
+    expect(html).toContain(`class="om-token-day" data-level="4" aria-label="${key}：2,793 Token"`);
+    expect(html).toContain(`?run=${run.id}`);
+  });
   it('仅展示四类已采集阶段和多轮模型，保留零值', async () => {
     responses();
     const path = conversationPath(run.agentId, run.conversationId);

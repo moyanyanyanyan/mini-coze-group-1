@@ -57,14 +57,15 @@ function OperationsController({ pathname, search }: { pathname: string; search: 
         pending = false;
         if (active) {
           setLoading(false);
-          if (polling && !document.hidden) timer = setTimeout(() => void refresh(), 5000);
+          if (!document.hidden) timer = setTimeout(() => void refresh(), polling ? 5000 : 30_000);
         }
       }
     }
     void refresh();
-    const visibility = () => { clearTimeout(timer); if (!document.hidden && polling) void refresh(); };
+    const visibility = () => { clearTimeout(timer); if (!document.hidden) void refresh(); };
     document.addEventListener('visibilitychange', visibility);
-    return () => { active = false; clearTimeout(timer); document.removeEventListener('visibilitychange', visibility); };
+    window.addEventListener('focus', visibility);
+    return () => { active = false; clearTimeout(timer); document.removeEventListener('visibilitychange', visibility); window.removeEventListener('focus', visibility); };
   }, [pathname, search, attempt, runPages]);
   useLayoutEffect(() => {
     if (!data || restored.current) return;
