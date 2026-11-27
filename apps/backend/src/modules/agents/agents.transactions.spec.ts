@@ -5,7 +5,7 @@ import { AgentsService } from './agents.service';
 function setup(status = 'ACTIVE') {
   const agent = {
     id: 'agent-1', ownerId: 'user-1', workspaceId: 'workspace-1', status, name: 'Agent',
-    systemPrompt: '', model: 'deepseek-chat', temperature: 0.7, maxTokens: 1024,
+    systemPrompt: '', model: 'deepseek-chat', modelConfigId: 'model-config-1', temperature: 0.7, maxTokens: 1024,
     createdAt: new Date(), updatedAt: new Date(), currentVersionId: 'version-1',
     pluginBindings: [{ id: 'binding-1', pluginId: 'plugin_echo', enabled: true, autoInvoke: false, sortOrder: 7, config: { legacy: 'keep' } }],
     knowledgeBaseBindings: [], workflowBindings: [],
@@ -44,7 +44,7 @@ function setup(status = 'ACTIVE') {
   const prisma = { $transaction: jest.fn(async (operation: (client: typeof tx) => Promise<unknown>) => operation(tx)) };
   const service = new AgentsService(prisma as never, {} as never, {
     findByIds: jest.fn(async (ids: string[]) => ids.map((pluginId) => ({ pluginId }))),
-  } as never);
+  } as never, {} as never);
   return { service, prisma, tx, agent };
 }
 
@@ -60,7 +60,12 @@ it('绑定、快照和当前版本指针均在持锁的同一事务内写入', a
   expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(tx.agent.findUnique.mock.invocationCallOrder[0]);
   expect(tx.agentPluginBinding.upsert.mock.invocationCallOrder[0]).toBeLessThan(tx.agentVersion.create.mock.invocationCallOrder[0]);
   expect(tx.agentVersion.create).toHaveBeenCalledWith({ data: expect.objectContaining({
-    version: 2, snapshot: expect.objectContaining({ pluginIds: [], revision: 2 }),
+    version: 2,
+    snapshot: expect.objectContaining({
+      pluginIds: [],
+      revision: 2,
+      modelConfigId: 'model-config-1',
+    }),
   }) });
   expect(tx.agent.update).toHaveBeenCalledWith({ where: { id: 'agent-1' }, data: { currentVersionId: 'version-2' } });
   expect(result).toEqual([expect.objectContaining({ pluginId: 'plugin_echo', enabled: false })]);
@@ -102,9 +107,9 @@ it('无权限时不修改绑定', async () => {
 
 it.each(['update', 'knowledge', 'workflow'] as const)('共享快照调用方 %s 同样在事务内持锁', async (operation) => {
   const { service, prisma, tx } = setup();
-  if (operation === 'update') await service.update('agent-1', { name: 'Changed' }, user);
-  if (operation === 'knowledge') await service.replaceKnowledgeBindings('agent-1', { bindings: [] }, user);
-  if (operation === 'workflow') await service.replaceWorkflowBindings('agent-1', { bindings: [] }, user);
+  if (operation === 'update') {await service.update('agent-1', { name: 'Changed' }, user);}
+  if (operation === 'knowledge') {await service.replaceKnowledgeBindings('agent-1', { bindings: [] }, user);}
+  if (operation === 'workflow') {await service.replaceWorkflowBindings('agent-1', { bindings: [] }, user);}
   expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
   expect(tx.agentVersion.create).toHaveBeenCalledTimes(1);

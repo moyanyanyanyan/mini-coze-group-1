@@ -20,7 +20,7 @@ export class HttpKnowledgeCatalog implements KnowledgeCatalogPort, OnModuleInit 
   }
 
   async findByIds(ids: string[]): Promise<KnowledgeCatalogItem[]> {
-    if (ids.length === 0) return [];
+    if (ids.length === 0) {return [];}
     const url = `${this.baseUrl}/knowledge-bases/by-ids?ids=${encodeURIComponent(ids.join(','))}`;
     const resp = await fetch(url);
     if (!resp.ok) {

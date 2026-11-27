@@ -17,6 +17,7 @@ const plan: PublicStreamPlan = {
     name: 'Agent',
     systemPrompt: '',
     model: 'model',
+    modelConfigId: 'model-config-1',
     temperature: 0.7,
     maxTokens: 1024,
     knowledgeBaseIds: [],
@@ -162,7 +163,7 @@ describe('PublicApiController stream cleanup', () => {
       firstWritten = resolve;
     });
     const response = new FakeResponse(undefined, (chunk) => {
-      if (chunk.includes('event: run.started')) firstWritten();
+      if (chunk.includes('event: run.started')) {firstWritten();}
     });
 
     const pending = controllerWith(service).stream(

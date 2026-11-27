@@ -13,9 +13,9 @@ export class KnowledgePreviewController {
   async chunks(@Req() request: Request, @Param('id') id: string, @Param('documentId') documentId: string,
     @Query('workspaceId') workspaceId: string, @Query('page') rawPage?: string) {
     workspaceId = resolveKnowledgeWorkspace(request, workspaceId);
-    if (rawPage !== undefined && !/^[1-9]\d*$/.test(rawPage)) throw new BadRequestException('page 必须为正整数');
+    if (rawPage !== undefined && !/^[1-9]\d*$/.test(rawPage)) {throw new BadRequestException('page 必须为正整数');}
     const page = rawPage ? Number(rawPage) : 1;
-    if (!Number.isSafeInteger(page)) throw new BadRequestException('page 超出范围');
+    if (!Number.isSafeInteger(page)) {throw new BadRequestException('page 超出范围');}
     return { code: 200, message: 'ok', data: await this.preview.listChunks(id, documentId, workspaceId, page) };
   }
 

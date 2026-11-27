@@ -36,6 +36,7 @@ it('checks readiness before acquiring a lock or opening SSE', async () => {
 it('reports a readiness race after SSE opens and releases the lock', async () => {
   const chat = {
     assertReady: jest.fn().mockResolvedValue(undefined), acquire: jest.fn(), release: jest.fn(),
+    assertAttachments: jest.fn().mockResolvedValue(undefined),
     run: async function* () { throw new ServiceUnavailableException({ code: 'SERVICE_NOT_READY' }); yield undefined as never; },
   };
   const conversations = { assertOwned: jest.fn().mockResolvedValue({ agentId: 'agent' }) };
@@ -46,6 +47,25 @@ it('reports a readiness race after SSE opens and releases the lock', async () =>
   expect(response.write).toHaveBeenLastCalledWith(expect.stringContaining('SERVICE_NOT_READY'));
   expect(chat.release).toHaveBeenCalledWith('conversation');
   expect(response.end).toHaveBeenCalled();
+});
+
+it('rejects invalid attachments before locking or opening SSE', async () => {
+  const failure = new ServiceUnavailableException({ code: 'ATTACHMENT_NOT_READY' });
+  const chat = {
+    assertReady: jest.fn().mockResolvedValue(undefined),
+    assertAttachments: jest.fn().mockRejectedValue(failure),
+    acquire: jest.fn(),
+  };
+  const controller = new ChatController(chat as never,
+    { assertOwned: jest.fn().mockResolvedValue({ agentId: 'agent' }) } as never,
+    { getAgentConfig: jest.fn().mockResolvedValue({}) } as never);
+  const response = { writeHead: jest.fn() };
+  await expect(controller.stream('conversation', { content: 'hello', attachmentIds: ['attachment'] },
+    { id: 'user' } as never, response as never)).rejects.toBe(failure);
+  expect(chat.assertReady).toHaveBeenCalled();
+  expect(chat.assertAttachments).toHaveBeenCalledWith('conversation', ['attachment']);
+  expect(chat.acquire).not.toHaveBeenCalled();
+  expect(response.writeHead).not.toHaveBeenCalled();
 });
 
 

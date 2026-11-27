@@ -7,7 +7,9 @@ import { HealthModule } from './health/health.module';
 import { AgentsModule } from './modules/agents/agents.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ConversationsModule } from './modules/conversations/conversations.module';
+import { AttachmentsModule } from './modules/attachments/attachments.module';
 import { KnowledgeModule } from './modules/knowledge/knowledge.module';
+import { ModelManagementModule } from './modules/model-configs/model-management.module';
 import { PluginsModule } from './modules/plugins/plugins.module';
 import { PublishingModule } from './modules/publishing/publishing.module';
 import { UsersModule } from './modules/users/users.module';
@@ -29,11 +31,13 @@ import { OperationsModule } from './modules/operations/operations.module';
     HealthModule,
     AuthModule,
     UsersModule,
+    ModelManagementModule,
     AgentsModule,
     ApiKeysModule,
     PublicApiModule,
     OperationsModule,
     ConversationsModule,
+    AttachmentsModule,
     KnowledgeModule,
     ChatModule,
     PluginsModule,

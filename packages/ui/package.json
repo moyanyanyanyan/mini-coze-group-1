@@ -11,6 +11,7 @@
     "./workflow-editor": "./src/modules/workflow-editor/index.ts",
     "./agent-chat": "./src/modules/agent-chat/index.ts",
     "./knowledge": "./src/modules/knowledge/index.ts",
+    "./model-management": "./src/modules/model-management/index.ts",
     "./plugins": "./src/modules/plugins/index.ts",
     "./agent-builder": "./src/modules/agent-builder/index.ts",
     "./auth": "./src/modules/auth/index.ts",

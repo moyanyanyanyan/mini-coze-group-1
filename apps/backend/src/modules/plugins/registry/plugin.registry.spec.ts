@@ -152,6 +152,11 @@ describe('PluginRegistry', () => {
         tags: row.tags,
         configSchema: row.configSchema,
         tools: row.tools,
+        kind: 'builtin',
+        authType: 'none',
+        endpoint: null,
+        connectionStatus: 'connected',
+        lastError: null,
       })),
     );
     expect(registry.listToolsByPluginIds([selected.catalog.pluginId])).toEqual(
@@ -208,7 +213,7 @@ describe('插件同步与运行时状态', () => {
       where: { kind: 'builtin', pluginId: { notIn: BUILTIN_PLUGINS.map(({ catalog }) => catalog.pluginId) } },
       data: { enabled: false },
     });
-    for (const [args] of prisma.plugin.upsert.mock.calls) expect(args.update).not.toHaveProperty('enabled');
+    for (const [args] of prisma.plugin.upsert.mock.calls) {expect(args.update).not.toHaveProperty('enabled');}
     expect(prisma.$transaction).toHaveBeenCalledTimes(2);
     expect(prisma.tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(prisma.plugin.findMany.mock.invocationCallOrder[0]);
   });

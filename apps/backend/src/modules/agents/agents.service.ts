@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { Prisma } from '@prisma/client';
+import { ErrorCode } from '../../common/errors/error-codes';
 import { AgentStatus } from './types';
 import {
   toAgentDetail,
@@ -25,7 +26,8 @@ import {
   KnowledgeCatalogPort,
 } from './ports/knowledge-catalog.port';
 import { PLUGIN_CATALOG_PORT, PluginCatalogPort } from './ports/plugin-catalog.port';
-import type { CurrentUserPayload, PublicAgentConfig } from './types';
+import type { CurrentUserPayload, PublicAgentConfig, RuntimeAgentConfig } from './types';
+import { ModelConfigsService } from '../model-configs/model-configs.service';
 
 @Injectable()
 export class AgentsService {
@@ -33,9 +35,12 @@ export class AgentsService {
     private readonly prisma: PrismaService,
     @Inject(KNOWLEDGE_CATALOG_PORT) private readonly knowledgeCatalog: KnowledgeCatalogPort,
     @Inject(PLUGIN_CATALOG_PORT) private readonly pluginCatalog: PluginCatalogPort,
+    private readonly modelConfigs: ModelConfigsService,
   ) {}
 
   async create(dto: CreateAgentDto, user: CurrentUserPayload) {
+    // 模型管理统一维护调用地址与 Key，新建必须绑定模型配置。
+    const boundConfig = await this.modelConfigs.resolveForBinding(user.id, dto.modelConfigId);
     const agent = await this.prisma.agent.create({
       data: {
         ownerId: user.id,
@@ -44,7 +49,8 @@ export class AgentsService {
         description: dto.description,
         avatarUrl: dto.avatarUrl,
         systemPrompt: dto.systemPrompt ?? '',
-        model: dto.model ?? process.env.DEEPSEEK_MODEL ?? 'deepseek-ai/DeepSeek-V4.1-Flash',
+        model: boundConfig.modelIdentifier,
+        modelConfigId: boundConfig.id,
         temperature: dto.temperature ?? 0.7,
         maxTokens: dto.maxTokens ?? 4096,
         contextLimit: dto.contextLimit ?? 20,
@@ -109,9 +115,9 @@ export class AgentsService {
         workflowBindings: true,
       },
     });
-    if (!agent) throw new NotFoundException('Agent 不存在');
-    if (agent.status === 'ARCHIVED') throw new NotFoundException('Agent 已归档');
-    if (agent.ownerId !== user.id) throw new ForbiddenException('无权访问此 Agent');
+    if (!agent) {throw new NotFoundException('Agent 不存在');}
+    if (agent.status === 'ARCHIVED') {throw new NotFoundException('Agent 已归档');}
+    if (agent.ownerId !== user.id) {throw new ForbiddenException('无权访问此 Agent');}
     return toAgentDetail(agent);
   }
 
@@ -124,10 +130,17 @@ export class AgentsService {
         workflowBindings: true,
       },
     });
-    if (!agent) throw new NotFoundException('Agent 不存在');
-    if (agent.status === 'ARCHIVED') throw new NotFoundException('Agent 已归档');
-    if (agent.ownerId !== userId) throw new ForbiddenException('无权访问此 Agent');
-    return buildAgentConfig(toAgentDetail(agent));
+    if (!agent) {throw new NotFoundException('Agent 不存在');}
+    if (agent.status === 'ARCHIVED') {throw new NotFoundException('Agent 已归档');}
+    if (agent.ownerId !== userId) {throw new ForbiddenException('无权访问此 Agent');}
+    if (!agent.modelConfigId) {
+      throw new BadRequestException({
+        code: ErrorCode.MODEL_NOT_BOUND,
+        message: 'Agent 未绑定模型配置，请先在「模型管理」中绑定后再运行',
+      });
+    }
+    const config = buildAgentConfig(toAgentDetail(agent));
+    return this.attachModelConnection(config, agent.ownerId, agent.modelConfigId);
   }
 
   async getPublicAgent(agentId: string): Promise<PublicAgentConfig> {
@@ -139,11 +152,12 @@ export class AgentsService {
         status: true,
         currentVersionId: true,
         contextLimit: true,
+        modelConfigId: true,
       },
     });
 
-    if (!agent) throw new NotFoundException('Agent 不存在');
-    if (agent.status === 'DRAFT') throw new ForbiddenException('Agent 尚未发布');
+    if (!agent) {throw new NotFoundException('Agent 不存在');}
+    if (agent.status === 'DRAFT') {throw new ForbiddenException('Agent 尚未发布');}
     if (agent.status === 'ARCHIVED') {
       throw new ForbiddenException('Agent 已归档，暂不可调用');
     }
@@ -186,11 +200,18 @@ export class AgentsService {
       agentId: agent.id,
       ownerId: agent.ownerId,
       status: agent.status,
-      config,
+      config: await this.attachModelConnection(
+        config,
+        agent.ownerId,
+        config.modelConfigId,
+      ),
     };
   }
 
   async update(agentId: string, dto: UpdateAgentDto, user: CurrentUserPayload) {
+    const boundConfig = dto.modelConfigId
+      ? await this.modelConfigs.resolveForBinding(user.id, dto.modelConfigId)
+      : null;
     return this.withAgentTransaction(agentId, async (tx) => {
       const existing = await this.assertAgentWritable(agentId, user.id, tx);
 
@@ -201,7 +222,7 @@ export class AgentsService {
         dto.status !== undefined ||
         dto.name !== undefined ||
         dto.systemPrompt !== undefined ||
-        dto.model !== undefined ||
+        dto.modelConfigId !== undefined ||
         dto.temperature !== undefined ||
         dto.maxTokens !== undefined ||
         dto.contextLimit !== undefined ||
@@ -218,7 +239,7 @@ export class AgentsService {
           description: dto.description,
           avatarUrl: dto.avatarUrl,
           systemPrompt: dto.systemPrompt,
-          model: dto.model,
+          ...(boundConfig ? { model: boundConfig.modelIdentifier, modelConfigId: boundConfig.id } : {}),
           temperature: dto.temperature,
           maxTokens: dto.maxTokens,
           contextLimit: dto.contextLimit,
@@ -231,12 +252,37 @@ export class AgentsService {
         },
       });
 
+      let configVersion: number | undefined;
       if (becomingActive || stayingActiveWithChanges) {
-        await this.takeSnapshot(agentId, tx);
+        const snapshot = await this.takeSnapshot(agentId, tx);
+        if (snapshot.version > 0) {configVersion = snapshot.version;}
       }
 
-      return toAgentDetail(agent);
+      return {
+        ...toAgentDetail(agent),
+        configVersion,
+        published: agent.status === 'ACTIVE',
+      };
     });
+  }
+
+  /** 运行时把模型配置解析为连接信息；Key 只进入内存请求体。 */
+  private async attachModelConnection(
+    config: RuntimeAgentConfig,
+    ownerId: string,
+    modelConfigId: string,
+  ): Promise<RuntimeAgentConfig> {
+    const connection = await this.modelConfigs.resolveConnection(ownerId, modelConfigId);
+    return {
+      ...config,
+      model: connection.model,
+      connection: {
+        protocol: connection.protocol,
+        model: connection.model,
+        baseUrl: connection.baseUrl,
+        apiKey: connection.apiKey,
+      },
+    };
   }
 
   async remove(agentId: string, user: CurrentUserPayload) {
@@ -259,13 +305,13 @@ export class AgentsService {
   async replacePluginBindings(agentId: string, dto: ReplacePluginBindingsDto, user: CurrentUserPayload) {
     if (dto.bindings.some((binding) =>
       binding.autoInvoke !== undefined || binding.sortOrder !== undefined || binding.config !== undefined,
-    )) throw new BadRequestException('MVP 不支持设置 autoInvoke、sortOrder 或 config');
+    )) {throw new BadRequestException('MVP 不支持设置 autoInvoke、sortOrder 或 config');}
     return this.withAgentTransaction(agentId, async (tx) => {
       const agent = await this.assertAgentWritable(agentId, user.id, tx);
 
       const seen = new Set<string>();
       for (const b of dto.bindings) {
-        if (seen.has(b.pluginId)) throw new BadRequestException(`插件 ${b.pluginId} 重复绑定`);
+        if (seen.has(b.pluginId)) {throw new BadRequestException(`插件 ${b.pluginId} 重复绑定`);}
         seen.add(b.pluginId);
       }
 
@@ -274,7 +320,7 @@ export class AgentsService {
         const catalogs = await this.pluginCatalog.findByIds(pluginIds);
         const catalogIds = new Set(catalogs.map((c) => c.pluginId));
         const missing = pluginIds.filter((id) => !catalogIds.has(id));
-        if (missing.length > 0) throw new BadRequestException(`以下插件不存在：[${missing.join(', ')}]`);
+        if (missing.length > 0) {throw new BadRequestException(`以下插件不存在：[${missing.join(', ')}]`);}
       }
 
       // 只删除解除绑定的项；启停更新不重建记录、不清除历史配置。
@@ -289,7 +335,7 @@ export class AgentsService {
         });
       }
 
-      if (agent.status === 'ACTIVE') await this.takeSnapshot(agentId, tx);
+      if (agent.status === 'ACTIVE') {await this.takeSnapshot(agentId, tx);}
 
       const saved = await tx.agent.findUniqueOrThrow({
         where: { id: agentId }, include: { pluginBindings: true },
@@ -313,7 +359,7 @@ export class AgentsService {
 
       const seen = new Set<string>();
       for (const b of dto.bindings) {
-        if (seen.has(b.knowledgeBaseId)) throw new BadRequestException(`知识库 ${b.knowledgeBaseId} 重复绑定`);
+        if (seen.has(b.knowledgeBaseId)) {throw new BadRequestException(`知识库 ${b.knowledgeBaseId} 重复绑定`);}
         seen.add(b.knowledgeBaseId);
       }
 
@@ -322,11 +368,11 @@ export class AgentsService {
         const catalogs = await this.knowledgeCatalog.findByIds(kbIds);
         const catalogIds = new Set(catalogs.map((c) => c.id));
         const missing = kbIds.filter((id) => !catalogIds.has(id));
-        if (missing.length > 0) throw new BadRequestException(`以下知识库不存在：[${missing.join(', ')}]`);
+        if (missing.length > 0) {throw new BadRequestException(`以下知识库不存在：[${missing.join(', ')}]`);}
         const inactive = catalogs.filter((c) => c.status !== 'ACTIVE').map((c) => c.id);
-        if (inactive.length > 0) throw new BadRequestException(`以下知识库不可用：[${inactive.join(', ')}]`);
+        if (inactive.length > 0) {throw new BadRequestException(`以下知识库不可用：[${inactive.join(', ')}]`);}
         const foreign = catalogs.filter((c) => c.workspaceId !== user.id).map((c) => c.id);
-        if (foreign.length > 0) throw new ForbiddenException('不能绑定其他用户的知识库');
+        if (foreign.length > 0) {throw new ForbiddenException('不能绑定其他用户的知识库');}
       }
 
       await tx.knowledgeBaseAgentBinding.deleteMany({ where: { agentId } });
@@ -339,7 +385,7 @@ export class AgentsService {
         })),
       });
 
-      if (agent.status === 'ACTIVE') await this.takeSnapshot(agentId, tx);
+      if (agent.status === 'ACTIVE') {await this.takeSnapshot(agentId, tx);}
 
       const saved = await tx.agent.findUniqueOrThrow({
         where: { id: agentId }, include: { knowledgeBaseBindings: true },
@@ -362,7 +408,7 @@ export class AgentsService {
       const agent = await this.assertAgentWritable(agentId, user.id, tx);
 
       const ids = dto.bindings.map((binding) => binding.workflowId);
-      if (new Set(ids).size !== ids.length) throw new BadRequestException('不能重复绑定同一工作流');
+      if (new Set(ids).size !== ids.length) {throw new BadRequestException('不能重复绑定同一工作流');}
       if (ids.length) {
         const available = await tx.workflow.count({
           where: {
@@ -370,7 +416,7 @@ export class AgentsService {
             status: { not: 'ARCHIVED' },
           },
         });
-        if (available !== ids.length) throw new NotFoundException('工作流不存在或无权绑定');
+        if (available !== ids.length) {throw new NotFoundException('工作流不存在或无权绑定');}
       }
 
       await tx.agentWorkflow.deleteMany({ where: { agentId } });
@@ -383,7 +429,7 @@ export class AgentsService {
         })),
       });
 
-      if (agent.status === 'ACTIVE') await this.takeSnapshot(agentId, tx);
+      if (agent.status === 'ACTIVE') {await this.takeSnapshot(agentId, tx);}
 
       const saved = await tx.agent.findUniqueOrThrow({
         where: { id: agentId }, include: { workflowBindings: true },
@@ -405,8 +451,8 @@ export class AgentsService {
 
   private async assertAgentWritable(agentId: string, userId: string, db: Prisma.TransactionClient = this.prisma): Promise<{ ownerId: string; workspaceId: string | null; status: AgentStatus }> {
     const agent = await db.agent.findUnique({ where: { id: agentId } });
-    if (!agent) throw new NotFoundException('Agent 不存在');
-    if (agent.ownerId !== userId) throw new ForbiddenException('无权操作此 Agent');
+    if (!agent) {throw new NotFoundException('Agent 不存在');}
+    if (agent.ownerId !== userId) {throw new ForbiddenException('无权操作此 Agent');}
     return agent;
   }
 
@@ -419,8 +465,8 @@ export class AgentsService {
         workflowBindings: true,
       },
     });
-    if (!agent) throw new NotFoundException('Agent 不存在');
-    if (agent.status !== 'ACTIVE') return { version: 0, versionId: agent.currentVersionId ?? '' };
+    if (!agent) {throw new NotFoundException('Agent 不存在');}
+    if (agent.status !== 'ACTIVE') {return { version: 0, versionId: agent.currentVersionId ?? '' };}
 
     const maxVersionRow = await tx.agentVersion.aggregate({
       where: { agentId },
@@ -466,7 +512,7 @@ export class AgentsService {
     const version = await this.prisma.agentVersion.findUnique({
       where: { id: versionId },
     });
-    if (!version || version.agentId !== agentId) throw new NotFoundException('版本不存在');
+    if (!version || version.agentId !== agentId) {throw new NotFoundException('版本不存在');}
     return version;
   }
 }

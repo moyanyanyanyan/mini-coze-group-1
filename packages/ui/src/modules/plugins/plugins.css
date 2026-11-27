@@ -648,3 +648,261 @@
     transition: none;
   }
 }
+
+/* ============================================================
+   MCP 插件补充样式：远程 MCP 插件的状态徽章、详情与「通过 URL 添加」弹窗。
+   合并 main 时保留（main 版没有这些类），不覆盖上面的积木化视觉。
+   ============================================================ */
+
+.pm-header-brand {
+  border-radius: 8px;
+  padding: 6px 12px;
+  color: var(--violet-600);
+  background: var(--violet-50);
+  font-size: 14px;
+  font-weight: 620;
+}
+
+.pm-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.pm-card-title-group {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.pm-card-title-group h3 {
+  margin: 0;
+  overflow: hidden;
+  color: var(--ink-900);
+  font-size: 15px;
+  font-weight: 620;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pm-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.pm-badge {
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.pm-badge-neutral {
+  color: var(--ink-600);
+  background: var(--violet-50);
+}
+
+.pm-badge-ok {
+  color: #1a7f37;
+  background: rgb(23 128 61 / 0.1);
+}
+
+.pm-badge-warn {
+  color: #a05a00;
+  background: #fef3c7;
+}
+
+.pm-badge-error {
+  color: #b3261e;
+  background: rgb(179 38 30 / 0.1);
+}
+
+.pm-card-error {
+  margin: 8px 0 0;
+  border-radius: 6px;
+  padding: 6px 8px;
+  color: #b3261e;
+  background: rgb(179 38 30 / 0.06);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.pm-card-endpoint {
+  margin: 10px 0 0;
+  overflow: hidden;
+  color: var(--ink-400);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pm-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.pm-auth-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.pm-auth-group legend {
+  padding: 0 4px;
+}
+
+.pm-auth-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.pm-auth-option input {
+  flex: none;
+  accent-color: var(--violet-600);
+}
+
+.pm-auth-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.pm-auth-label {
+  color: var(--ink-800);
+  font-size: 13px;
+  font-weight: 560;
+}
+
+.pm-auth-hint {
+  color: var(--ink-500);
+  font-size: 11px;
+}
+
+.pm-form-error {
+  margin: 0;
+  border: 1px solid rgb(179 38 30 / 0.35);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #b3261e;
+  background: rgb(179 38 30 / 0.06);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.pm-probe {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pm-probe-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.pm-probe-title {
+  margin: 0;
+  color: var(--ink-900);
+  font-size: 15px;
+  font-weight: 620;
+}
+
+.pm-probe-endpoint {
+  margin: 0;
+  color: var(--ink-500);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.pm-probe-hint {
+  margin: 2px 0 0;
+  color: var(--ink-500);
+  font-size: 12px;
+}
+
+.pm-tool-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  padding: 10px;
+  max-height: 36vh;
+  overflow-y: auto;
+}
+
+.pm-tool-list-head {
+  display: flex;
+  gap: 12px;
+}
+
+.pm-link-button {
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--violet-600);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+}
+
+.pm-link-button:hover {
+  color: var(--violet-700);
+  text-decoration: underline;
+}
+
+.pm-probe-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: flex-start;
+  gap: 10px;
+  border-radius: 6px;
+  padding: 8px;
+  cursor: pointer;
+}
+
+.pm-probe-row:hover {
+  background: var(--violet-50);
+}
+
+.pm-probe-row input {
+  margin-top: 3px;
+  accent-color: var(--violet-600);
+}
+
+.pm-probe-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pm-probe-name {
+  color: var(--violet-700);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+}
+
+.pm-probe-desc {
+  color: var(--ink-700);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.pm-probe-args {
+  color: var(--ink-400);
+  font-size: 11px;
+}

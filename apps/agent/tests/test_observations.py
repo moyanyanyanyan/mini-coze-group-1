@@ -85,3 +85,37 @@ def test_cancellation_closes_source_without_inventing_completion():
         assert trace.stages[0].status == 'interrupted'
         assert trace.stages[0].usage is None
     asyncio.run(verify())
+
+
+@pytest.mark.parametrize("with_tools", [False, True])
+def test_bound_connection_keeps_model_stage_records(settings, body, with_tools):
+    body["agentConfig"]["model"] = "bound-model"
+    body["agentConfig"]["connection"] = {
+        "protocol": "openai_compatible", "model": "bound-model",
+        "baseUrl": "https://bound.example.invalid/v1", "apiKey": "bound-test-key",
+    }
+    body["agentConfig"]["pluginIds"] = ["plugin_echo"] if with_tools else []
+    responses = [tool_stream(), answer()] if with_tools else [answer()]
+    calls = []
+
+    def handler(request):
+        assert str(request.url) == "https://bound.example.invalid/v1/chat/completions"
+        assert request.headers["authorization"] == "Bearer bound-test-key"
+        assert json.loads(request.content)["model"] == "bound-model"
+        calls.append(request)
+        return httpx.Response(200, content=responses[len(calls) - 1],
+                              headers={"content-type": "text/event-stream"})
+
+    async def verify():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            service = RuntimeService(settings, plugins=Plugins(), client=client)
+            events = await collect(service, body)
+        assert events[-1]["type"] == "run.completed"
+        stages = events[-1]["data"]["stages"]
+        models = [stage for stage in stages if stage["kind"] == "model"]
+        assert len(models) == len(responses)
+        assert all(stage["model"] == "bound-model" and stage["status"] == "completed" for stage in models)
+        assert "bound-test-key" not in json.dumps(stages)
+        assert (any(stage["kind"] == "tool" for stage in stages)) == with_tools
+
+    asyncio.run(verify())

@@ -24,7 +24,7 @@ export class KnowledgeRetrievalService {
     try {
       return await this.performSearch(knowledgeBaseIds, query.trim(), topK);
     } catch (error) {
-      if (error instanceof ForbiddenException || error instanceof ServiceUnavailableException) throw error;
+      if (error instanceof ForbiddenException || error instanceof ServiceUnavailableException) {throw error;}
       throw new ServiceUnavailableException('知识库检索服务不可用');
     }
   }
@@ -46,7 +46,7 @@ export class KnowledgeRetrievalService {
       where: { knowledgeBaseId: { in: ids }, enabled: true, document: { status: 'READY' }, vector: { isNot: null } },
       select: { id: true },
     });
-    if (!readyChunk) return { status: 'NO_HIT', hits: [] };
+    if (!readyChunk) {return { status: 'NO_HIT', hits: [] };}
 
     let model: string;
     let distance: Prisma.Sql;
@@ -59,7 +59,7 @@ export class KnowledgeRetrievalService {
       // 每个片段取与整道问题各段最接近的距离，单段时保留原查询。
       distance = distances.length === 1 ? distances[0] : Prisma.sql`LEAST(${Prisma.join(distances)})`;
     } catch (error) {
-      if (error instanceof EmbeddingUnavailableError) throw new ServiceUnavailableException('Embedding 服务不可用');
+      if (error instanceof EmbeddingUnavailableError) {throw new ServiceUnavailableException('Embedding 服务不可用');}
       throw error;
     }
 
@@ -70,7 +70,7 @@ export class KnowledgeRetrievalService {
         },
         select: { id: true },
     });
-    if (incompatibleChunk) throw new ServiceUnavailableException('知识库向量模型版本不一致，需要重新索引');
+    if (incompatibleChunk) {throw new ServiceUnavailableException('知识库向量模型版本不一致，需要重新索引');}
 
     const hits: KnowledgeHit[] = [];
     for (const knowledgeBaseId of ids) {

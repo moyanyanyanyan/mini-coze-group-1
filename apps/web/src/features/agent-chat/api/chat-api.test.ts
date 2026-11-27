@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { streamMessage } from './chat-api';
+import { streamMessage, uploadAttachment } from './chat-api';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -50,6 +50,54 @@ describe('chat stream transport', () => {
     expect(onFailed).toHaveBeenCalledWith('MODEL_ERROR', '生成失败', true);
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ code: 'UNAUTHORIZED', message: '请登录' }), { status: 401 })));
     await expect(streamMessage('conversation-1', '问题', { onDelta: vi.fn() })).rejects.toMatchObject({ status: 401, message: '请登录' });
+  });
+
+  it('only sends attachmentIds when the caller provides them', async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(
+      'data: {"type":"run.completed","data":{"content":"好"}}\n\n',
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await streamMessage('conversation-1', '问题', { onDelta: vi.fn() }, undefined, { attachmentIds: ['a1', 'a2'] });
+    await streamMessage('conversation-1', '问题', { onDelta: vi.fn() });
+
+    const [withIds, withoutIds] = fetchMock.mock.calls.map((call) => JSON.parse(String(call[1]?.body)));
+    expect(withIds).toEqual({ content: '问题', attachmentIds: ['a1', 'a2'] });
+    expect(withoutIds).toEqual({ content: '问题' });
+    expect(String(fetchMock.mock.calls[1][1]?.body)).not.toContain('attachmentIds');
+  });
+});
+
+describe('attachment upload', () => {
+  it('posts the file as FormData and returns the attachment metadata', async () => {
+    const data = { id: 'a1', fileName: 'x.md', mimeType: 'text/markdown', sourceType: 'FILE', byteSize: 4, status: 'READY', textBytes: 4, preview: '# x' };
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(
+      JSON.stringify({ code: 200, message: 'ok', data }),
+      { status: 201 },
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await uploadAttachment('c1', new File(['# x'], 'x.md', { type: 'text/markdown' }));
+
+    expect(result).toEqual(data);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('/api/conversations/c1/attachments');
+    expect(init?.method).toBe('POST');
+    expect(init?.credentials).toBe('include');
+    expect(init?.body).toBeInstanceOf(FormData);
+    const uploaded = (init?.body as FormData).get('file');
+    expect(uploaded).toBeInstanceOf(File);
+    expect((uploaded as File).name).toBe('x.md');
+  });
+
+  it('turns a rejected upload envelope into ApiError with the backend code', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({ code: 400, message: 'UNSUPPORTED_FILE' }),
+      { status: 400 },
+    )));
+
+    await expect(uploadAttachment('c1', new File(['x'], 'x.exe')))
+      .rejects.toMatchObject({ name: 'ApiError', status: 400, code: 400, message: 'UNSUPPORTED_FILE' });
   });
 });
 

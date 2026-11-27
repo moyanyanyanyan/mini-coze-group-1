@@ -19,9 +19,9 @@ export class CreateAgentDto {
   @IsString()
   systemPrompt?: string;
 
-  @IsOptional()
   @IsString()
-  model?: string;
+  @IsNotEmpty()
+  modelConfigId!: string;
 
   @IsOptional()
   @IsNumber()

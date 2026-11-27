@@ -30,9 +30,9 @@ export class KnowledgeDocumentService implements OnModuleInit {
   async createText(knowledgeBaseId: string, input: CreateTextDocumentDto) {
     await this.assertKnowledgeBase(knowledgeBaseId, input.workspaceId);
     const title = input.title.trim();
-    if (!title) throw new BadRequestException('文档标题不能为空');
+    if (!title) {throw new BadRequestException('文档标题不能为空');}
     const bytes = Buffer.from(input.text, 'utf8');
-    if (bytes.byteLength > MAX_DOCUMENT_BYTES) throw new BadRequestException('资料不能超过 1 MB');
+    if (bytes.byteLength > MAX_DOCUMENT_BYTES) {throw new BadRequestException('资料不能超过 1 MB');}
 
     const document = await this.prisma.knowledgeDocument.create({
       data: { knowledgeBaseId, title, sourceType: 'TEXT', sourceBytes: bytes },
@@ -43,7 +43,7 @@ export class KnowledgeDocumentService implements OnModuleInit {
 
   async createFile(knowledgeBaseId: string, workspaceId: string, title: string | undefined, file: UploadedDocumentFile | undefined) {
     await this.assertKnowledgeBase(knowledgeBaseId, workspaceId);
-    if (!file) throw new BadRequestException('请选择 TXT 或 JSON 文件');
+    if (!file) {throw new BadRequestException('请选择 TXT 或 JSON 文件');}
     const filename = decodeUploadFilename(file.originalname);
     let sourceType: 'TXT' | 'JSON';
     try {
@@ -51,9 +51,9 @@ export class KnowledgeDocumentService implements OnModuleInit {
     } catch (error) {
       throw new BadRequestException(error instanceof Error ? error.message : '文件类型不支持');
     }
-    if (file.size > MAX_DOCUMENT_BYTES) throw new BadRequestException('文件不能超过 1 MB');
+    if (file.size > MAX_DOCUMENT_BYTES) {throw new BadRequestException('文件不能超过 1 MB');}
     const documentTitle = (title?.trim() || basename(filename, extname(filename))).trim();
-    if (!documentTitle || documentTitle.length > 100) throw new BadRequestException('文档标题长度必须为 1～100 字符');
+    if (!documentTitle || documentTitle.length > 100) {throw new BadRequestException('文档标题长度必须为 1～100 字符');}
 
     const document = await this.prisma.knowledgeDocument.create({
       data: { knowledgeBaseId, title: documentTitle, sourceType, originalFileName: filename, sourceBytes: new Uint8Array(file.buffer) },
@@ -70,19 +70,19 @@ export class KnowledgeDocumentService implements OnModuleInit {
 
   async get(id: string, workspaceId: string) {
     const document = await this.prisma.knowledgeDocument.findUnique({ where: { id }, include: { knowledgeBase: true } });
-    if (!document || document.knowledgeBase.workspaceId !== workspaceId?.trim()) throw new NotFoundException('文档不存在');
+    if (!document || document.knowledgeBase.workspaceId !== workspaceId?.trim()) {throw new NotFoundException('文档不存在');}
     return this.publicDocument(document);
   }
 
   async retry(id: string, workspaceId: string) {
     const document = await this.prisma.knowledgeDocument.findUnique({ where: { id }, include: { knowledgeBase: true } });
-    if (!document || document.knowledgeBase.workspaceId !== workspaceId?.trim()) throw new NotFoundException('文档不存在');
-    if (document.knowledgeBase.status !== 'ACTIVE') throw new BadRequestException('知识库已停用');
+    if (!document || document.knowledgeBase.workspaceId !== workspaceId?.trim()) {throw new NotFoundException('文档不存在');}
+    if (document.knowledgeBase.status !== 'ACTIVE') {throw new BadRequestException('知识库已停用');}
     const updated = await this.prisma.knowledgeDocument.updateMany({
       where: { id, status: 'FAILED' },
       data: { status: 'PROCESSING', stage: 'VALIDATING', errorCode: null, errorMessage: null, chunkCount: 0 },
     });
-    if (updated.count === 0) throw new ConflictException('只有处理失败的文档可以重试');
+    if (updated.count === 0) {throw new ConflictException('只有处理失败的文档可以重试');}
     this.schedule(id);
     return this.get(id, workspaceId);
   }
@@ -91,10 +91,10 @@ export class KnowledgeDocumentService implements OnModuleInit {
     const document = await this.prisma.knowledgeDocument.findUnique({
       where: { id }, select: { knowledgeBase: { select: { workspaceId: true } }, status: true },
     });
-    if (!document || document.knowledgeBase.workspaceId !== workspaceId) throw new NotFoundException('文档不存在');
-    if (document.status === 'PROCESSING') throw new ConflictException('文档正在处理，请等待处理完成后删除');
+    if (!document || document.knowledgeBase.workspaceId !== workspaceId) {throw new NotFoundException('文档不存在');}
+    if (document.status === 'PROCESSING') {throw new ConflictException('文档正在处理，请等待处理完成后删除');}
     const deleted = await this.prisma.knowledgeDocument.deleteMany({ where: { id, status: { not: 'PROCESSING' } } });
-    if (deleted.count === 0) throw new ConflictException('文档正在处理，请等待处理完成后删除');
+    if (deleted.count === 0) {throw new ConflictException('文档正在处理，请等待处理完成后删除');}
     return { id };
   }
 
@@ -106,7 +106,7 @@ export class KnowledgeDocumentService implements OnModuleInit {
   }
 
   private schedule(id: string) {
-    if (this.running.has(id)) return;
+    if (this.running.has(id)) {return;}
     this.running.add(id);
     setImmediate(() => void this.process(id)
       .catch((error: unknown) => this.logger.error(`文档 ${id} 处理任务失败`, error))
@@ -120,7 +120,7 @@ export class KnowledgeDocumentService implements OnModuleInit {
       const text = extractDocumentText(document.sourceType, document.sourceBytes ?? new Uint8Array());
       await this.prisma.knowledgeDocument.update({ where: { id }, data: { rawText: text, stage: 'CHUNKING' } });
       const chunks = chunkDocument(text);
-      if (chunks.length === 0) throw new DocumentContentError('EMPTY_CONTENT', '资料无法生成可检索片段');
+      if (chunks.length === 0) {throw new DocumentContentError('EMPTY_CONTENT', '资料无法生成可检索片段');}
       await this.prisma.knowledgeDocument.update({ where: { id }, data: { stage: 'EMBEDDING' } });
       const { model, vectors } = await this.embedding.embed(chunks.map((chunk) => chunk.content));
       await this.prisma.knowledgeDocument.update({ where: { id }, data: { stage: 'PERSISTING' } });

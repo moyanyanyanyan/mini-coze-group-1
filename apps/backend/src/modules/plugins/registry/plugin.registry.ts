@@ -5,9 +5,13 @@ import {
   type BuiltinPluginRegistration,
 } from '../data/plugins.data';
 import { HttpExecutor } from '../executors/http.executor';
+import { McpExecutor } from '../executors/mcp.executor';
+import { McpClient } from '../mcp/mcp.client';
 import type { ToolExecutor } from '../executors/tool-executor.interface';
 import type {
+  PluginAuthType,
   PluginCatalogItem,
+  PluginConnectionStatus,
   PluginToolDefinition,
 } from '../types/plugin-tool';
 
@@ -21,6 +25,10 @@ interface PluginRow {
   tools: unknown;
   kind: string;
   endpoint: string | null;
+  authType?: string | null;
+  authCredential?: string | null;
+  connectionStatus?: string | null;
+  lastError?: string | null;
   enabled: boolean;
 }
 
@@ -28,7 +36,7 @@ interface PluginRow {
  * 插件注册表：目录数据来自 PostgreSQL，执行器按插件类型分发。
  *
  * - 内置插件启动时由统一注册表 upsert 进 DB，执行器走代码类。
- * - 历史 HTTP 插件仍按 endpoint 执行；MVP 不开放创建入口。
+ * - HTTP 插件仍按 endpoint 执行；MCP 插件按 endpoint + 鉴权配置构造 McpExecutor。
  * - 目录缓存由 reload 刷新；每次执行前重新检查数据库中的启用状态。
  */
 @Injectable()
@@ -137,6 +145,14 @@ export class PluginRegistry implements OnModuleInit {
       tools: Array.isArray(row.tools)
         ? (row.tools as PluginToolDefinition[])
         : [],
+      kind: (row.kind as PluginCatalogItem['kind']) ?? 'builtin',
+      authType: (row.authType as PluginAuthType) ?? 'none',
+      endpoint: row.endpoint,
+      connectionStatus:
+        row.kind === 'builtin'
+          ? 'connected'
+          : ((row.connectionStatus as PluginConnectionStatus) ?? 'unknown'),
+      lastError: row.lastError ?? null,
     };
   }
 
@@ -176,20 +192,29 @@ export class PluginRegistry implements OnModuleInit {
   /** 仅从目录定位工具，执行前再检查实时状态，不能由内置执行器绕过停用。 */
   async getExecutor(toolName: string): Promise<ToolExecutor | undefined> {
     for (const item of this.catalog.values()) {
-      if (!item.tools.some((tool) => tool.name === toolName)) continue;
+      if (!item.tools.some((tool) => tool.name === toolName)) {continue;}
       const row = await this.getRow(item.pluginId);
-      if (!row?.enabled) return undefined;
+      if (!row?.enabled) {return undefined;}
       const tools = Array.isArray(row.tools) ? row.tools as PluginToolDefinition[] : [];
       const tool = tools.find((definition) => definition.name === toolName && definition.pluginId === row.pluginId);
-      if (!tool) return undefined;
+      if (!tool) {return undefined;}
       if (row.kind === 'builtin') {
         const executor = this.builtinExecutors.get(toolName);
         return executor?.definition.pluginId === row.pluginId ? executor : undefined;
       }
       if (row.kind === 'http' && row.endpoint) {
         // 已注册的内置名称不能被运行中修改的 HTTP 记录接管。
-        if (this.builtinExecutors.has(toolName)) return undefined;
+        if (this.builtinExecutors.has(toolName)) {return undefined;}
         return new HttpExecutor(tool, row.endpoint);
+      }
+      if (row.kind === 'mcp' && row.endpoint) {
+        if (this.builtinExecutors.has(toolName)) {return undefined;}
+        const client = new McpClient(
+          row.endpoint,
+          (row.authType as PluginAuthType) ?? 'none',
+          row.authCredential ?? undefined,
+        );
+        return new McpExecutor(tool, client);
       }
       return undefined;
     }
@@ -241,12 +266,12 @@ export function validateBuiltinPlugins(
 function validatePluginRows(rows: PluginRow[]): void {
   const names = new Set<string>();
   for (const row of rows) {
-    if (!Array.isArray(row.tools)) throw new Error(`插件 "${row.pluginId}" 的工具定义无效`);
+    if (!Array.isArray(row.tools)) {throw new Error(`插件 "${row.pluginId}" 的工具定义无效`);}
     for (const tool of row.tools) {
       if (!tool || typeof tool.name !== 'string' || tool.pluginId !== row.pluginId) {
         throw new Error(`插件 "${row.pluginId}" 的工具归属或名称无效`);
       }
-      if (names.has(tool.name)) throw new Error(`工具名必须全局唯一，但 "${tool.name}" 重复注册`);
+      if (names.has(tool.name)) {throw new Error(`工具名必须全局唯一，但 "${tool.name}" 重复注册`);}
       names.add(tool.name);
     }
   }

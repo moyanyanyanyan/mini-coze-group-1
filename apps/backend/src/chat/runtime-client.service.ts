@@ -1,12 +1,21 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 
 // 智能体配置
+export interface RuntimeModelConnection {
+  protocol: string;
+  model: string;
+  baseUrl: string;
+  apiKey: string;
+}
+
 export interface RuntimeAgentConfig {
   id: string;
   revision: number;
   name: string;
   systemPrompt: string;
   model: string;
+  modelConfigId?: string;
+  connection?: RuntimeModelConnection;
   temperature: number;
   maxTokens: number;
   knowledgeBaseIds: string[];
@@ -123,7 +132,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function isRuntimeResult(value: unknown): value is RuntimeResult {
-  if (!isRecord(value)) return false;
+  if (!isRecord(value)) {return false;}
   const usage = value.usage;
   return (
     typeof value.runId === 'string'
@@ -210,7 +219,7 @@ class RuntimeEventParser {
   #eventId = '';
 
   push(chunk: string): RuntimeSseEvent[] {
-    if (!chunk) return [];
+    if (!chunk) {return [];}
 
     const events: RuntimeSseEvent[] = [];
     this.#buffer += chunk;
@@ -227,14 +236,14 @@ class RuntimeEventParser {
           break;
         }
         if (character === '\r') {
-          if (index === this.#buffer.length - 1) break;
+          if (index === this.#buffer.length - 1) {break;}
           lineEnd = index;
           lineBreakLength = this.#buffer[index + 1] === '\n' ? 2 : 1;
           break;
         }
       }
 
-      if (lineEnd === -1) break;
+      if (lineEnd === -1) {break;}
 
       this.#processLine(this.#buffer.slice(cursor, lineEnd), events);
       cursor = lineEnd + lineBreakLength;
@@ -246,7 +255,7 @@ class RuntimeEventParser {
 
   finish(): RuntimeSseEvent[] {
     const events: RuntimeSseEvent[] = [];
-    if (this.#buffer === '\r') this.#processLine('', events);
+    if (this.#buffer === '\r') {this.#processLine('', events);}
     this.#buffer = '';
     this.#eventType = '';
     this.#dataLines = [];
@@ -269,12 +278,12 @@ class RuntimeEventParser {
       return;
     }
 
-    if (line.startsWith(':')) return;
+    if (line.startsWith(':')) {return;}
 
     const separator = line.indexOf(':');
     const field = separator === -1 ? line : line.slice(0, separator);
     let value = separator === -1 ? '' : line.slice(separator + 1);
-    if (value.startsWith(' ')) value = value.slice(1);
+    if (value.startsWith(' ')) {value = value.slice(1);}
 
     if (field === 'event') {
       this.#eventType = value;
@@ -465,7 +474,7 @@ export class RuntimeClientService {
         body: JSON.stringify(request),
         signal: controller.signal,
       });
-      if (!response.ok) throw await this.toCallError(response);
+      if (!response.ok) {throw await this.toCallError(response);}
       if (!response.body) {
         throw new RuntimeCallError(
           'MODEL_STREAM_INTERRUPTED',
@@ -495,7 +504,7 @@ export class RuntimeClientService {
         yield event;
       }
     } catch (error) {
-      if (error instanceof RuntimeCallError) throw error;
+      if (error instanceof RuntimeCallError) {throw error;}
       if (timedOut) {
         throw new RuntimeCallError(
           'RUN_TIMEOUT',
