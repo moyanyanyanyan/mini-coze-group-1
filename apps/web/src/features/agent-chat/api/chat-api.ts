@@ -3,7 +3,7 @@ import type {
   ConversationSummary,
   SendMessageResult,
 } from '@minicoze/shared';
-import { ApiError, API_BASE, del, get, post } from '../../../shared/api/http';
+import { ApiError, API_BASE, del, get, patch, post } from '../../../shared/api/http';
 
 export function listConversations() {
   return get<ConversationSummary[]>('/api/conversations');
@@ -93,6 +93,10 @@ export async function uploadAttachment(
   return payload.data;
 }
 
+export function renameConversation(conversationId: string, title: string) {
+  return patch<ConversationSummary>(`/api/conversations/${conversationId}`, { title });
+}
+
 // ---------- 流式 ----------
 
 /** 后端 C3 下发的一帧。type 在 data 的信封里，和 event: 行一致 */
@@ -110,6 +114,12 @@ export interface ChatCitation {
   position?: { page?: number };
 }
 
+export interface StreamUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
 export interface StreamHandlers {
   onConnected?: () => void;
   /** 第一个事件，拿到本轮 assistant 消息 id */
@@ -118,7 +128,7 @@ export interface StreamHandlers {
   onDelta: (chunk: string) => void;
   onKnowledge?: (status: string, citations: ChatCitation[]) => void;
   /** 正常结束，data.content 是全量最终文本（以它为准，比拼 delta 更可靠） */
-  onCompleted?: (content: string) => void;
+  onCompleted?: (content: string, usage?: StreamUsage) => void;
   /** code 已被后端脱敏成 MODEL_ERROR / MODEL_TIMEOUT / PERSISTENCE_FAILED */
   onFailed?: (code: string, message: string, retryable: boolean) => void;
 }
@@ -168,7 +178,7 @@ function dispatch(event: ChatStreamEvent | null, handlers: StreamHandlers): void
       );
       break;
     case 'run.completed':
-      handlers.onCompleted?.(String(event.data.content ?? ''));
+      handlers.onCompleted?.(String(event.data.content ?? ''), parseUsage(event.data.usage));
       break;
     case 'run.failed':
       handlers.onFailed?.(
@@ -181,6 +191,18 @@ function dispatch(event: ChatStreamEvent | null, handlers: StreamHandlers): void
       // tool.* 暂不展示
       break;
   }
+}
+
+function parseUsage(value: unknown): StreamUsage | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const usage = value as Record<string, unknown>;
+  const values = [usage.promptTokens, usage.completionTokens, usage.totalTokens];
+  if (!values.every((item) => typeof item === 'number' && Number.isFinite(item) && item >= 0)) return undefined;
+  return {
+    promptTokens: values[0] as number,
+    completionTokens: values[1] as number,
+    totalTokens: values[2] as number,
+  };
 }
 
 /**

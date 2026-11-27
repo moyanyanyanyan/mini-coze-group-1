@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import type { ChangeEvent, ClipboardEvent, DragEvent, FormEvent, KeyboardEvent } from 'react';
 import { Icon } from '../../components';
 import type { ComposerAttachment } from './types';
+import { ContextUsageIndicator, type ContextUsageSnapshot } from './ContextUsageIndicator';
 import styles from './agent-chat.module.css';
 
 const ACCEPT = '.pdf,.docx,.md,.xlsx,.csv,.png,.jpg,.jpeg,.webp,.pptx,.html';
@@ -14,6 +15,7 @@ interface MessageComposerProps {
   onStop?: () => void;
   contextRemaining?: number;
   contextMax?: number;
+  contextUsage?: ContextUsageSnapshot;
   /** 已上传（含解析中/失败）的附件，展示在输入框上方 */
   attachments?: ComposerAttachment[];
   uploading?: boolean;
@@ -30,6 +32,7 @@ export function MessageComposer({
   onStop,
   contextRemaining,
   contextMax,
+  contextUsage,
   attachments = [],
   uploading = false,
   attachmentError,
@@ -117,6 +120,7 @@ export function MessageComposer({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      <div className={styles.contextIndicators}>
       {contextRemaining !== undefined && contextMax !== undefined ? <div
         className={styles.contextMeter}
         role="meter"
@@ -138,6 +142,8 @@ export function MessageComposer({
         </svg>
         <span>{contextRemaining} 轮可用</span>
       </div> : null}
+      {contextUsage ? <ContextUsageIndicator usage={contextUsage} /> : null}
+      </div>
       {attachments.length > 0 && (
         <div className={styles.composerAttachments}>
           {attachments.map((attachment) => (

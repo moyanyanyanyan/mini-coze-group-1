@@ -9,7 +9,7 @@ describe('chat stream transport', () => {
     const encoded = new TextEncoder().encode(': heartbeat\n\n' + frame('run.started', { assistantMessageId: 'reply-1' })
       + frame('message.delta', { content: '你好' })
       + frame('knowledge.result', { status: 'HIT', citations: [{ title: '文档' }] })
-      + frame('run.completed', { content: '完整回答' }).trimEnd());
+      + frame('run.completed', { content: '完整回答', usage: { promptTokens: 30, completionTokens: 10, totalTokens: 40 } }).trimEnd());
     const body = new ReadableStream<Uint8Array>({ start(controller) {
       for (const byte of encoded) controller.enqueue(Uint8Array.of(byte));
       controller.close();
@@ -22,7 +22,7 @@ describe('chat stream transport', () => {
     expect(handlers.onStarted).toHaveBeenCalledWith('reply-1');
     expect(handlers.onDelta).toHaveBeenCalledWith('你好');
     expect(handlers.onKnowledge).toHaveBeenCalledWith('HIT', [{ title: '文档' }]);
-    expect(handlers.onCompleted).toHaveBeenCalledWith('完整回答');
+    expect(handlers.onCompleted).toHaveBeenCalledWith('完整回答', { promptTokens: 30, completionTokens: 10, totalTokens: 40 });
     expect(fetchMock).toHaveBeenCalledWith('/api/conversations/conversation-1/messages/stream',
       expect.objectContaining({ method: 'POST', credentials: 'include', signal: controller.signal,
         body: JSON.stringify({ content: '问题' }) }));

@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ChatMessage, ConversationSummary } from '@minicoze/shared';
 import { ApiError } from '../../shared/api/http';
-import { getAgent, listAgents, type Agent } from '../agent-builder/agent.api';
+import { listAgents, type Agent, type AgentStatus } from '../agent-builder/agent.api';
 import {
   createConversation,
   deleteConversation,
   listConversations,
   listMessages,
+  renameConversation,
   streamMessage,
   uploadAttachment,
   type ChatCitation,
   type PendingAttachment,
 } from './api/chat-api';
+import { estimateConversationTokens, getContextTokenLimit } from './context-usage';
 import { AppLink } from '../../shared/routing/AppLink';
 import { useConfirm } from '@minicoze/ui/hooks';
 import { AgentChatView, useChatViewport } from '@minicoze/ui/agent-chat';
@@ -26,6 +28,28 @@ const CONTEXT_HISTORY_ROUND_LIMIT = 10;
 /** 与后端 SendMessageDto 的 ArrayMaxSize(5) 保持一致 */
 const MAX_ATTACHMENTS = 5;
 
+async function listEveryAgent(status?: AgentStatus): Promise<Agent[]> {
+  const agents: Agent[] = [];
+  let page = 1;
+  while (true) {
+    const params = new URLSearchParams({ page: String(page), pageSize: '100' });
+    if (status) params.set('status', status);
+    const result = await listAgents(params);
+    agents.push(...result.items);
+    if (agents.length >= result.total || result.items.length === 0) return agents;
+    page += 1;
+  }
+}
+
+function rememberChatLocation(agentId: string | null, conversationId: string | null): void {
+  const url = new URL(window.location.href);
+  if (agentId) url.searchParams.set('agentId', agentId);
+  else url.searchParams.delete('agentId');
+  if (conversationId) url.searchParams.set('conversation', conversationId);
+  else url.searchParams.delete('conversation');
+  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
 export function AgentChatPage() {
   const { confirm, confirmation } = useConfirm();
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -33,6 +57,7 @@ export function AgentChatPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [tokenUsage, setTokenUsage] = useState<{ conversationId: string | null; usedTokens: number; source: 'actual' | 'estimated' } | null>(null);
   const [citationsByMessage, setCitationsByMessage] = useState<Record<string, ChatCitation[]>>({});
   /** 非空 = 这一轮还在生成。同时也用作「禁止再发」的闸门 */
   const [streamingId, setStreamingId] = useState<string | null>(null);
@@ -84,25 +109,31 @@ export function AgentChatPage() {
     const request = ++requestId.current;
     setSwitching(true);
     try {
-      const [agentPage, existing] = await Promise.all([listAgents(), listConversations()]);
-      const available = agentPage.items.filter((agent) => agent.status !== 'ARCHIVED');
+      const [available, existing] = await Promise.all([listEveryAgent(), listConversations()]);
+      const historicalAgentIds = new Set(existing.map((item) => item.agentId).filter((id): id is string => Boolean(id)));
+      const needsArchived = [...historicalAgentIds].some((id) => !available.some((agent) => agent.id === id));
+      const archived = needsArchived ? (await listEveryAgent('ARCHIVED')).filter((agent) => historicalAgentIds.has(agent.id)) : [];
+      const allAgents = [...available, ...archived];
       const target = new URLSearchParams(window.location.search).get('agentId');
-      if (target && !available.some(agent => agent.id === target)) available.push(await getAgent(target));
       if (request !== requestId.current) return;
-      setAgents(available);
+      setAgents(allAgents);
       setNeedsAgent(available.length === 0);
-      if (available.length === 0) return;
-      const usable = existing.filter((item) => item.agentId && available.some((agent) => agent.id === item.agentId));
       const requested = new URLSearchParams(window.location.search).get('conversation');
-      const conversation = usable.find((item) => item.id === requested)
-        ?? usable.find((item) => !target || item.agentId === target);
+      const conversation = requested
+        ? existing.find((item) => item.id === requested)
+        : target ? undefined : existing[0];
       const history = conversation ? await listMessages(conversation.id) : [];
       if (request !== requestId.current) return;
       following.current = true;
-      setConversations(usable);
-      setSelectedAgentId(conversation?.agentId ?? target ?? available[0].id);
+      setConversations(existing);
+      const agentId = conversation
+        ? conversation.agentId ?? ''
+        : (available.some((agent) => agent.id === target) ? target : null) ?? available[0]?.id ?? '';
+      setSelectedAgentId(agentId);
       setConversationId(conversation?.id ?? null);
       setMessages(history);
+      const agent = allAgents.find((item) => item.id === agentId);
+      setTokenUsage({ conversationId: conversation?.id ?? null, usedTokens: estimateConversationTokens(history, agent?.systemPrompt, Math.min(agent?.contextLimit ?? 10, 10)), source: 'estimated' });
     } catch (caught) {
       if (request === requestId.current) setBootError(caught instanceof ApiError ? caught.message : '会话加载失败，请稍后再试');
     } finally {
@@ -131,7 +162,10 @@ export function AgentChatPage() {
         ? existing
         : [conversation, ...existing]);
       setMessages(history);
+      const agent = agents.find((item) => item.id === agentId);
+      setTokenUsage({ conversationId: conversation.id, usedTokens: estimateConversationTokens(history, agent?.systemPrompt, Math.min(agent?.contextLimit ?? 10, 10)), source: 'estimated' });
       setCitationsByMessage({});
+      rememberChatLocation(agentId, conversation.id);
       jumpToLatest();
     } catch (caught) {
       if (request === requestId.current) setBootError(caught instanceof Error ? caught.message : '切换智能体失败');
@@ -158,6 +192,9 @@ export function AgentChatPage() {
       setConversationId(conversation.id);
       setSelectedAgentId(conversation.agentId ?? '');
       setMessages(history);
+      rememberChatLocation(conversation.agentId, conversation.id);
+      const agent = agents.find((item) => item.id === conversation.agentId);
+      setTokenUsage({ conversationId: conversation.id, usedTokens: estimateConversationTokens(history, agent?.systemPrompt, Math.min(agent?.contextLimit ?? 10, 10)), source: 'estimated' });
       setCitationsByMessage({});
     } catch (caught) {
       if (request === requestId.current) setBootError(caught instanceof Error ? caught.message : '会话加载失败');
@@ -167,18 +204,20 @@ export function AgentChatPage() {
   };
 
   const handleNewConversation = async () => {
-    if (!selectedAgentId || sendingRef.current || streamingId || switching) return;
+    if (!selectedAgent || selectedAgent.status === 'ARCHIVED' || sendingRef.current || streamingId || switching) return;
     const request = ++requestId.current;
     setBootError('');
     setSendError('');
     clearPendingAttachments();
     setSwitching(true);
     try {
-      const conversation = await createConversation(selectedAgentId);
+      const conversation = await createConversation(selectedAgent.id);
       if (request !== requestId.current) return;
       setConversations((items) => [conversation, ...items]);
       setConversationId(conversation.id);
       setMessages([]);
+      setTokenUsage({ conversationId: conversation.id, usedTokens: 0, source: 'estimated' });
+      rememberChatLocation(conversation.agentId, conversation.id);
       jumpToLatest();
       closeConversationDrawer();
       setCitationsByMessage({});
@@ -201,15 +240,34 @@ export function AgentChatPage() {
       const next = conversations.filter((item) => item.id !== conversation.id);
       setConversations(next);
       if (conversation.id === conversationId) {
-        const fallback = next[0];
+        const fallback = next.find((item) => item.agentId === conversation.agentId) ?? next[0];
         if (fallback) {
           await handleConversationChange(fallback);
         } else {
-          await handleNewConversation();
+          const agentId = agents.find((agent) => agent.id === selectedAgentId && agent.status !== 'ARCHIVED')?.id
+            ?? agents.find((agent) => agent.status !== 'ARCHIVED')?.id ?? '';
+          setConversationId(null);
+          setSelectedAgentId(agentId);
+          setMessages([]);
+          setTokenUsage({ conversationId: null, usedTokens: 0, source: 'estimated' });
+          setCitationsByMessage({});
+          rememberChatLocation(agentId, null);
         }
       }
     } catch (caught) {
       setBootError(caught instanceof Error ? caught.message : '删除会话失败');
+    }
+  };
+
+  const handleRenameConversation = async (id: string, title: string): Promise<boolean> => {
+    try {
+      const updated = await renameConversation(id, title.trim());
+      setConversations((prev) => prev.map((item) => item.id === id ? updated : item)
+        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)));
+      return true;
+    } catch (caught) {
+      setBootError(caught instanceof Error ? caught.message : '重命名失败');
+      return false;
     }
   };
 
@@ -269,7 +327,7 @@ export function AgentChatPage() {
   };
 
   const handleSend = async (content: string) => {
-    if (streamingId || sendingRef.current || switching || !selectedAgentId) {
+    if (streamingId || sendingRef.current || switching || !selectedAgent || selectedAgent.status === 'ARCHIVED') {
       return;
     }
     if (attaching) {
@@ -297,6 +355,9 @@ export function AgentChatPage() {
     const key = `${Date.now()}-${Math.random()}`;
     const assistantKey = `tmp-assistant-${key}`;
     const userKey = `tmp-user-${key}`;
+    const contextTurns = Math.min(selectedAgent?.contextLimit ?? CONTEXT_HISTORY_ROUND_LIMIT, CONTEXT_HISTORY_ROUND_LIMIT);
+    const pendingUser: ChatMessage = { id: userKey, conversationId: convId ?? '', role: 'user', status: 'completed', seq: -2, content, createdAt: now };
+    setTokenUsage({ conversationId: convId, usedTokens: estimateConversationTokens([...messages, pendingUser], selectedAgent?.systemPrompt, contextTurns), source: 'estimated' });
     // 先显示本轮消息；新会话的创建请求也可能需要一段时间。
     setMessages((prev) => [
       ...prev,
@@ -365,6 +426,8 @@ export function AgentChatPage() {
         const created = await createConversation(selectedAgentId);
         convId = created.id;
         setConversationId(created.id);
+        rememberChatLocation(created.agentId, created.id);
+        setTokenUsage((current) => current ? { ...current, conversationId: created.id } : current);
         setConversations((prev) => [created, ...prev]);
         setMessages((prev) => prev.map((item) =>
           item.id === userKey || item.id === assistantKey ? { ...item, conversationId: created.id } : item,
@@ -404,7 +467,7 @@ export function AgentChatPage() {
             }
             setCitationsByMessage((prev) => ({ ...prev, [id]: citations }));
           },
-          onCompleted: (finalContent) => {
+          onCompleted: (finalContent, usage) => {
             if (controller.signal.aborted) return;
             terminalStatus = 'completed';
             // 后端给的全量优先，避免网络抖动丢过某个 delta
@@ -421,6 +484,19 @@ export function AgentChatPage() {
                   : item,
               ),
             );
+            const completed: ChatMessage = {
+              ...pendingUser,
+              role: 'assistant',
+              id: targetIdRef.current ?? assistantKey,
+              seq: -1,
+              content: finalContent,
+              status: 'completed',
+            };
+            setTokenUsage({
+              conversationId: convId,
+              usedTokens: usage?.totalTokens ?? estimateConversationTokens([...messages, pendingUser, completed], selectedAgent?.systemPrompt, contextTurns),
+              source: usage ? 'actual' : 'estimated',
+            });
             setGenerationPhase(null);
             setStreamingId(null);
           },
@@ -486,7 +562,7 @@ export function AgentChatPage() {
       sendingRef.current = false;
       setPreparingMessage(false);
       // 第一轮结束后标题会变，顺手刷新左侧列表
-      void listConversations().then((items) => setConversations(items.filter((item) => item.agentId && agents.some((agent) => agent.id === item.agentId)))).catch(() => undefined);
+      void listConversations().then(setConversations).catch(() => undefined);
     }
   };
 
@@ -509,7 +585,13 @@ export function AgentChatPage() {
     message.role === 'user' && messages[index + 1]?.role === 'assistant'
       && messages[index + 1].status === 'completed' ? 1 : 0
   ), 0);
-  const contextRemaining = Math.max(0, CONTEXT_HISTORY_ROUND_LIMIT - completedTurns);
+  const contextMax = Math.min(selectedAgent?.contextLimit ?? CONTEXT_HISTORY_ROUND_LIMIT, CONTEXT_HISTORY_ROUND_LIMIT);
+  const contextRemaining = Math.max(0, contextMax - completedTurns);
+  const contextUsage = {
+    usedTokens: tokenUsage?.conversationId === conversationId ? tokenUsage.usedTokens : null,
+    maxTokens: getContextTokenLimit(selectedAgent),
+    source: tokenUsage?.source ?? 'estimated',
+  } as const;
 
   return (
     <AgentChatView
@@ -522,7 +604,8 @@ export function AgentChatPage() {
       streamingId={streamingId}
       generationPhase={generationPhase}
       contextRemaining={contextRemaining}
-      contextMax={CONTEXT_HISTORY_ROUND_LIMIT}
+      contextMax={contextMax}
+      contextUsage={contextUsage}
       sendError={sendError}
       needsAgent={needsAgent}
       bootError={bootError}
@@ -541,6 +624,7 @@ export function AgentChatPage() {
         const conversation = conversations.find((item) => item.id === id);
         if (conversation) void handleDeleteConversation(conversation);
       }}
+      handleRenameConversation={handleRenameConversation}
       handleAgentChange={handleAgentChange}
       handleSend={handleSend}
       handleStop={handleStop}

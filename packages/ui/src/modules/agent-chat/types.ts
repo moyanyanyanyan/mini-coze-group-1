@@ -24,10 +24,12 @@ export interface ChatAgentOption {
   id: string;
   name: string;
   avatarUrl?: string;
+  status?: 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
 }
 
 export interface ChatConversationItem {
   id: string;
   title: string;
+  agentId: string | null;
   updatedAt: string;
 }
