@@ -94,6 +94,7 @@ export interface KnowledgeDocumentsState {
   sourceMode: DocumentSourceMode;
   documentTitle: string;
   documentText: string;
+  documentFileName: string | null;
   selectedDocumentId: string | null;
   selectedDocument: KnowledgeDocumentItem | undefined;
   documentDrawerOpen: boolean;
@@ -156,6 +157,7 @@ export interface KnowledgeViewProps {
   actions: KnowledgeActions;
   confirmation: ReactNode;
   fileInputRef: RefObject<HTMLInputElement | null>;
+  getOriginalFileUrl: (documentId: string) => string;
   onBackToCenter: () => void;
   editDialogOpen: boolean;
   editName: string;

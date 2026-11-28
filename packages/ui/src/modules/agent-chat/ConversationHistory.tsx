@@ -3,6 +3,7 @@ import { ActionMenu, Icon } from '../../components';
 import { conversationGroupId, groupConversations, searchConversations } from './conversation-groups';
 import type { ChatAgentOption, ChatConversationItem } from './types';
 import styles from './agent-chat.module.css';
+import { HistoryPreview, HistoryPreviewScope } from './HistoryPreview';
 
 const EXPANDED_STORAGE_KEY = 'minicoze:conversation-groups:v1';
 
@@ -33,7 +34,8 @@ function ConversationRow({ conversation, agentName, selected, disabled, onSelect
   const [saving, setSaving] = useState(false);
   const title = conversation.title || '新对话';
 
-  return <div className={`${styles.conversationItem}${selected ? ` ${styles.conversationItemActive}` : ''}`}>
+  return <HistoryPreview title={title} agentName={agentName} createdAt={conversation.createdAt} updatedAt={conversation.updatedAt}
+    className={`${styles.conversationItem}${selected ? ` ${styles.conversationItemActive}` : ''}`}>
     {editing ? <form className={styles.conversationEdit} onSubmit={async (event) => {
       event.preventDefault();
       if (!draft.trim() || saving) return;
@@ -50,11 +52,9 @@ function ConversationRow({ conversation, agentName, selected, disabled, onSelect
     </form> : <>
       <button type="button" className={styles.conversationSelect} disabled={disabled} aria-current={selected ? 'page' : undefined}
         onClick={() => onSelect(conversation.id)}>
-        <span title={title}>{title}</span>
-        {agentName && <small className={styles.conversationAgentName} title={agentName}>{agentName}</small>}
-        <small>{new Date(conversation.updatedAt).toLocaleDateString('zh-CN')}</small>
+        <span className={styles.historyTitleViewport}><span data-history-title>{title}</span></span>
       </button>
-      <ActionMenu floating label={`会话操作：${title}`}>
+      <ActionMenu floating menuClassName={styles.conversationMenu} label={`会话操作：${title}`}>
         <button type="button" disabled={disabled} onClick={() => { setDraft(conversation.title); setEditing(true); }}>
           重命名
         </button>
@@ -64,7 +64,7 @@ function ConversationRow({ conversation, agentName, selected, disabled, onSelect
         </button>
       </ActionMenu>
     </>}
-  </div>;
+  </HistoryPreview>;
 }
 
 interface ConversationHistoryProps {
@@ -100,7 +100,7 @@ export function ConversationHistory({ conversations, agents, conversationId, dis
     onSelect(id);
   };
 
-  return <div className={styles.conversationList}>
+  return <HistoryPreviewScope><div className={styles.conversationList}>
     <input className={styles.historySearch} type="search" aria-label="搜索历史对话"
       placeholder="搜索历史对话" value={query} onChange={(event) => setQuery(event.target.value)} />
     <div className={styles.historyGroups}>
@@ -113,20 +113,20 @@ export function ConversationHistory({ conversations, agents, conversationId, dis
         const open = expanded[group.id] ?? group.id === selectedGroupId;
         const panelId = `conversation-group-${index}`;
         return <section key={group.id} className={styles.historyGroup}>
+          <HistoryPreview title={group.name}>
           <button type="button" className={styles.historyGroupTrigger} aria-expanded={open} aria-controls={panelId}
             onClick={() => setExpanded((previous) => ({ ...previous, [group.id]: !open }))}>
-            <span className={styles.historyGroupAvatar} aria-hidden="true">
-              {group.avatarUrl ? <img src={group.avatarUrl} alt="" /> : group.name.slice(0, 1)}
-            </span>
-            <span className={styles.historyGroupName} title={group.name}>{group.name}</span>
+            <Icon name="bot" className={styles.historyAgentIcon} />
+            <span className={styles.historyTitleViewport}><span className={styles.historyGroupName} data-history-title>{group.name}</span></span>
             <span className={styles.historyGroupCount} aria-label={`${group.conversations.length} 条对话`}>{group.conversations.length}</span>
             <Icon name="chevronDown" className={`${styles.historyGroupChevron}${open ? ` ${styles.historyGroupChevronOpen}` : ''}`} />
           </button>
+          </HistoryPreview>
           <div id={panelId} className={`${styles.historyGroupPanel}${open ? ` ${styles.historyGroupPanelOpen}` : ''}`}
             aria-hidden={!open} inert={!open}>
             <div className={styles.historyGroupContent}>
               {group.conversations.length ? group.conversations.map((conversation) => <ConversationRow key={conversation.id}
-                conversation={conversation} selected={conversation.id === conversationId} disabled={disabled}
+                conversation={conversation} agentName={group.name} selected={conversation.id === conversationId} disabled={disabled}
                 onSelect={(id) => select(id, group.id)} onDelete={onDelete} onRename={onRename} />)
                 : <p className={styles.historyEmpty}>暂无历史对话</p>}
             </div>
@@ -134,5 +134,5 @@ export function ConversationHistory({ conversations, agents, conversationId, dis
         </section>;
       })}
     </div>
-  </div>;
+  </div></HistoryPreviewScope>;
 }

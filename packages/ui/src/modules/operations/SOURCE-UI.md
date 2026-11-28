@@ -9,7 +9,7 @@
 | 03 | Mhyar-nsi/selfish-parrot-52 | 搜索备选，本次选 12，不同时叠加。 |
 | 04 | Pradeepsaranbishnoi/heavy-dragonfly-92 | 选项卡备选，本次选用户新提供的 15。 |
 | 05 | Sujitkavaiya/mighty-pig-81 | 公共 Panel，保留原作白色面、边框过渡和投影；尺寸由内容决定，悬浮边框改紫。 |
-| 06 | chase2k25/mighty-dragonfly-75 | 知识库卡片，使用用户完整源码。保留五层圆片、玻璃层、25° 倾斜、Z 位移与延迟；白色顶面、自动高度、真实数据和路由链接。 |
+| 06 | chase2k25/mighty-dragonfly-75 | 知识库卡片，使用用户完整源码。保留五层圆片、玻璃层、Z 位移与延迟；悬浮或键盘聚焦时整体上移 6px，离开后回落，减少动态效果时保持静止；白色顶面、自动高度、真实数据和路由链接。 |
 | 07 | Yaya12085/terrible-otter-19 | Notice，包括异常和文件状态；使用原作图标/标题/消息分区，去除无业务用途的示例操作。 |
 | 08 | Cobp/mighty-pig-13 | 知识库空列表与无搜索结果的文件夹，使用公共 FolderCard；紫色适配、无虚假点击。 |
 | 09 | themrsami/ordinary-lion-95 | 工具调用脱敏说明提示层；白底紫边，支持键盘和 Escape。 |

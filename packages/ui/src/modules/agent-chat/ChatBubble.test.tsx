@@ -28,12 +28,12 @@ it('历史中断消息可重试，主动停止的消息保留取消状态', () =
   expect(cancelled).not.toContain('正在生成回答');
 });
 
-it('保留智能体头像并渲染 Markdown，链接带安全属性且不执行 HTML', () => {
+it('不渲染头像并保留 Markdown 和安全链接', () => {
   const markup = renderToStaticMarkup(<ChatBubble
     message={{ ...message, status: 'completed', content: '**回答** [链接](https://example.com) <script>alert(1)</script>' }}
-    agentName="测试智能体" avatarUrl="/avatar.png" active={false}
+    active={false}
   />);
-  expect(markup).toContain('src="/avatar.png"');
+  expect(markup).not.toContain('<img');
   expect(markup).toContain('<strong>回答</strong>');
   expect(markup).toContain('rel="noreferrer noopener"');
   expect(markup).not.toContain('<script>');

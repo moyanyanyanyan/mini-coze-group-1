@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { ChatBubble } from './ChatBubble';
 import { MessageComposer } from './MessageComposer';
 import { AgentSwitcher } from './AgentSwitcher';
@@ -10,6 +10,19 @@ import type { ChatMessageView, ChatAgentOption, ChatConversationItem, ComposerAt
 import type { ContextUsageSnapshot } from './ContextUsageIndicator';
 import styles from './agent-chat.module.css';
 
+const PANEL_WIDTH_STORAGE_KEY = 'minicoze:conversation-panel-width:v1';
+
+function savedPanelWidth(): number {
+  try {
+    const stored = sessionStorage.getItem(PANEL_WIDTH_STORAGE_KEY);
+    const width = stored ? Number(stored) : NaN;
+    return Number.isFinite(width) ? Math.round(Math.max(220, Math.min(560, width))) : 264;
+  } catch {
+    // 浏览器禁用存储时仍可正常调整宽度。
+    return 264;
+  }
+}
+
 export interface AgentChatViewProps {
   conversationId: string | null;
   conversations: ChatConversationItem[];
@@ -19,8 +32,6 @@ export interface AgentChatViewProps {
   citationsByMessage: Record<string, { title: string }[]>;
   streamingId: string | null;
   generationPhase: 'connecting' | 'thinking' | 'generating' | null;
-  contextRemaining: number;
-  contextMax: number;
   contextUsage: ContextUsageSnapshot;
   sendError: string;
   readiness?: 'starting' | 'ready' | 'failed' | 'unavailable';
@@ -44,19 +55,43 @@ export interface AgentChatViewProps {
   pendingAttachments: ComposerAttachment[];
   attaching: boolean;
   attachmentError: string;
-  memoryPanel?: ReactNode;
   onSelectFiles: (files: File[]) => void;
   onRemoveAttachment: (id: string) => void;
 }
 
 export function AgentChatView({
   conversationId, conversations, agents, selectedAgentId, messages, citationsByMessage,
-  streamingId, generationPhase, contextRemaining, contextMax, contextUsage, sendError, needsAgent, bootError, switching, suggestedPrompts, viewport,
+  streamingId, generationPhase, contextUsage, sendError, needsAgent, bootError, switching, suggestedPrompts, viewport,
   confirmation, LinkComponent, createAgentRoute, handleNewConversation, handleConversationChange,
   handleDeleteConversation, handleRenameConversation, handleAgentChange, handleSend, handleStop, onRetry, readiness = 'ready', onReadinessRetry,
   pendingAttachments, attaching, attachmentError, onSelectFiles, onRemoveAttachment,
-  memoryPanel,
 }: AgentChatViewProps) {
+  const pageRef = useRef<HTMLElement>(null);
+  const drag = useRef<{ x: number; width: number } | null>(null);
+  const [panelWidth, setPanelWidth] = useState(savedPanelWidth);
+  const [maxPanelWidth, setMaxPanelWidth] = useState(560);
+  const [resizing, setResizing] = useState(false);
+  const resize = (width: number) => {
+    const nextWidth = Math.round(Math.max(220, Math.min(maxPanelWidth, width)));
+    setPanelWidth(nextWidth);
+    try {
+      // 只保存主动调整的宽度，避免窗口变窄时覆盖用户偏好。
+      sessionStorage.setItem(PANEL_WIDTH_STORAGE_KEY, String(nextWidth));
+    } catch {
+      // 存储不可用时保留本次页面内的调整。
+    }
+  };
+  useEffect(() => {
+    if (!pageRef.current) return;
+    const observer = new ResizeObserver(([entry]) => {
+      // 给右侧对话区保留阅读空间，小屏继续使用原有抽屉。
+      const maximum = Math.max(220, Math.min(560, entry.contentRect.width - 480));
+      setMaxPanelWidth(maximum);
+      setPanelWidth((width) => Math.min(width, maximum));
+    });
+    observer.observe(pageRef.current);
+    return () => observer.disconnect();
+  }, []);
   const selectedAgent = agents.find(agent => agent.id === selectedAgentId);
   const selectedConversation = conversations.find(conversation => conversation.id === conversationId);
   const fallbackAgentName = selectedConversation && !selectedAgent
@@ -64,36 +99,10 @@ export function AgentChatView({
     : undefined;
   const { conversationsOpen, setConversationsOpen, conversationPanelRef, conversationDrawer,
     streamRef, onScroll, awayFromBottom, jumpToLatest } = viewport;
-  const [activePromptId, setActivePromptId] = useState<string | null>(null);
-  const promptRefs = useRef(new Map<string, HTMLDivElement>());
-  const promptMarkRefs = useRef(new Map<string, HTMLButtonElement>());
-  const userPrompts = messages.filter((message) => message.role === 'user');
-  const updateTurnRail = () => {
-    const stream = streamRef.current;
-    if (!stream) return;
-    const streamTop = stream.getBoundingClientRect().top;
-    let active: string | null = null;
-    for (const message of userPrompts) {
-      const element = promptRefs.current.get(message.id);
-      if (!element) continue;
-      const top = element.getBoundingClientRect().top - streamTop;
-      const mark = promptMarkRefs.current.get(message.id);
-      if (mark) mark.style.top = `${top + 13}px`;
-      if (top <= 140) active = message.id;
-    }
-    setActivePromptId(active);
-  };
-  useEffect(() => {
-    updateTurnRail();
-    const stream = streamRef.current;
-    if (!stream || typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(updateTurnRail);
-    observer.observe(stream);
-    return () => observer.disconnect();
-  }, [messages]);
 
   return (
-    <section className={`${styles.page} ${conversationsOpen ? styles.panelOpen : styles.panelClosed}`} aria-label="智能体聊天">
+    <section ref={pageRef} style={{ '--history-width': `${panelWidth}px` } as CSSProperties}
+      className={`${styles.page} ${conversationsOpen ? styles.panelOpen : styles.panelClosed}`} aria-label="智能体聊天">
       {confirmation}
       {conversationsOpen && <button className={styles.panelBackdrop} aria-label="关闭会话列表" onClick={() => setConversationsOpen(false)} />}
       <aside ref={conversationPanelRef} role={conversationDrawer ? 'dialog' : undefined} aria-modal={conversationDrawer || undefined} className={styles.conversationPanel} aria-label="会话列表">
@@ -101,7 +110,7 @@ export function AgentChatView({
           <div>
             <strong>对话工作区</strong>
           </div>
-          <button className={styles.panelClose} aria-label="关闭会话列表" onClick={() => setConversationsOpen(false)}><Icon name="close" /></button>
+          <button className={styles.panelClose} aria-label="关闭会话列表" onClick={() => setConversationsOpen(false)}><Icon name="panel" /></button>
         </div>
           <button
             type="button"
@@ -114,34 +123,36 @@ export function AgentChatView({
         <ConversationHistory conversations={conversations} agents={agents} conversationId={conversationId}
           disabled={switching || attaching || streamingId !== null} onSelect={handleConversationChange}
           onDelete={handleDeleteConversation} onRename={handleRenameConversation} />
+        <div className={styles.panelResize} role="separator" tabIndex={conversationDrawer || !conversationsOpen ? -1 : 0}
+          aria-label="调整会话列表宽度" aria-orientation="vertical" aria-valuemin={220} aria-valuemax={maxPanelWidth}
+          aria-valuenow={panelWidth} aria-valuetext={`${panelWidth} 像素`} data-resizing={resizing || undefined}
+          onPointerDown={(event) => {
+            if (event.button !== 0) return;
+            event.preventDefault();
+            drag.current = { x: event.clientX, width: panelWidth };
+            event.currentTarget.setPointerCapture(event.pointerId);
+            setResizing(true);
+          }}
+          onPointerMove={(event) => { if (drag.current) resize(drag.current.width + event.clientX - drag.current.x); }}
+          onPointerUp={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); }}
+          onLostPointerCapture={() => { drag.current = null; setResizing(false); }}
+          onKeyDown={(event) => {
+            if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+            event.preventDefault();
+            resize(event.key === 'Home' ? 220 : event.key === 'End' ? maxPanelWidth : panelWidth + (event.key === 'ArrowRight' ? 24 : -24));
+          }} />
       </aside>
 
       <div className={styles.chatMain}>
         <header className={styles.header}>
-          <button className={styles.panelToggle} aria-label="历史对话" title="历史对话" aria-expanded={conversationsOpen} onClick={() => setConversationsOpen(!conversationsOpen)}><Icon name="panel" /></button>
+          {!conversationsOpen && <button className={styles.panelToggle} aria-label="历史对话" title="历史对话" aria-expanded={conversationsOpen} onClick={() => setConversationsOpen(!conversationsOpen)}><Icon name="panel" /></button>}
           <AgentSwitcher agents={agents} value={selectedAgentId} disabled={streamingId !== null || switching || attaching}
             fallbackName={fallbackAgentName} onChange={(id) => void handleAgentChange(id)} />
           {(switching || streamingId) && <span className={styles.activity} role="status">{generationPhase === 'connecting' ? '正在连接…' : generationPhase === 'thinking' ? '正在思考…' : generationPhase === 'generating' ? '正在生成…' : '正在加载…'}</span>}
         </header>
 
         <div className={styles.streamFrame}>
-          <nav className={styles.turnRail} aria-label="本轮对话提问">
-            {userPrompts.map((message, index) => {
-              const promptLabel = message.content.trim() || message.attachments?.map((attachment) => attachment.fileName).join('、') || '附件';
-              return <button key={message.id} type="button"
-                ref={(element) => {
-                  if (element) promptMarkRefs.current.set(message.id, element);
-                  else promptMarkRefs.current.delete(message.id);
-                }}
-                className={`${styles.turnMark}${activePromptId === message.id ? ` ${styles.turnMarkActive}` : ''}`}
-                title={`第 ${index + 1} 轮：${promptLabel}`}
-                aria-label={`跳转到第 ${index + 1} 轮提问：${promptLabel}`}
-                aria-current={activePromptId === message.id ? 'location' : undefined}
-                onClick={() => promptRefs.current.get(message.id)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-              />;
-            })}
-          </nav>
-        <div className={styles.stream} ref={streamRef} onScroll={() => { onScroll(); updateTurnRail(); }}>
+        <div className={styles.stream} ref={streamRef} onScroll={onScroll}>
         {bootError && agents.length === 0 ? (
           <div className={styles.empty}>
             <span className={styles.emptyIcon} aria-hidden="true"><Icon name="plug" /></span>
@@ -179,14 +190,8 @@ export function AgentChatView({
         ) : null}
 
         {messages.map((message, index) => (
-          <div key={message.id}
-            ref={message.role === 'user' ? (element) => {
-              if (element) promptRefs.current.set(message.id, element);
-              else promptRefs.current.delete(message.id);
-            } : undefined}
-            className={message.role === 'user' ? styles.userTurnAnchor : undefined}
-          >
-            <ChatBubble message={message} agentName={selectedAgent?.name} avatarUrl={selectedAgent?.avatarUrl}
+          <div key={message.id}>
+            <ChatBubble message={message}
               active={message.id === streamingId}
               phase={message.id === streamingId ? generationPhase ?? undefined : undefined}
               onRetry={(message.status === 'failed' || ((message.status === 'running' || message.status === 'pending') && message.id !== streamingId)) && messages[index - 1]?.role === 'user' && !messages[index - 1].attachments?.length && pendingAttachments.length === 0 && !attaching && !switching && !streamingId
@@ -204,7 +209,6 @@ export function AgentChatView({
         </div>
 
         <div className={styles.footer}>
-        {memoryPanel}
         {readiness !== 'ready' && <div className={styles.alert} role="status">
           {readiness === 'starting' ? '对话服务正在准备，准备完成后即可发送' : readiness === 'failed' ? '对话服务准备失败，请联系维护者检查并重启服务' : '暂时无法连接对话服务，正在尝试重新连接'}
           {readiness !== 'starting' && <button type="button" onClick={onReadinessRetry}>重新检查</button>}
@@ -219,8 +223,6 @@ export function AgentChatView({
             <MessageComposer
               disabled={streamingId !== null || switching}
               sendBlocked={readiness !== 'ready'}
-              contextRemaining={contextRemaining}
-              contextMax={contextMax}
               contextUsage={contextUsage}
               streaming={streamingId !== null}
               onStop={handleStop}

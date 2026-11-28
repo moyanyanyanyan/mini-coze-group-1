@@ -68,7 +68,6 @@ export function ContextUsageIndicator({ usage }: ContextUsageIndicatorProps) {
               strokeDasharray={`${dash} ${circumference}`}
             />
           </svg>
-          <span>{reportedUsedTokens === null ? '--' : `${percentage}%`}</span>
         </span>
         <span className={styles.contextUsageLabel}>上下文用量</span>
       </button>
@@ -80,7 +79,6 @@ export function ContextUsageIndicator({ usage }: ContextUsageIndicatorProps) {
           <div><dt>使用比例</dt><dd>{reportedUsedTokens === null ? '--' : `${percentage}%`}</dd></div>
           <div><dt>剩余容量</dt><dd>{formatTokens(remainingTokens)}</dd></div>
         </dl>
-        <small>{usage.source === 'actual' ? '来源：Runtime 实际 Token' : '来源：本地估算 Token'}；容量为模型配置参考值，实际历史可能被裁剪。</small>
       </div>
     </div>
   );

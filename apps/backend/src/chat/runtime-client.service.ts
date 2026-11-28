@@ -39,6 +39,7 @@ export interface RuntimeRequestBody {
   assistantMessageId: string;
   agentConfig: RuntimeAgentConfig;
   history: RuntimeHistoryMessage[];
+  historySummary?: string;
   message: string;
   /** 原始问题；没有文字时使用截取的附件内容，与发给模型的消息分开传递。 */
   retrievalQuery?: string;
@@ -327,7 +328,27 @@ export class RuntimeClientService {
     }
   }
 
-  async previewContext(input: { systemPrompt: string; maxTokens: number; history: RuntimeHistoryMessage[] }): Promise<Pick<ConversationMemory, 'tokenLimit' | 'estimatedInputTokens' | 'reservedOutputTokens' | 'remainingTokens' | 'droppedTurns' | 'history'>> {
+  async compressContext(input: { model: string; connection?: RuntimeModelConnection; previousSummary: string; messages: RuntimeHistoryMessage[] }, signal?: AbortSignal): Promise<{ summary: string; usage: RuntimeUsage | null }> {
+    if (!this.token) throw new ServiceUnavailableException({ code: 'CONTEXT_COMPRESSION_FAILED', message: '上下文压缩服务未配置' });
+    const response = await fetch(`${this.baseUrl}/internal/runtime/context/compress`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.token}` },
+      body: JSON.stringify(input), signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(120_000)]) : AbortSignal.timeout(120_000),
+    }).catch(() => {
+      if (signal?.aborted) throw signal.reason;
+      throw new ServiceUnavailableException({ code: 'CONTEXT_COMPRESSION_FAILED', message: '历史摘要生成失败，请重试；原始对话已保留' });
+    });
+    if (!response.ok) throw new ServiceUnavailableException({ code: 'CONTEXT_COMPRESSION_FAILED', message: '历史摘要生成失败，请重试；原始对话已保留' });
+    const body = await response.json();
+    if (!isRecord(body) || typeof body.summary !== 'string' || !body.summary.trim() || Buffer.byteLength(body.summary) > 6000) {
+      throw new ServiceUnavailableException({ code: 'CONTEXT_COMPRESSION_FAILED', message: '历史摘要无效，原始对话已保留' });
+    }
+    const usage = body.usage;
+    if (usage !== null && (!isRecord(usage) || !['promptTokens', 'completionTokens', 'totalTokens'].every(key => Number.isSafeInteger(usage[key]) && Number(usage[key]) >= 0)
+      || usage.totalTokens !== Number(usage.promptTokens) + Number(usage.completionTokens))) throw new ServiceUnavailableException({ code: 'CONTEXT_COMPRESSION_FAILED', message: '压缩用量响应无效' });
+    return { summary: body.summary, usage: usage as RuntimeUsage | null };
+  }
+
+  async previewContext(input: { systemPrompt: string; maxTokens: number; history: RuntimeHistoryMessage[]; historySummary?: string }): Promise<Pick<ConversationMemory, 'tokenLimit' | 'estimatedInputTokens' | 'reservedOutputTokens' | 'remainingTokens' | 'droppedTurns' | 'history'>> {
     try {
       if (!this.token) throw new Error('unconfigured');
       const response = await fetch(`${this.baseUrl}/internal/runtime/context/preview`, {

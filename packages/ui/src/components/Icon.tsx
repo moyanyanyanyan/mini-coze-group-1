@@ -7,10 +7,13 @@ interface IconProps extends SVGProps<SVGSVGElement> {
 
 export function Icon({ name, ...props }: IconProps) {
   const paths: Record<IconName, ReactNode> = {
+    // Lucide Bot 图标，授权说明见 licenses/lucide.txt。
+    bot: <><path d="M12 8V4H8" /><rect width="16" height="12" x="4" y="8" rx="2" /><path d="M2 14h2m16 0h2m-7-1v2m-6-2v2" /></>,
     chevronDown: <path d="m6 9 6 6 6-6" />,
     close: <path d="m6 6 12 12M6 18 18 6" />,
     plus: <path d="M12 5v14M5 12h14" />,
     more: <><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></>,
+    copy: <><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" /></>,
     check: <path d="m5 12 4 4L19 6" />,
     menu: <path d="M4 6h16M4 12h16M4 18h16" />,
     panel: <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /></>,

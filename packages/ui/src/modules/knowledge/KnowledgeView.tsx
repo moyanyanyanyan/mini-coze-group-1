@@ -7,12 +7,12 @@ import { describeSourceRange, uniqueSourceRanges } from './source-format';
 import './knowledge.css';
 
 export function KnowledgeView({
-  catalog, documentState, documentContentState, searchState, actions, confirmation, fileInputRef, onBackToCenter,
+  catalog, documentState, documentContentState, searchState, actions, confirmation, fileInputRef, getOriginalFileUrl, onBackToCenter,
   editDialogOpen, editName, editDescription, editSaving, onEditNameChange, onEditDescriptionChange, onEditSubmit, onCloseEditDialog,
 }: KnowledgeViewProps) {
   const { error, selectedId, selectedBase, selectedBaseStatus, deletingBase, updatingBaseStatus } = catalog;
   const { activeTab, documents, documentError, documentLoading, documentSaving, deletingDocumentId,
-    addingDocument, sourceMode, documentTitle, documentText, selectedDocument, documentDrawerOpen,
+    addingDocument, sourceMode, documentTitle, documentText, documentFileName, selectedDocument, documentDrawerOpen,
     hasProcessing } = documentState;
   const { content: documentContent, loading: documentContentLoading, error: documentContentError, hasMore: documentContentHasMore, totalLength: documentContentTotalLength,
     sourceRanges: documentSourceRanges, sourceRangesLoading: documentSourceLoading, sourceRangesError: documentSourceError } = documentContentState;
@@ -99,13 +99,13 @@ export function KnowledgeView({
                       <button type="button" className={sourceMode === 'file' ? 'is-active' : ''} onClick={() => onSourceModeChange('file')}>上传文件</button>
                     </div>
                     <label htmlFor="document-title">文档标题{sourceMode === 'file' ? '（可选）' : ''}</label>
-                    <input id="document-title" value={documentTitle} onChange={(event) => onDocumentTitleChange(event.target.value)} maxLength={100} required={sourceMode === 'text'} placeholder={sourceMode === 'file' ? '留空则使用文件名' : '例如：报销规则'} />
+                    <input className="knowledge-document-title-input" id="document-title" value={documentTitle} onChange={(event) => onDocumentTitleChange(event.target.value)} maxLength={100} required={sourceMode === 'text'} placeholder={sourceMode === 'file' ? '留空则使用文件名' : '例如：报销规则'} />
                     {sourceMode === 'text' ? (
                       <><label htmlFor="document-text">正文</label><textarea id="document-text" value={documentText} onChange={(event) => onDocumentTextChange(event.target.value)} rows={8} required placeholder="在此粘贴资料正文" /></>
                     ) : (
-                      <><label htmlFor="document-file">TXT / JSON / MD / HTML 最多 1 MiB；PDF 最多 64 MiB；DOCX / PPTX 最多 32 MiB；PNG / JPG / JPEG 图片最多 10 MiB；XLSX 最多 20 MiB；CSV 最多 2 MiB；WEBP 最多 5 MiB</label><input id="document-file" ref={fileInputRef} type="file" accept=".txt,.json,.md,.markdown,.html,.htm,.pdf,.docx,.pptx,.png,.jpg,.jpeg,.xlsx,.csv,.webp" onChange={(event) => onDocumentFileChange(event.target.files?.[0] ?? null)} required /></>
+                      <><span className="knowledge-upload-hint" id="document-file-hint">TXT / JSON / MD / HTML 最多 1 MiB；PDF 最多 64 MiB；DOCX / PPTX 最多 32 MiB；PNG / JPG / JPEG 图片最多 10 MiB；XLSX 最多 20 MiB；CSV 最多 2 MiB；WEBP 最多 5 MiB</span><div className="knowledge-file-picker"><input hidden id="document-file" aria-label="选择资料文件" aria-describedby="document-file-hint" ref={fileInputRef} type="file" accept=".txt,.json,.md,.markdown,.html,.htm,.pdf,.docx,.pptx,.png,.jpg,.jpeg,.xlsx,.csv,.webp" onChange={(event) => { const file = event.target.files?.[0]; if (file) onDocumentFileChange(file); }} /><button type="button" className="knowledge-file-select" disabled={documentSaving} onClick={() => fileInputRef.current?.click()}>{documentFileName ? '重新选择' : '选择文件'}</button><span className="knowledge-file-name" title={documentFileName ?? undefined} aria-live="polite">{documentFileName ? `已选择：${documentFileName}` : '尚未选择文件'}</span></div></>
                     )}
-                    <button type="submit" disabled={documentSaving}>{documentSaving ? '提交中…' : '提交资料'}</button>
+                    <button type="submit" disabled={documentSaving || (sourceMode === 'file' && !documentFileName)}>{documentSaving ? '提交中…' : '提交资料'}</button>
                   </form>
                   {documentError && <p className="knowledge-error" role="alert">{documentError}</p>}
                   {documentLoading && documents.length === 0 ? <p className="knowledge-empty">正在加载…</p> : documents.length === 0 ? (
@@ -147,6 +147,17 @@ export function KnowledgeView({
                   <div className="knowledge-drawer-body">
                     <div className="knowledge-drawer-status-row"><span className={`knowledge-document-status status-${selectedDocument.status.toLowerCase()}`}>{selectedDocument.status === 'READY' ? '可检索' : selectedDocument.status === 'PROCESSING' ? '处理中' : '处理失败'}</span>{selectedDocument.status === 'PROCESSING' && <span className="knowledge-stage">当前步骤：{selectedDocument.stage}</span>}</div>
                     <section className="knowledge-detail-section"><h3>资料信息</h3><dl className="knowledge-detail-grid"><div><dt>资料格式</dt><dd>{documentFormat(selectedDocument)}</dd></div><div><dt>添加时间</dt><dd>{new Date(selectedDocument.createdAt).toLocaleString('zh-CN')}</dd></div><div><dt>原始文件名</dt><dd>{selectedDocument.originalFileName || selectedDocument.title}</dd></div><div><dt>处理状态</dt><dd>{selectedDocument.status === 'READY' ? '处理完成' : selectedDocument.status === 'PROCESSING' ? '正在处理' : '处理失败'}</dd></div>{documentContentTotalLength !== undefined && <div><dt>内容长度</dt><dd>{documentContentTotalLength.toLocaleString('zh-CN')} 字</dd></div>}</dl></section>
+                    <section className="knowledge-detail-section knowledge-original-file">
+                      <h3>原始文件</h3>
+                      <p className="knowledge-source-hint">{selectedDocument.sourceType === 'TEXT' ? '录入时的原始文本，可下载保存。' : '上传时的原始文件，保留原有内容与格式。'}</p>
+                      <div className="knowledge-original-file-row">
+                        <span className="knowledge-original-file-name">{selectedDocument.originalFileName || `${selectedDocument.title}.txt`}</span>
+                        <div className="knowledge-original-file-actions">
+                          {['PDF', 'IMAGE', 'PNG', 'JPG', 'JPEG', 'WEBP'].includes(selectedDocument.sourceType) && <a href={`${getOriginalFileUrl(selectedDocument.id)}&inline=1`} target="_blank" rel="noopener noreferrer">查看原文件</a>}
+                          <a href={getOriginalFileUrl(selectedDocument.id)} download>下载原文件</a>
+                        </div>
+                      </div>
+                    </section>
                     {selectedDocument.status === 'PROCESSING' && <section className="knowledge-processing-panel"><strong>正在处理这份资料</strong><p>处理完成后，资料会自动变为可检索状态。请稍候。</p></section>}
                     {selectedDocument.status === 'FAILED' && <section className="knowledge-failed-panel"><strong>这份资料暂时无法处理</strong><p>{friendlyDocumentError(selectedDocument.error?.message)}</p><button type="button" className="knowledge-primary-button" disabled={deletingDocumentId !== null} onClick={() => void handleRetry(selectedDocument.id)}>重新处理</button></section>}
                     {selectedDocument.status === 'READY' && <section className="knowledge-detail-section"><div className="knowledge-panel-heading"><div><h3>识别内容</h3><p>以下内容为资料处理后识别出的连续文本。</p></div></div>{documentContentError && <p className="knowledge-error" role="alert">{documentContentError}</p>}{documentContentLoading ? <p className="knowledge-empty">正在加载识别内容…</p> : documentContent === null ? null : documentContent ? <><div className="knowledge-document-content">{documentContent}</div>{documentContentHasMore && <button type="button" className="knowledge-primary-button knowledge-read-more" onClick={() => onReadDocument(selectedDocument.id)}>阅读全文</button>}</> : <p className="knowledge-empty">这份资料没有可展示的识别内容。</p>}</section>}

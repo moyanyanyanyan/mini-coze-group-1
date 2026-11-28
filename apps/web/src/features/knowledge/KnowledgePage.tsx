@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { KnowledgeView, documentFormat } from '@minicoze/ui/knowledge';
 import { useConfirm } from '@minicoze/ui/hooks';
 import { KnowledgeCenterPage } from './KnowledgeCenterPage';
-import { createKnowledgeBase, createTextDocument, getKnowledgeDocument, getKnowledgeDocumentContent, getKnowledgeDocumentContentPage, getKnowledgeWorkspaceId, deleteKnowledgeBase, deleteKnowledgeDocument, listDocumentChunks, listKnowledgeBases, listKnowledgeDocuments, previewKnowledgeSearch, retryKnowledgeDocument, updateKnowledgeBase, updateKnowledgeBaseStatus, uploadDocumentFile, type KnowledgeBase, type KnowledgeDocument, type KnowledgeSearchResult, type KnowledgeSourceRange } from './knowledge.api';
+import { knowledgeDocumentDownloadUrl, createKnowledgeBase, createTextDocument, getKnowledgeDocument, getKnowledgeDocumentContent, getKnowledgeDocumentContentPage, getKnowledgeWorkspaceId, deleteKnowledgeBase, deleteKnowledgeDocument, listDocumentChunks, listKnowledgeBases, listKnowledgeDocuments, previewKnowledgeSearch, retryKnowledgeDocument, updateKnowledgeBase, updateKnowledgeBaseStatus, uploadDocumentFile, type KnowledgeBase, type KnowledgeDocument, type KnowledgeSearchResult, type KnowledgeSourceRange } from './knowledge.api';
 import { navigate, usePathname } from '../../shared/routing/navigation';
 import { knowledgeUploadError } from './upload-validation';
 
@@ -185,6 +185,7 @@ function KnowledgeDetailPage({ knowledgeBaseId }: { knowledgeBaseId: string }) {
       setDocumentTitle('');
       setDocumentText('');
       setDocumentFile(null);
+      setAddingDocument(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (cause) {
       setDocumentError(getMessage(cause));
@@ -348,7 +349,7 @@ function KnowledgeDetailPage({ knowledgeBaseId }: { knowledgeBaseId: string }) {
       documentState={{
         activeTab, documents, documentError, documentLoading, documentSaving, deletingDocumentId,
         addingDocument, sourceMode, documentTitle, documentText, selectedDocumentId, selectedDocument,
-        documentDrawerOpen, readyDocuments, hasProcessing,
+        documentDrawerOpen, readyDocuments, hasProcessing, documentFileName: documentFile?.name ?? null,
       }}
       documentContentState={{
         content: documentContent, loading: documentContentLoading, error: documentContentError,
@@ -359,6 +360,7 @@ function KnowledgeDetailPage({ knowledgeBaseId }: { knowledgeBaseId: string }) {
       searchState={{ query, searchResult, contentByDocumentId, searching, searchError, canSearch: Boolean(query.trim()) }}
       confirmation={confirmation}
       fileInputRef={fileInputRef}
+      getOriginalFileUrl={(id) => knowledgeDocumentDownloadUrl(id, workspaceId)}
       editDialogOpen={editDialogOpen}
       editName={editName}
       editDescription={editDescription}

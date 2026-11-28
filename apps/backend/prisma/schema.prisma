@@ -203,6 +203,8 @@ model Conversation {
   userId    String   @db.Uuid
   agentId   String?
   title     String   @default("新对话")
+  contextSummary String?
+  contextSummaryThrough String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

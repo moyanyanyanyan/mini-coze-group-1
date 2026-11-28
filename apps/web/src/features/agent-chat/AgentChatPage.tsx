@@ -16,7 +16,7 @@ import {
 import { estimateConversationTokens, getContextTokenLimit } from './context-usage';
 import { AppLink } from '../../shared/routing/AppLink';
 import { useConfirm } from '@minicoze/ui/hooks';
-import { AgentChatView, ConversationMemory, useChatViewport } from '@minicoze/ui/agent-chat';
+import { AgentChatView, useChatViewport } from '@minicoze/ui/agent-chat';
 import { useConversationMemory } from './use-conversation-memory';
 
 import { useChatReadiness } from './use-chat-readiness';
@@ -27,7 +27,7 @@ const SUGGESTED_PROMPTS = [
   '帮我规划下一步任务',
 ];
 
-const CONTEXT_HISTORY_ROUND_LIMIT = 10;
+const CONTEXT_HISTORY_ROUND_LIMIT = 100;
 /** 与后端 SendMessageDto 的 ArrayMaxSize(5) 保持一致 */
 const MAX_ATTACHMENTS = 5;
 
@@ -140,7 +140,7 @@ export function AgentChatPage() {
       setConversationId(conversation?.id ?? null);
       setMessages(history);
       const agent = allAgents.find((item) => item.id === agentId);
-      setTokenUsage({ conversationId: conversation?.id ?? null, usedTokens: estimateConversationTokens(history, agent?.systemPrompt, Math.min(agent?.contextLimit ?? 10, 10)), source: 'estimated' });
+      setTokenUsage({ conversationId: conversation?.id ?? null, usedTokens: estimateConversationTokens(history, agent?.systemPrompt, Math.min(agent?.contextLimit ?? 10, 100)), source: 'estimated' });
     } catch (caught) {
       if (request === requestId.current) setBootError(caught instanceof ApiError ? caught.message : '会话加载失败，请稍后再试');
     } finally {
@@ -170,7 +170,7 @@ export function AgentChatPage() {
         : [conversation, ...existing]);
       setMessages(history);
       const agent = agents.find((item) => item.id === agentId);
-      setTokenUsage({ conversationId: conversation.id, usedTokens: estimateConversationTokens(history, agent?.systemPrompt, Math.min(agent?.contextLimit ?? 10, 10)), source: 'estimated' });
+      setTokenUsage({ conversationId: conversation.id, usedTokens: estimateConversationTokens(history, agent?.systemPrompt, Math.min(agent?.contextLimit ?? 10, 100)), source: 'estimated' });
       setCitationsByMessage({});
       rememberChatLocation(agentId, conversation.id);
       jumpToLatest();
@@ -201,7 +201,7 @@ export function AgentChatPage() {
       setMessages(history);
       rememberChatLocation(conversation.agentId, conversation.id);
       const agent = agents.find((item) => item.id === conversation.agentId);
-      setTokenUsage({ conversationId: conversation.id, usedTokens: estimateConversationTokens(history, agent?.systemPrompt, Math.min(agent?.contextLimit ?? 10, 10)), source: 'estimated' });
+      setTokenUsage({ conversationId: conversation.id, usedTokens: estimateConversationTokens(history, agent?.systemPrompt, Math.min(agent?.contextLimit ?? 10, 100)), source: 'estimated' });
       setCitationsByMessage({});
     } catch (caught) {
       if (request === requestId.current) setBootError(caught instanceof Error ? caught.message : '会话加载失败');
@@ -500,7 +500,7 @@ export function AgentChatPage() {
             }
             setCitationsByMessage((prev) => ({ ...prev, [id]: citations }));
           },
-          onCompleted: (finalContent, usage) => {
+          onCompleted: (finalContent) => {
             if (controller.signal.aborted) return;
             terminalStatus = 'completed';
             // 后端给的全量优先，避免网络抖动丢过某个 delta
@@ -527,19 +527,20 @@ export function AgentChatPage() {
             };
             setTokenUsage({
               conversationId: convId,
-              usedTokens: usage?.totalTokens ?? estimateConversationTokens([...messages, pendingUser, completed], selectedAgent?.systemPrompt, contextTurns),
-              source: usage ? 'actual' : 'estimated',
+              usedTokens: estimateConversationTokens([...messages, pendingUser, completed], selectedAgent?.systemPrompt, contextTurns),
+              source: 'estimated',
             });
             setGenerationPhase(null);
             setStreamingId(null);
           },
           onFailed: (code, message) => {
             if (controller.signal.aborted) return;
-            if (code === 'SERVICE_NOT_READY' && !started) {
+            if ((code === 'SERVICE_NOT_READY' || code === 'CONTEXT_COMPRESSION_FAILED') && !started) {
               rejectedBeforeStart = true;
               setPendingAttachments(sendingAttachments);
               setMessages(prev => prev.filter(m => m.id !== assistantKey && m.id !== userKey));
-              readiness.refresh();
+              if (code === 'SERVICE_NOT_READY') readiness.refresh();
+              else setSendError(message);
               return;
             }
             terminalStatus = 'failed';
@@ -631,22 +632,15 @@ export function AgentChatPage() {
     setGenerationPhase(null);
   };
 
-  const completedTurns = messages.reduce((count, message, index) => count + (
-    message.role === 'user' && messages[index + 1]?.role === 'assistant'
-      && messages[index + 1].status === 'completed' ? 1 : 0
-  ), 0);
-  const contextMax = Math.min(selectedAgent?.contextLimit ?? CONTEXT_HISTORY_ROUND_LIMIT, CONTEXT_HISTORY_ROUND_LIMIT);
-  const contextRemaining = Math.max(0, contextMax - completedTurns);
   const contextUsage = {
-    usedTokens: tokenUsage?.conversationId === conversationId ? tokenUsage.usedTokens : null,
-    maxTokens: getContextTokenLimit(selectedAgent),
-    source: tokenUsage?.source ?? 'estimated',
+    usedTokens: memory.memory?.estimatedInputTokens ?? (tokenUsage?.conversationId === conversationId ? tokenUsage.usedTokens : null),
+    maxTokens: memory.memory ? Math.max(1, memory.memory.tokenLimit - memory.memory.reservedOutputTokens) : getContextTokenLimit(selectedAgent),
+    source: 'estimated',
   } as const;
 
   return (
     <AgentChatView
       conversationId={conversationId}
-      memoryPanel={conversationId ? <ConversationMemory memory={memory.memory} error={memory.error} loading={memory.loading} onRefresh={memory.refresh} /> : undefined}
       conversations={conversations}
       agents={agents}
       selectedAgentId={selectedAgentId}
@@ -654,8 +648,6 @@ export function AgentChatPage() {
       citationsByMessage={citationsByMessage}
       streamingId={streamingId}
       generationPhase={generationPhase}
-      contextRemaining={contextRemaining}
-      contextMax={contextMax}
       contextUsage={contextUsage}
       sendError={sendError}
       readiness={readiness.status}

@@ -325,10 +325,11 @@
 .om .uv-stat-tile__number { font-size:clamp(24px,2.5vw,36px); line-height:1.2; white-space:nowrap; margin:0; }
 .om .uv-stat-tile__caption { margin:0; max-width:none; }
 .om .uv-stat-tile__body { gap:8px; }
-/* 06 保留全部原作 3D 层、位移与延迟；内容面改为白色，采用内容高度。 */
+/* 06 保留原作分层；悬浮或键盘聚焦时整体上移，离开后回落。 */
 .om .om-source-base { min-width:0; padding:12px 6px 22px; }
 .om .om-source-base .uv-card-parent { width:100%; height:auto; }
 .om .om-source-base .uv-card-card { position:relative; height:auto; min-height:380px; background:linear-gradient(135deg,#fff 70%,#f1ecff); border:1px solid #e6e0f3; }
+.om .om-source-base .uv-card-parent:is(:hover,:focus-within) .uv-card-card { transform:translateY(-6px); }
 .om .om-source-base .uv-card-glass { pointer-events:none; background:linear-gradient(0deg,#ffffff70,#ffffffd9); }
 .om .om-source-base .uv-card-content { padding:92px 24px 76px; }
 .om .om-source-base .uv-card-title { font-size:18px; }
@@ -378,6 +379,7 @@
 }
 @media (prefers-reduced-motion:reduce) {
   .om .om-primary:is(:hover,:focus,:active),.om .om-source-keycap:active { transform:none; }
+  .om .om-source-base .uv-card-parent:is(:hover,:focus-within) .uv-card-card { transform:none; }
 }
 
 .om .om-k-history summary::after { rotate:0deg; }

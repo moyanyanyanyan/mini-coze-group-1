@@ -141,6 +141,7 @@ export class ChatController {
       this.logger.error(`聊天流异常 conversationId=${id}`, error as Error);
       const detail = error instanceof HttpException ? error.getResponse() : null;
       const notReady = detail !== null && typeof detail === 'object' && 'code' in detail && detail.code === 'SERVICE_NOT_READY';
+      const compressionFailed = detail !== null && typeof detail === 'object' && 'code' in detail && detail.code === 'CONTEXT_COMPRESSION_FAILED';
       if (!res.writableEnded) {
         res.write(frame({
           runId: lastEvent?.runId ?? randomUUID(),
@@ -148,7 +149,7 @@ export class ChatController {
           seq: (lastEvent?.seq ?? 0) + 1,
           timestamp: new Date().toISOString(),
           type: 'run.failed',
-          data: { code: notReady ? 'SERVICE_NOT_READY' : 'MODEL_ERROR', message: notReady ? '对话服务尚未就绪，请稍后重试' : '生成失败，请稍后重试', retryable: true },
+          data: { code: notReady ? 'SERVICE_NOT_READY' : compressionFailed ? 'CONTEXT_COMPRESSION_FAILED' : 'MODEL_ERROR', message: notReady ? '对话服务尚未就绪，请稍后重试' : compressionFailed ? '历史摘要生成失败，请重试；原始对话已保留' : '生成失败，请稍后重试', retryable: true },
         }));
       }
     } finally {

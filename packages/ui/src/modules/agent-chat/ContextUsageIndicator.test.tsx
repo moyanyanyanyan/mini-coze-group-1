@@ -9,9 +9,11 @@ describe('ContextUsageIndicator', () => {
     );
 
     expect(markup).toContain('上下文用量 25%');
+    expect(markup.split('</button>')[0]).not.toContain('>25%<');
     expect(markup).toContain('当前使用');
     expect(markup).toContain('32,000 Tokens');
-    expect(markup).toContain('来源：Runtime 实际 Token');
+    expect(markup).toContain('使用比例</dt><dd>25%</dd>');
+    expect(markup).not.toContain('来源：');
     expect(markup).toContain('stroke-dasharray="14.137166941154069 56.548667764616276"');
   });
 

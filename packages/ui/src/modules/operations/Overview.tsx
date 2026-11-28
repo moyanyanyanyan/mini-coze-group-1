@@ -2,7 +2,8 @@ import { TokenActivity } from './TokenActivity';
 import { animateOperationsChange } from './motion';
 import { useState } from 'react';
 import { conversationPath, taskPath, duration, dateTime } from './model';
-import { PageHeader, Panel, Pagination, Badge, Cell, Empty, Records, runLabels, taskLabels } from './components';
+import { PageHeader, Panel, Pagination, Badge, Cell, Empty, Records, runLabels } from './components';
+import { taskState } from './knowledge-display';
 import type { ContentProps } from './view-types';
 
 export function Overview(p: ContentProps) {
@@ -23,7 +24,7 @@ export function Overview(p: ContentProps) {
       const d = data.documents.find(d => d.id === t.documentId)!;
       const attempt = t.observed?.latestAttempt;
       return { id: t.id, at: attempt?.finishedAt ? Date.parse(attempt.finishedAt) : t.observed ? Date.parse(t.observed.updatedAt) : t.startedAt, title: d.name, module: '知识库', status: t.status,
-        badge: taskLabels[t.status], error: t.error ?? t.stages.filter(s => s.status === 'failed').map(s => `${s.name}：${s.description}`).join('；'),
+        badge: taskState(t), error: t.error ?? t.stages.filter(s => s.status === 'failed').map(s => `${s.name}：${s.description}`).join('；'),
         href: taskPath(d.baseId, t.id), durationMs: attempt?.startedAt && attempt.finishedAt ? Date.parse(attempt.finishedAt) - Date.parse(attempt.startedAt) : null, durationSample: false,
         inputTokens: null, outputTokens: null };
     }),

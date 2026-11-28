@@ -1,4 +1,5 @@
 export type IconName =
+  | 'bot'
   | 'home'
   | 'edit'
   | 'chat'
@@ -7,4 +8,4 @@ export type IconName =
   | 'workflow'
   | 'send'
   | 'image'
-  | 'api' | 'model' | 'chevronDown' | 'close' | 'plus' | 'more' | 'check' | 'menu' | 'panel' | 'stop' | 'arrowDown' | 'play' | 'repeat';
+  | 'api' | 'model' | 'chevronDown' | 'close' | 'plus' | 'more' | 'check' | 'copy' | 'menu' | 'panel' | 'stop' | 'arrowDown' | 'play' | 'repeat';

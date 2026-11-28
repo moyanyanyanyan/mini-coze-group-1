@@ -25,7 +25,7 @@ class ChatMessage(DTO):
 
 class ModelInput(DTO):
     model: str = Field(min_length=1, max_length=100)
-    messages: list[ChatMessage] = Field(min_length=1, max_length=100)
+    messages: list[ChatMessage] = Field(min_length=1, max_length=204)
     temperature: float = Field(default=0.7, ge=0, le=2, allow_inf_nan=False)
     max_tokens: int = Field(default=1024, ge=1, le=8192)
 
@@ -69,7 +69,8 @@ class HistoryMessage(DTO):
 class ContextPreviewRequest(DTO):
     systemPrompt: str = Field(max_length=16000)
     maxTokens: int = Field(ge=1, le=8192)
-    history: list[HistoryMessage] = Field(max_length=20)
+    history: list[HistoryMessage] = Field(max_length=200)
+    historySummary: str = Field(default="", max_length=6000)
 
     @model_validator(mode="after")
     def validate_pairs(self) -> Self:
@@ -81,6 +82,13 @@ class ContextPreviewRequest(DTO):
         return self
 
 
+class ContextCompressionRequest(DTO):
+    model: str = Field(min_length=1, max_length=100)
+    connection: ModelConnection | None = None
+    previousSummary: str = Field(default="", max_length=6000)
+    messages: list[HistoryMessage] = Field(min_length=1, max_length=200)
+
+
 class RuntimeRequest(DTO):
     runId: Identifier
     actor: Actor
@@ -88,7 +96,8 @@ class RuntimeRequest(DTO):
     userMessageId: Identifier
     assistantMessageId: Identifier
     agentConfig: AgentConfig
-    history: list[HistoryMessage] = Field(max_length=20)
+    history: list[HistoryMessage] = Field(max_length=200)
+    historySummary: str = Field(default="", max_length=6000)
     message: str = Field(min_length=1, max_length=20000)
     retrievalQuery: str | None = Field(default=None, min_length=1, max_length=8000, pattern=r"\S")
 

@@ -53,6 +53,9 @@ describe('agent builder views', () => {
       <AgentDetailView {...detailProps} pluginSaving versionsError="版本加载失败" />,
     );
     expect(html).toContain('人设与回复逻辑');
+    expect(html).not.toContain('ab-chat-empty-avatar');
+    expect(html).not.toContain('ab-chat-avatar');
+    expect(html).toContain('在下方输入消息开始测试对话。');
     expect(html).toContain('编排');
     expect(html).toContain('草稿名称');
     expect(html).toContain('测试模型');

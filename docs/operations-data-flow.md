@@ -12,7 +12,7 @@
 | 会话目录、完整正文 | `/api/operations/agents/:id/conversations`、`/api/operations/conversations/:id/messages` | `Conversation`、`Message` | 完整翻页；没有历史执行采集的消息仍可看正文，不虚构执行链路 |
 | 会话来源 | 运行记录的 `source`、`apiKeyId` | Web 默认为 `web`；公开 API 由请求上下文提供已验证的 Key ID | 混合来源独立标记；旧记录未存来源时显示历史未记录，不从 stream/run 猜渠道 |
 | 执行链路与节点异常 | `/api/operations/runtime/runs/:id` | Runtime 阶段与事件 + 同一 runId 的检索/工具日志 | 实际耗时、首字响应、每轮模型用量、工具参数/结果、检索候选/引用；工具失败但回答成功标为“完成，有异常” |
-| 当前上下文/记忆 | `/api/conversations/:id/memory` → `/internal/runtime/context/preview` | ChatService 实际历史筛选 + Runtime 实际预算裁剪函数 | 当前配置下的下一轮基础上下文预览；Token 是明确标注的保守估算，区别于模型实际用量 |
+| 当前上下文/记忆 | `/api/conversations/:id/memory` → `/internal/runtime/context/preview` | ChatService 历史摘要与近期原文 + Runtime 实际预算预览函数 | 当前配置下的下一轮基础上下文预览；Token 是明确标注的保守估算，区别于模型实际用量 |
 | 知识库容量、文件类型/状态/切片数 | `/api/operations/knowledge-bases`、`/knowledge-bases/:id/documents` | `KnowledgeBase`、`KnowledgeDocument`、`KnowledgeChunk` | 原文件大小由 PostgreSQL `octet_length(sourceBytes)` 计算；缺失大小不使用占位容量 |
 | 原文件、解析文本、切片 | `/api/documents/:id/file`、运行管理的 `/text`、知识库的 `/chunks` | 原始 `sourceBytes`、`rawText`、实际切片行 | PDF/图片预览访问真实文件；其他格式查看实际解析文本；停用知识库仍可只读切片，不能参与检索 |
 | 文件处理历史/阶段耗时 | `/api/operations/knowledge-bases/:id/documents/:documentId/attempts`，目录同时带最新一次记录 | `OperationDocumentAttempt` 数据库触发器 | 每次处理保留独立记录。阶段耗时按进入/离开时间差计算，未知旧时间不推算 |
@@ -54,7 +54,7 @@ flowchart TD
   Read --> View[React 运行管理页面]
 ```
 
-1. ChatService 在事务中保存用户消息、创建助手占位消息，再按既有规则构造完整问答历史和附件正文/摘要。
+1. ChatService 验证归属与附件，按智能体原文轮数和预算将较早对话增量压缩为会话摘要；完成后在事务中保存本轮消息，再携带历史摘要与近期问答调用 Runtime。原始消息不会删除，详见 [上下文压缩改造](conversation-context-compression.md)。
 2. Collector 在实际调用前创建运行记录，公开 API 的来源和 Key ID 从服务器验证过的请求上下文取得，不信任浏览器传入的归属信息。
 3. Runtime 检索时，NestJS 先验证用户、智能体、绑定和知识库范围。检索问题实际向量化，再查询 pgvector；记录候选、相似度、耗时和结果。
 4. Runtime 完成上下文组装后使用实际模型。工具调用进入现有执行器，运行管理另存经脱敏的参数与实际结果。

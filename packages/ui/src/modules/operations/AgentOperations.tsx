@@ -1,5 +1,6 @@
 import { InfoTooltip } from '../../components/uiverse/InfoTooltip';
 import { Icon } from '../../components/Icon';
+import { MarkdownMessage } from '../agent-chat/MarkdownMessage';
 import { animateOperationsChange } from './motion';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -195,7 +196,7 @@ export function Conversation(p: ContentProps & { agentId: string; conversationId
     return (
       <><PageHeader title={conversation.title} description="当前会话尚无对应的采集记录，以下为已有消息。" />
       <ConversationMemory memory={data.memory} error={data.memoryError} loading={p.loading} onRefresh={p.onRefresh} />
-      {data.messages?.map(message => <Panel key={message.id} title={message.role === 'user' ? '用户' : '助手'}><p className="om-answer">{message.content}</p></Panel>)}
+      {data.messages?.map(message => <Panel key={message.id} title={message.role === 'user' ? '用户' : '助手'}><div className="om-answer">{message.role === 'assistant' ? <MarkdownMessage content={message.content} /> : message.content}</div></Panel>)}
       <Empty>
         执行记录不存在，或不属于当前会话。
         <L to={conversationPath(agentId, conversationId)}>返回会话</L>
@@ -230,7 +231,7 @@ export function Conversation(p: ContentProps & { agentId: string; conversationId
               return <article className="om-turn" key={message.id}>
                 <div className={`om-replay-message ${message.role === 'user' ? 'is-user' : 'is-assistant'}`}>
                   <span className="om-replay-avatar" aria-hidden="true">{message.role === 'user' ? '用' : '助'}</span>
-                  <div className="om-replay-body"><div className="om-speaker">{message.role === 'user' ? '用户' : '助手'} · {({ completed: '已完成', failed: '失败', cancelled: '已取消', running: '生成中', pending: '等待生成' } as Record<string,string>)[message.status] ?? message.status}</div><p className="om-answer">{message.content || '没有已保存的正文'}</p></div>
+                  <div className="om-replay-body"><div className="om-speaker">{message.role === 'user' ? '用户' : '助手'} · {({ completed: '已完成', failed: '失败', cancelled: '已取消', running: '生成中', pending: '等待生成' } as Record<string,string>)[message.status] ?? message.status}</div><div className="om-answer">{message.role === 'assistant' ? <MarkdownMessage content={message.content || '没有已保存的正文'} /> : message.content || '没有已保存的正文'}</div></div>
                 </div>
                 {associated ? <L className="om-run-link" to={`${conversationPath(agentId, conversationId)}?run=${associated.id}`} aria-expanded={expanded && run.id === associated.id}><Badge tone={associated.status}>{runLabels[associated.status]}</Badge><span>{duration(associated.durationMs)}</span><span>查看第 {runs.indexOf(associated) + 1} 轮执行链路</span></L>
                   : message.role === 'assistant' ? <p className="om-note">这条历史消息没有采集执行链路。</p> : null}
@@ -249,7 +250,7 @@ export function Conversation(p: ContentProps & { agentId: string; conversationId
                   <span className="om-replay-avatar" aria-hidden="true">{data.agents.find((a) => a.id === agentId)!.name.slice(0, 1)}</span>
                   <div className="om-replay-body">
                     <div className="om-speaker">{data.agents.find((a) => a.id === agentId)!.name}</div>
-                    <p className="om-answer">{r.answer || (r.observed ? '当前没有已保存的回复内容。' : '本轮执行失败，没有生成回复。')}</p>
+                    <div className="om-answer"><MarkdownMessage content={r.answer || (r.observed ? '当前没有已保存的回复内容。' : '本轮执行失败，没有生成回复。')} /></div>
                   </div>
                 </div>
                 <L

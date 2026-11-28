@@ -1,13 +1,12 @@
 import { memo, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { ChatMessageView } from './types';
+import { Icon } from '../../components/Icon';
 import { MarkdownMessage } from './MarkdownMessage';
 import styles from './agent-chat.module.css';
 
 interface ChatBubbleProps {
   message: ChatMessageView;
-  agentName?: string;
-  avatarUrl?: string;
   active?: boolean;
   phase?: 'connecting' | 'thinking' | 'generating';
   onRetry?: () => void;
@@ -31,7 +30,7 @@ function ThinkingIndicator({ phase }: { phase: 'connecting' | 'thinking' }) {
   </span>;
 }
 
-export const ChatBubble = memo(function ChatBubble({ message, agentName, avatarUrl, active, phase, onRetry }: ChatBubbleProps) {
+export const ChatBubble = memo(function ChatBubble({ message, active, phase, onRetry }: ChatBubbleProps) {
   const [copied, setCopied] = useState(false);
   const isUser = message.role === 'user';
   // 是否还在生成只看 status，不能靠「内容为空」猜 —— 失败的消息内容也是空的
@@ -56,12 +55,6 @@ export const ChatBubble = memo(function ChatBubble({ message, agentName, avatarU
 
   return (
     <div className={`${styles.row} ${isUser ? styles.rowUser : ''}`}>
-      {!isUser && <div
-        className={`${styles.avatar} ${isUser ? styles.avatarUser : styles.avatarAssistant}`}
-        aria-hidden="true"
-      >
-        {avatarUrl ? <img src={avatarUrl} alt="" /> : agentName?.slice(0, 1) || '助'}
-      </div>}
       <div className={styles.bubbleColumn}>
         <div
           className={`${styles.bubble} ${isUser ? styles.bubbleUser : styles.bubbleAssistant}`}
@@ -93,6 +86,8 @@ export const ChatBubble = memo(function ChatBubble({ message, agentName, avatarU
           <div className={styles.messageActions}>
             <button
               type="button"
+              aria-label={copied ? '已复制' : '复制回答'}
+              title={copied ? '已复制' : '复制回答'}
               onClick={() => {
                 if (!navigator.clipboard?.writeText) return;
                 void navigator.clipboard.writeText(message.content)
@@ -103,7 +98,7 @@ export const ChatBubble = memo(function ChatBubble({ message, agentName, avatarU
                   .catch(() => setCopied(false));
               }}
             >
-              {copied ? '已复制' : '复制回答'}
+              <Icon name={copied ? 'check' : 'copy'} width={16} height={16} />
             </button>
           </div>
         ) : null}

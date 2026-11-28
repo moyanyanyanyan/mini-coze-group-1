@@ -5,7 +5,14 @@ import type { MessagesService } from '../modules/conversations/messages.service'
 import type { AgentsService } from '../modules/agents/agents.service';
 import type { RuntimeClientService, RuntimeHistoryMessage, RuntimeRequestBody, RuntimeSseEvent } from './runtime-client.service';
 
-it.each([[0, 0], [5, 5], [100, 10]])('配置 %i 轮时只向 Runtime 发送最近 %i 个完整问答对', async (contextLimit, expectedTurns) => {
+const originalContextLimit = process.env.CONTEXT_TOKEN_LIMIT;
+beforeEach(() => { process.env.CONTEXT_TOKEN_LIMIT = '200000'; });
+afterEach(() => {
+  if (originalContextLimit === undefined) delete process.env.CONTEXT_TOKEN_LIMIT;
+  else process.env.CONTEXT_TOKEN_LIMIT = originalContextLimit;
+});
+
+it.each([[0, 0], [5, 5], [100, 12]])('配置 %i 轮时只向 Runtime 发送最近 %i 个完整问答对', async (contextLimit, expectedTurns) => {
   const config = {
     id: 'agent-selected', revision: 0, name: '报销助手', systemPrompt: '依据知识库回答',
     model: 'deepseek-ai/DeepSeek-V4.1-Flash', temperature: 0.7, maxTokens: 4096,
@@ -27,6 +34,8 @@ it.each([[0, 0], [5, 5], [100, 10]])('配置 %i 轮时只向 Runtime 发送最�
       conversation: { update: jest.fn().mockResolvedValue({}), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
     }),
     message: { findMany, update },
+    conversation: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+    operationTelemetry: { create: jest.fn().mockResolvedValue({}) },
   } as unknown as PrismaService;
   const conversations = {
     assertOwned: jest.fn().mockResolvedValue({ agentId: config.id }),
@@ -35,7 +44,7 @@ it.each([[0, 0], [5, 5], [100, 10]])('配置 %i 轮时只向 Runtime 发送最�
     getAgentConfig: jest.fn().mockResolvedValue({ ...config, contextLimit }),
   } as unknown as AgentsService;
   let runtimeRequest: RuntimeRequestBody | undefined;
-  const runtime = { assertReady: jest.fn().mockResolvedValue(undefined),
+  const runtime = { compressContext: jest.fn().mockResolvedValue({ summary: '较早问答摘要', usage: null }), assertReady: jest.fn().mockResolvedValue(undefined),
     stream: async function* (request: RuntimeRequestBody): AsyncGenerator<RuntimeSseEvent> {
       runtimeRequest = request;
       const envelope = { runId: request.runId, conversationId: request.conversationId, timestamp: new Date().toISOString() };

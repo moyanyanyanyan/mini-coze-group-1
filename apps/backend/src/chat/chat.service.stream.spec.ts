@@ -42,6 +42,7 @@ function createHarness() {
       },
     }),
     message: { findMany: jest.fn().mockResolvedValue([]), update },
+    messageAttachment: { findMany: attachmentFindMany },
   } as unknown as PrismaService;
   const conversations = {
     assertOwned: jest.fn().mockResolvedValue({

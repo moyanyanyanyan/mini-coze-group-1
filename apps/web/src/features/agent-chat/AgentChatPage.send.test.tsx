@@ -53,14 +53,15 @@ it.each(['SERVICE_NOT_READY', 'ATTACHMENT_INVALID'])('restores attachments and r
   expect(harness.setters[11]).toHaveBeenLastCalledWith([attachment]);
 });
 
-it('restores attachments on an SSE readiness race before run.started', async () => {
+it.each(['SERVICE_NOT_READY', 'CONTEXT_COMPRESSION_FAILED'])('restores attachments before run.started on SSE %s', async code => {
   harness.stream.mockImplementation(async (_id, _content, handlers) => {
-    handlers.onFailed('SERVICE_NOT_READY', '准备中', true);
+    handlers.onFailed(code, '请求未接受', true);
   });
   const view = AgentChatPage();
   expect(await view.props.handleSend('我的问题')).toBe(false);
   expect(harness.setters[11]).toHaveBeenLastCalledWith([attachment]);
-  expect(harness.refresh).toHaveBeenCalledOnce();
+  if (code === 'SERVICE_NOT_READY') expect(harness.refresh).toHaveBeenCalledOnce();
+  else expect(harness.refresh).not.toHaveBeenCalled();
 });
 
 it('does not restore bound attachments after run.started', async () => {

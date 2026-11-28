@@ -33,9 +33,12 @@ export interface ChatConversationItem {
   title: string;
   agentId: string | null;
   updatedAt: string;
+  createdAt?: string;
 }
 
 export interface ConversationMemoryData {
+  summary?: string;
+  compressionPending?: boolean;
   conversationId: string;
   systemPrompt: string;
   configuredTurns: number;

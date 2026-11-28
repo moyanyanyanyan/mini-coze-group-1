@@ -208,5 +208,28 @@ describe('知识库运行首页目录加载', () => {
     const html = renderToStaticMarkup(<OperationsView data={data} pathname="/workspace/operations/knowledge" search="" LinkComponent={Link} />);
     expect(html).toContain('真实切片错误');
     expect(html).toContain('/documents/failed-doc?focus=error');
+    const overview = renderToStaticMarkup(<OperationsView data={data} pathname="/workspace/operations" search="" LinkComponent={Link} />);
+    expect(overview).toContain('切片失败');
+    expect(overview).not.toContain('向量化失败');
   });
+});
+
+it.each(['messages', 'without-run', 'run-fallback'])('运行管理助手正文渲染 Markdown：%s', async mode => {
+  responses();
+  const path = conversationPath(run.agentId, run.conversationId);
+  const data = await loadOperations(path, '', 'owner');
+  const content = '### 第一幕\n\n**提瓦特代码日志**\n\n- 调查异常请求\n\n```ts\nconst traveler = "林夜";\n```\n\n<script>alert(1)</script>';
+  data.runs[0].answer = content;
+  data.messages = mode === 'run-fallback' ? [] : [
+    { id: 'user', role: 'user', status: 'completed', content: '**保留用户原文**' },
+    { id: 'message', role: 'assistant', status: 'completed', content },
+  ];
+  if (mode === 'without-run') data.runs = [];
+  const html = renderToStaticMarkup(<OperationsView data={data} pathname={path} search="" LinkComponent={Link} />);
+  expect(html).toContain('<h3>第一幕</h3>');
+  expect(html).toContain('<strong>提瓦特代码日志</strong>');
+  expect(html).toContain('<li>调查异常请求</li>');
+  expect(html).toContain('class="language-ts"');
+  expect(html).not.toContain('<script>');
+  if (mode !== 'run-fallback') expect(html).toContain('**保留用户原文**');
 });

@@ -7,6 +7,8 @@ export interface OperationsPageResult<T> {
 }
 
 export interface ConversationMemory {
+  summary?: string;
+  compressionPending?: boolean;
   conversationId: string;
   systemPrompt: string;
   configuredTurns: number;

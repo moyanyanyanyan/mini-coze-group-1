@@ -489,20 +489,6 @@
   padding: 20px 12px;
 }
 
-.ab-chat-empty-avatar {
-  width: 40px;
-  height: 40px;
-  margin: 0 auto 12px;
-  border-radius: 50%;
-  background: var(--violet-500);
-  color: #fff;
-  font-size: 16px;
-  font-weight: 620;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .ab-chat-empty-text {
   font-size: 14px;
   color: var(--ink-700);
@@ -523,21 +509,6 @@
 
 .ab-chat-row--user {
   flex-direction: row-reverse;
-}
-
-.ab-chat-avatar {
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--violet-500);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 620;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 2px;
 }
 
 .ab-chat-bubble {

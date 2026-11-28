@@ -1,4 +1,4 @@
-import { Children, type ReactElement } from 'react';
+import { Children, type ReactElement, type ReactNode } from 'react';
 import { afterEach, expect, it, vi } from 'vitest';
 const state = vi.hoisted(() => ({ draft: '我的草稿', setDraft: vi.fn() }));
 vi.mock('react', async importOriginal => ({
@@ -8,12 +8,15 @@ vi.mock('react', async importOriginal => ({
   useLayoutEffect: () => undefined,
 }));
 import { MessageComposer } from './MessageComposer';
+import styles from './agent-chat.module.css';
 // 直接驱动元素事件，验证发送约束而不依赖浏览器布局。
 function render(onSend: () => Promise<boolean>, sendBlocked = false, extra: Partial<Parameters<typeof MessageComposer>[0]> = {}) {
   const form = MessageComposer({ disabled: false, onSend, sendBlocked, ...extra });
   const children = Children.toArray(form.props.children) as ReactElement<Record<string, unknown>>[];
-  const textarea = children.find(child => child.type === 'textarea')!;
-  const button = children.find(child => child.props['aria-label'] === '发送')!;
+  const row = children.find(child => child.props.className === styles.composerControls)!;
+  const controls = Children.toArray(row.props.children as ReactNode) as ReactElement<Record<string, unknown>>[];
+  const textarea = controls.find(child => child.type === 'textarea')!;
+  const button = controls.find(child => child.props['aria-label'] === '发送')!;
   return { form, textarea, button };
 }
 afterEach(() => vi.clearAllMocks());

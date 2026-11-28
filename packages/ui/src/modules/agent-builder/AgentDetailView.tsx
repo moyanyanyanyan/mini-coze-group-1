@@ -312,12 +312,13 @@ export function AgentDetailView({
               </div>
 
               <div className="ab-field">
-                <label className="ab-label" htmlFor="agent-context">历史消息轮数</label>
-                <select id="agent-context" className="ab-input" value={form.contextLimit} onChange={(e) => update('contextLimit', Number(e.target.value))}>
+                <label className="ab-label" htmlFor="agent-context">近期原文轮数</label>
+                <select id="agent-context" aria-describedby="agent-context-hint" className="ab-input" value={form.contextLimit} onChange={(e) => update('contextLimit', Number(e.target.value))}>
                   {contextLimitOptions.map((n) => (
-                    <option key={n} value={n}>{n} 轮</option>
+                    <option key={n} value={n}>{n === 0 ? '不带入历史' : `${n} 轮原文 + 更早摘要`}</option>
                   ))}
                 </select>
+                <small id="agent-context-hint" className="ab-field-hint">较早对话自动压缩为摘要；接近上下文预算时提前压缩，原始记录保留。</small>
               </div>
             </div>
 
@@ -470,7 +471,6 @@ export function AgentDetailView({
             <div className="ab-chat-messages">
               {testMessages.length === 0 && (
                 <div className="ab-chat-empty">
-                  <div className="ab-chat-empty-avatar">{(form.name || '助').slice(0, 1)}</div>
                   <div className="ab-chat-empty-text">
                     {form.openingMessage || `你好，我是${form.name || '智能助手'}，有什么可以帮你？`}
                   </div>
@@ -479,7 +479,6 @@ export function AgentDetailView({
               )}
               {testMessages.map((m, idx) => (
                 <div key={idx} className={`ab-chat-row${m.role === 'user' ? ' ab-chat-row--user' : ''}`}>
-                  {m.role === 'assistant' && <div className="ab-chat-avatar">{(form.name || '助').slice(0, 1)}</div>}
                   <div className={`ab-chat-bubble${m.role === 'user' ? ' ab-chat-bubble--user' : ''}`}>
                     {m.status === 'running' && !m.content ? (
                       <span className="ab-chat-dots">

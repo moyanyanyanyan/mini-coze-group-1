@@ -10,9 +10,10 @@ type ActionMenuProps = {
    * 避免被表格等 overflow 容器裁切，也不会撑开容器造成空白。
    */
   floating?: boolean;
+  menuClassName?: string;
 };
 
-export function ActionMenu({ label = '更多操作', children, floating = false }: ActionMenuProps) {
+export function ActionMenu({ label = '更多操作', children, floating = false, menuClassName }: ActionMenuProps) {
   const ref = useRef<HTMLDetailsElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -87,7 +88,7 @@ export function ActionMenu({ label = '更多操作', children, floating = false 
   const menu = (
     <div
       ref={floating ? menuRef : undefined}
-      className="ui-menu-items"
+      className={`ui-menu-items${menuClassName ? ` ${menuClassName}` : ''}`}
       style={
         floating
           ? placement

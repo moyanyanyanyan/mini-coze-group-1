@@ -17,7 +17,7 @@ function props(): KnowledgeViewProps {
       deletingBase: false, updatingBaseStatus: false, canCreate: false },
     documentState: { activeTab: 'documents', documents: [document], documentError: '', documentLoading: false,
       documentSaving: false, deletingDocumentId: null, addingDocument: false, sourceMode: 'text',
-      documentTitle: '', documentText: '', selectedDocumentId: document.id, selectedDocument: document,
+      documentTitle: '', documentText: '', documentFileName: null, selectedDocumentId: document.id, selectedDocument: document,
       documentDrawerOpen: false, readyDocuments: [document], hasProcessing: false },
     documentContentState: {
       content: '第一段识别内容', loading: false, error: '',
@@ -25,6 +25,7 @@ function props(): KnowledgeViewProps {
     },
     searchState: { query: '', searchResult: null, contentByDocumentId: {}, searching: false, searchError: '', canSearch: false },
     confirmation: <span>确认弹窗插槽</span>, fileInputRef: createRef<HTMLInputElement>(),
+    getOriginalFileUrl: (id) => `/api/documents/${id}/file?workspaceId=owner`,
     onBackToCenter: noop,
     editDialogOpen: false, editName: '', editDescription: '', editSaving: false,
     onEditNameChange: noop, onEditDescriptionChange: noop, onEditSubmit: noop, onCloseEditDialog: noop,
@@ -42,6 +43,51 @@ function props(): KnowledgeViewProps {
 }
 
 describe('knowledge view', () => {
+  it.each(['CSV', 'HTML', 'JSON', 'DOCX', 'PDF', 'IMAGE'] as const)('offers the original %s file separately from recognized content', (sourceType) => {
+    const input = props();
+    input.documentState.documentDrawerOpen = true;
+    input.documentState.selectedDocument = { ...document, sourceType, originalFileName: '原始资料.csv' };
+    const html = renderToStaticMarkup(<KnowledgeView {...input} />);
+    expect(html).toContain('原始文件');
+    expect(html).toContain('原始资料.csv');
+    expect(html).toContain('href="/api/documents/document-1/file?workspaceId=owner" download=""');
+    expect(html).toContain('下载原文件');
+    expect(html).toContain('第一段识别内容');
+    if (sourceType === 'PDF' || sourceType === 'IMAGE') {
+      expect(html).toContain('href="/api/documents/document-1/file?workspaceId=owner&amp;inline=1" target="_blank"');
+      expect(html).toContain('查看原文件');
+    } else {
+      expect(html).not.toContain('查看原文件');
+    }
+  });
+
+  it('keeps the original text downloadable when recognition fails', () => {
+    const input = props();
+    input.documentState.documentDrawerOpen = true;
+    input.documentState.selectedDocument = { ...document, status: 'FAILED' };
+    const html = renderToStaticMarkup(<KnowledgeView {...input} />);
+    expect(html).toContain('测试文档.txt');
+    expect(html).toContain('录入时的原始文本');
+    expect(html).toContain('下载原文件');
+  });
+
+  it('shows a compact file action and changes it to reselect after choosing a file', () => {
+    const input = props();
+    input.documentState.addingDocument = true;
+    input.documentState.sourceMode = 'file';
+    const emptyHtml = renderToStaticMarkup(<KnowledgeView {...input} />);
+    expect(emptyHtml).toContain('尚未选择文件');
+    expect(emptyHtml).toContain('>选择文件</button>');
+    expect(emptyHtml).toContain('<button type="submit" disabled="">提交资料</button>');
+
+    input.documentState.documentFileName = '报销规则.txt';
+    const selectedHtml = renderToStaticMarkup(<KnowledgeView {...input} />);
+    expect(selectedHtml).toContain('>重新选择</button>');
+    expect(selectedHtml).toContain('已选择：报销规则.txt');
+    expect(selectedHtml).toContain('<button type="submit">提交资料</button>');
+    expect(selectedHtml).not.toContain('尚未选择文件');
+  });
+
   it('offers PDF upload and displays its extracted text through the existing drawer', () => {
     const input = props();
     input.documentState.addingDocument = true;

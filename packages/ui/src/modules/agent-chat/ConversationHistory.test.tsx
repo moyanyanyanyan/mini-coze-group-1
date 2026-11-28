@@ -4,7 +4,7 @@ import { ConversationHistory } from './ConversationHistory';
 
 it('renders separate agent groups, counts, and an unclassified group', () => {
   const markup = renderToStaticMarkup(<ConversationHistory
-    agents={[{ id: 'agent-a', name: '智能体 A' }, { id: 'agent-b', name: '智能体 B' }]}
+    agents={[{ id: 'agent-a', name: '智能体 A', avatarUrl: '/agent-avatar.png' }, { id: 'agent-b', name: '智能体 B' }]}
     conversations={[
       { id: 'one', title: '第一段对话', agentId: 'agent-a', updatedAt: '2026-01-01T00:00:00.000Z' },
       { id: 'two', title: '旧记录', agentId: null, updatedAt: '2026-01-02T00:00:00.000Z' },
@@ -20,4 +20,9 @@ it('renders separate agent groups, counts, and an unclassified group', () => {
   expect(markup).toContain('1 条对话');
   expect(markup).toContain('0 条对话');
   expect(markup).toContain('aria-expanded="true"');
+  expect(markup).not.toContain('<img');
+  expect(markup).toContain('data-history-title');
+  expect(markup).not.toContain('<small');
+  expect(markup).not.toContain('2026/1/1');
+  expect(markup).not.toContain('title="第一段对话"');
 });

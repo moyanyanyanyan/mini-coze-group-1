@@ -84,7 +84,8 @@
 .om-k-pdf { width: 100%; height: 600px; border: 1px solid var(--line); border-radius: 12px; background: #faf9fd; }
 .om-k-preview-fallback { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 13px; padding: 16px; background: var(--om-wash); border-radius: 12px; }
 .om-k-storage.has-trend { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 20px 40px; align-items: center; }
-.om-k-storage.has-trend > .om-k-legend { grid-column: 1 / -1; }
+.om-k-storage.has-trend > .om-k-legend { grid-column: 1 / -1; width: 100%; max-width: 560px; justify-self: start; }
+.om-k-storage.has-trend .om-k-legend :is(a, button, span) { min-width: 0; max-width: 100%; justify-self: start; text-align: left; }
 .om-k-token { min-width: 0; width: 100%; color: var(--violet-600); padding: 18px; background: #fff; border: 1px solid var(--violet-200); border-radius: 12px; box-shadow: inset 0 2px 4px #6f56d908; }
 .om-k-token-heading, .om-k-token-axis { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--ink-500); }
 .om-k-token-heading > span:first-child { color: var(--violet-700); font-weight: 600; }

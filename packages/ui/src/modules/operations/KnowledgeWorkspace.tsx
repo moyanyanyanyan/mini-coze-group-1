@@ -435,16 +435,12 @@ export function BaseFiles(p: ContentProps & { baseId: string }) {
               正在查看：
               {files.find((f) => f.document.id === selected)?.document.name}
             </span>
-            <button
-              onClick={() => animateOperationsChange(() => setSelected(""))}
-            >
-              显示全部文件
-            </button>
           </div>
         )}
         <Records
           id={`knowledge-files-${baseId}`}
           title="文件列表"
+          searchAction={selected ? <button type="button" onClick={() => animateOperationsChange(() => setSelected(""))}>显示全部文件</button> : undefined}
           headers={[
             "文件名",
             "文件大小",

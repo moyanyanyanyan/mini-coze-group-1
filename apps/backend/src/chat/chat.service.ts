@@ -33,8 +33,8 @@ import {
   type RuntimeSseEvent,
 } from './runtime-client.service';
 
-/** 契约规定：history 最多 20 条 = 10 个完整问答对 */
-const MAX_HISTORY_TURNS = 10;
+const DEFAULT_HISTORY_TURNS = 10;
+const MAX_HISTORY_TURNS = 100;
 const MAX_HISTORY_CONTENT = 8000;
 const ATTACHMENT_ONLY_HISTORY_PLACEHOLDER = '（用户只发送了附件，附件内容已省略）';
 
@@ -61,6 +61,11 @@ interface HistoryRow {
   role: 'user' | 'assistant';
   content: string;
   attachments: HistoryAttachmentRow[];
+}
+
+interface ContextState {
+  contextSummary?: string | null;
+  contextSummaryThrough?: string | null;
 }
 
 export interface RunChatInput {
@@ -119,13 +124,13 @@ export class ChatService {
     const conversation = await this.conversations.assertOwned(conversationId, userId);
     if (!conversation.agentId) throw new HttpException('请先选择智能体', HttpStatus.BAD_REQUEST);
     const config = await this.agents.getAgentConfig(conversation.agentId, userId);
-    const configuredTurns = config.contextLimit ?? MAX_HISTORY_TURNS;
+    const configuredTurns = config.contextLimit ?? DEFAULT_HISTORY_TURNS;
     const effectiveTurns = Math.min(configuredTurns, MAX_HISTORY_TURNS);
-    const history = await this.buildHistory(conversationId, effectiveTurns, []);
-    const preview = await this.runtime.previewContext({ systemPrompt: config.systemPrompt, maxTokens: config.maxTokens, history });
+    const context = await this.conversationContext(conversationId, userId, config, conversation, [], false);
+    const preview = await this.runtime.previewContext({ systemPrompt: config.systemPrompt, maxTokens: config.maxTokens, history: context.history, historySummary: context.summary });
     const retainedTurns = preview.history.length / 2;
     return { ...preview, conversationId, systemPrompt: config.systemPrompt, configuredTurns, effectiveTurns,
-      retainedTurns, availableTurns: Math.max(0, effectiveTurns - retainedTurns), asOf: new Date().toISOString() };
+      retainedTurns, availableTurns: Math.max(0, effectiveTurns - retainedTurns), summary: context.summary, compressionPending: context.compressionPending, asOf: new Date().toISOString() };
   }
 
   release(conversationId: string): void {
@@ -176,6 +181,8 @@ export class ChatService {
       agentId: input.agentId,
       content: input.message,
       agentConfig: input.agentConfig,
+      contextState: conversation,
+      signal: input.signal,
     });
 
     try {
@@ -256,6 +263,8 @@ export class ChatService {
       content: input.content,
       attachmentIds: input.attachmentIds,
       agentConfig,
+      contextState: conversation,
+      signal: input.signal,
     });
     const request = run.request;
     const persistContext = {
@@ -521,10 +530,16 @@ export class ChatService {
     content: string;
     attachmentIds?: string[];
     agentConfig: RuntimeAgentConfig;
+    contextState: ContextState;
+    signal?: AbortSignal;
   }): Promise<{ request: RuntimeRequestBody }> {
     if (input.agentConfig.id !== input.agentId) {
       throw new HttpException('Agent 发布配置与当前 Agent 不一致', HttpStatus.INTERNAL_SERVER_ERROR);
     }
+
+    // 压缩先于本轮消息落库；失败时不留下无法继续发送的助手占位消息。
+    const pendingAttachments = input.attachmentIds?.length ? await this.resolveAttachments(this.prisma, input.conversationId, input.attachmentIds) : [];
+    const context = await this.conversationContext(input.conversationId, input.userId, input.agentConfig, input.contextState, [], true, buildAttachmentMessage(input.content, pendingAttachments), input.signal);
 
     const turn = await this.prisma.$transaction(async (tx) => {
       // 先校验附件再落消息：校验失败时事务回滚，附件保持未绑定，可重试
@@ -595,12 +610,8 @@ export class ChatService {
       return { userMessage, assistantMessage, attachments };
     });
 
-    const { contextLimit = MAX_HISTORY_TURNS, model, ...runtimeRest } = input.agentConfig;
+    const { contextLimit: _contextLimit, model, ...runtimeRest } = input.agentConfig;
     const runtimeConfig = { ...runtimeRest, model };
-    const history = await this.buildHistory(input.conversationId, contextLimit, [
-      turn.userMessage.id,
-      turn.assistantMessage.id,
-    ]);
 
     return {
       request: {
@@ -610,7 +621,8 @@ export class ChatService {
         userMessageId: turn.userMessage.id,
         assistantMessageId: turn.assistantMessage.id,
         agentConfig: runtimeConfig,
-        history,
+        history: context.history,
+        ...(context.summary ? { historySummary: context.summary } : {}),
         message: buildAttachmentMessage(input.content, turn.attachments),
         retrievalQuery: buildRetrievalQuery(input.content, turn.attachments),
       },
@@ -675,6 +687,55 @@ export class ChatService {
    * 所以这里按 seq 扫描，只收「完整的 user→assistant 对」，
    * 最后落单的 user（生成中/已中断）直接丢掉。
    */
+  private async conversationContext(
+    conversationId: string, userId: string, config: RuntimeAgentConfig, state: ContextState,
+    excludeIds: string[], compress: boolean, currentMessage = '', signal?: AbortSignal,
+  ): Promise<{ history: RuntimeHistoryMessage[]; summary: string; compressionPending: boolean }> {
+    const turns = Math.min(config.contextLimit ?? DEFAULT_HISTORY_TURNS, MAX_HISTORY_TURNS);
+    if (turns === 0) return { history: [], summary: '', compressionPending: false };
+    const all = await this.buildHistory(conversationId, Number.MAX_SAFE_INTEGER, excludeIds);
+    const cursor = state.contextSummaryThrough ? all.findIndex(message => message.id === state.contextSummaryThrough) : -1;
+    const fresh = all.slice(cursor + 1);
+    let kept = Math.min(turns * 2, fresh.length);
+    const limit = Number(process.env.CONTEXT_TOKEN_LIMIT ?? 32768);
+    // 留出摘要、检索、工具及新问题的空间；保守字节口径与 Runtime 一致。
+    const reserved = Buffer.byteLength(config.systemPrompt ?? '') + Buffer.byteLength(currentMessage) + config.maxTokens + 12_000;
+    while (kept > 0 && fresh.slice(-kept).reduce((sum, item) => sum + Buffer.byteLength(item.content) + 16, reserved) > limit) kept -= 2;
+    const older = fresh.slice(0, fresh.length - kept);
+    let summary = state.contextSummary ?? '';
+    if (compress && older.length) {
+      const parts = older.flatMap(message => {
+        const chars = Array.from(message.content);
+        return Array.from({ length: Math.ceil(chars.length / 1500) }, (_, index) => ({
+          ...message, id: `${message.id}:${index}`, content: chars.slice(index * 1500, (index + 1) * 1500).join(''),
+        }));
+      });
+      let offset = 0;
+      while (offset < parts.length) {
+        signal?.throwIfAborted();
+        const batch: RuntimeHistoryMessage[] = [];
+        let bytes = 0;
+        while (offset < parts.length && bytes + Buffer.byteLength(parts[offset].content) <= 8000) {
+          bytes += Buffer.byteLength(parts[offset].content);
+          batch.push(parts[offset++]);
+        }
+        const startedAt = new Date();
+        const result = await this.runtime.compressContext({ model: config.model, connection: config.connection,
+          previousSummary: summary, messages: batch }, signal);
+        summary = result.summary;
+        await this.prisma.operationTelemetry.create({ data: { ownerId: userId, agentId: config.id, kind: 'context_compression',
+          status: 'completed', startedAt, durationMs: Date.now() - startedAt.getTime(), inputTokens: result.usage?.promptTokens,
+          itemCount: batch.length, data: { conversationId, model: config.model, usage: result.usage as unknown as Prisma.InputJsonValue } } });
+      }
+      const updated = await this.prisma.conversation.updateMany({
+        where: { id: conversationId, userId, contextSummaryThrough: state.contextSummaryThrough ?? null },
+        data: { contextSummary: summary, contextSummaryThrough: older.at(-1)!.id },
+      });
+      if (!updated.count) throw new HttpException('会话上下文已更新，请重新发送', HttpStatus.CONFLICT);
+    }
+    return { history: kept ? fresh.slice(-kept) : [], summary, compressionPending: !compress && older.length > 0 };
+  }
+
   private async buildHistory(
     conversationId: string,
     contextLimit: number,
@@ -721,6 +782,11 @@ export class ChatService {
         continue;
       }
       if (pendingUser) {
+        // 供应商可能以完成终态返回空正文；保留原记录，但空问答对不能进入 Runtime 历史。
+        if (!row.content.trim()) {
+          pendingUser = null;
+          continue;
+        }
         pairs.push(pendingUser, {
           id: row.id,
           role: 'assistant',
@@ -731,7 +797,7 @@ export class ChatService {
       }
     }
 
-    const turns = Math.min(contextLimit, MAX_HISTORY_TURNS);
+    const turns = contextLimit;
     const selected = pairs.slice(-2 * turns);
     // 从最新一轮往回数：最近 RECENT_ATTACHMENT_TURNS 轮注入全文，其余降级为摘要
     const userPositions = selected

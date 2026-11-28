@@ -144,6 +144,7 @@ export function Records({
   sourceLabel = '来源',
   initialStatus = '',
   compact = false,
+  searchAction,
 }: {
   id: string;
   title: string;
@@ -154,6 +155,7 @@ export function Records({
   sourceLabel?: string;
   initialStatus?: string;
   compact?: boolean;
+  searchAction?: ReactNode;
 }) {
   const [filters, setFilters] = useState<Filters>(() => ({
     query: '',
@@ -182,7 +184,7 @@ export function Records({
   return (
     <Panel title={title}>
       {!compact && (
-        <div className="om-toolbar">
+        <div className={`om-toolbar${searchAction ? ' om-toolbar-with-action' : ''}`}>
           <input
             type="search"
             aria-label={`${title}搜索`}
@@ -190,6 +192,7 @@ export function Records({
             value={filters.query}
             onChange={(e) => change({ query: e.target.value })}
           />
+          {searchAction}
           <div>
             {sourceOptions.length > 0 && (
               <MenuFilter label={`${sourceLabel}筛选`} value={filters.source} onChange={source => change({ source })}

@@ -83,6 +83,8 @@
 .om-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 0 16px; }
 .om-toolbar input { width: min(320px, 48%); }
 .om-toolbar > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.om-toolbar-with-action { justify-content: flex-start; }
+.om-toolbar-with-action > div { margin-left: auto; }
 .om-cell-title { font-size: 16px; font-weight: 600; color: var(--ink-800); overflow-wrap: anywhere; }
 .om-sub, .om-note { font-size: 13px; color: var(--ink-500); line-height: 1.7; overflow-wrap: anywhere; }
 .om-sub { margin-top: 4px; font-weight: 400; }

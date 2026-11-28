@@ -29,7 +29,6 @@ export function AgentSwitcher({ agents, value, disabled, fallbackName, onChange 
   const select = (index: number) => { if (choices[index]) onChange(choices[index].id); close(); };
   return <div className={styles.agentSwitcher} ref={root} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false); }}>
     <button ref={trigger} className={styles.agentTrigger} disabled={disabled || !choices.length} aria-label={`切换智能体，当前：${selected?.name ?? fallbackName ?? '暂无智能体'}`} aria-haspopup="listbox" aria-expanded={open} onClick={() => { setActive(Math.max(0, choices.findIndex(a => a.id === value))); setOpen(!open); }}>
-      <span className={styles.identityAvatar}>{selected?.avatarUrl ? <img src={selected.avatarUrl} alt="" /> : selected?.name.slice(0, 1) || fallbackName?.slice(0, 1) || '?'}</span>
       <span className={styles.agentName} title={selected?.name ?? fallbackName}>{selected?.name || fallbackName || '选择智能体'}</span><Icon name="chevronDown" />
     </button>
     {open && <div className={styles.agentOptions} role="listbox" aria-label="选择智能体" tabIndex={0} aria-activedescendant={`agent-option-${active}`} onKeyDown={(event) => {
