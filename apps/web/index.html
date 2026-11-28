@@ -7,6 +7,34 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="theme-color" content="#6f56d9" />
     <title>妙搭 — AI Agent 工作空间</title>
+    <script>
+      // 首屏先定外观，避免刷新时闪一下再跳到用户设置（与 shared/theme/theme-store.ts 保持一致）
+      (function () {
+        var root = document.documentElement;
+        var pick = function (key, allowed, fallback) {
+          try {
+            var raw = localStorage.getItem(key);
+            return allowed.indexOf(raw) >= 0 ? raw : fallback;
+          } catch (error) {
+            return fallback;
+          }
+        };
+        try {
+          var theme = pick('minicoze-theme', ['light', 'dark', 'system'], 'light');
+          var resolved = theme;
+          if (theme === 'system') {
+            resolved =
+              window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          }
+          root.dataset.theme = resolved;
+          root.dataset.accent = pick('minicoze-accent', ['purple', 'blue', 'green', 'red'], 'purple');
+          root.dataset.fontSize = pick('minicoze-font-size', ['small', 'normal', 'large'], 'normal');
+          root.dataset.density = pick('minicoze-density', ['compact', 'comfortable'], 'comfortable');
+        } catch (error) {
+          root.dataset.theme = 'light';
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

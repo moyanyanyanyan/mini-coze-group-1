@@ -27,6 +27,7 @@ it.each([[0, 0], [5, 5], [100, 10]])('配置 %i 轮时只向 Runtime 发送最�
       conversation: { update: jest.fn().mockResolvedValue({}), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
     }),
     message: { findMany, update },
+    user: { findUnique: jest.fn().mockResolvedValue({ globalPrompt: '我是初学者，请用简单语言' }) },
   } as unknown as PrismaService;
   const conversations = {
     assertOwned: jest.fn().mockResolvedValue({ agentId: config.id }),
@@ -76,6 +77,8 @@ it.each([[0, 0], [5, 5], [100, 10]])('配置 %i 轮时只向 Runtime 发送最�
   expect(agents.getAgentConfig).toHaveBeenCalledWith(config.id, 'actor-1');
   expect(runtimeRequest?.agentConfig).toEqual(config);
   expect(runtimeRequest?.message).toBe('餐费多少？');
+  expect(runtimeRequest?.actor).toEqual({ id: 'actor-1' });
+  expect(runtimeRequest?.globalPrompt).toBe('我是初学者，请用简单语言');
   const sent = runtimeRequest!.history;
   expect(sent.map((row) => row.id)).toEqual(history.slice(history.length - expectedTurns * 2).map((row) => row.id));
   if (expectedTurns === 0) {

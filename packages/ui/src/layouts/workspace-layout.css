@@ -73,7 +73,7 @@
   min-height: 44px;
   margin: 0 8px 34px;
   color: var(--ink-900);
-  font-size: 20px;
+  font-size: var(--fs-600);
   font-weight: 700;
   letter-spacing: -0.035em;
   text-decoration: none;
@@ -97,14 +97,14 @@
 
 .workspace-nav-item {
   position: relative;
-  min-height: 42px;
+  min-height: var(--row-height);
   display: flex;
   align-items: center;
   gap: 13px;
   padding: 0 11px;
   border-radius: var(--radius-sm);
   color: var(--ink-700);
-  font-size: 14px;
+  font-size: var(--fs-400);
   font-weight: 540;
   text-decoration: none;
   transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
@@ -119,7 +119,7 @@
 
 .workspace-nav-item:hover {
   color: var(--violet-700);
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--hover-bg);
 }
 
 .workspace-nav-item:hover svg {
@@ -153,20 +153,20 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  min-height: 44px;
+  min-height: calc(44px * var(--ui-space-scale));
   padding: 6px 10px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--ink-800);
-  font-size: 14px;
+  font-size: var(--fs-400);
   font-weight: 540;
   cursor: pointer;
   transition: background-color 160ms ease, border-color 160ms ease;
 }
 
 .workspace-user-trigger:hover {
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--hover-bg);
 }
 
 .workspace-avatar {
@@ -232,7 +232,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--ink-900);
-  font-size: 13px;
+  font-size: var(--fs-300);
   font-weight: 640;
 }
 
@@ -242,20 +242,20 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--ink-500);
-  font-size: 12px;
+  font-size: var(--fs-200);
 }
 
 .workspace-user-menu-item {
   display: flex;
   align-items: center;
   width: 100%;
-  min-height: 38px;
+  min-height: calc(38px * var(--ui-space-scale));
   padding: 0 10px;
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--ink-700);
-  font-size: 13px;
+  font-size: var(--fs-300);
   font-weight: 540;
   text-align: left;
   cursor: pointer;
@@ -270,10 +270,10 @@
 .workspace-content {
   position: relative;
   overflow: auto;
-  background: #f8f8fb;
+  background: var(--surface);
 }
 
-.workspace-sidebar { background: #f7f7fa; padding: 12px; }
+.workspace-sidebar { background: var(--surface-muted); padding: var(--gutter-block) var(--gutter-inline); }
 .workspace-sidebar::after { display: none; }
 .workspace-nav-item.is-active { box-shadow: none; }
 .workspace-sidebar-footer { padding-bottom: 0; }
@@ -316,7 +316,7 @@
   background:
     linear-gradient(var(--line-soft) 1px, transparent 1px),
     linear-gradient(90deg, var(--line-soft) 1px, transparent 1px),
-    rgba(255, 255, 255, 0.55);
+    var(--empty-card-bg);
   background-size: 28px 28px;
 }
 
@@ -379,10 +379,10 @@
 
 @media (max-width: 767px) {
   .workspace-shell, .workspace-shell.is-editor-mode { grid-template-columns: minmax(0, 1fr); grid-template-rows: 44px minmax(0, 1fr); }
-  .workspace-mobile-toggle { display: block; text-align: left; padding-inline: 16px; border: 0; border-bottom: 1px solid var(--line); background: white; }
+  .workspace-mobile-toggle { display: block; text-align: left; padding-inline: 16px; border: 0; border-bottom: 1px solid var(--line); background: var(--surface-raised); }
   .workspace-sidebar { display: none; }
   .workspace-shell.is-nav-open .workspace-sidebar { display: flex; position: fixed; inset: 0 auto 0 0; width: 208px; z-index: 101; }
-  .workspace-shell.is-nav-open .workspace-nav-backdrop { display: block; position: fixed; inset: 0; background: #25223266; border: 0; z-index: 100; }
+  .workspace-shell.is-nav-open .workspace-nav-backdrop { display: block; position: fixed; inset: 0; background: var(--overlay); border: 0; z-index: 100; }
   .workspace-shell.is-nav-open .workspace-brand > span:last-child,
   .workspace-shell.is-nav-open .workspace-nav-item span,
   .workspace-shell.is-nav-open .workspace-user-name { display: inline; }

@@ -80,16 +80,13 @@ export class WorkflowAgentClient {
     }
     return value;
   }
-  async run(definition: unknown, input: unknown): Promise<ExecutionResult> {
-    // 与 Agent 共用 WORKFLOW_RUN_TIMEOUT_SECONDS（启动时已校验），多等 30 秒让 Agent 先返回超时结果。
-    const seconds = Number(
-      this.config.get('WORKFLOW_RUN_TIMEOUT_SECONDS') ?? 270,
-    );
-    const value = (await this.post(
-      'run',
-      { definition, input },
-      ((Number.isFinite(seconds) && seconds > 0 ? seconds : 270) + 30) * 1000,
-    )) as ExecutionResult;
+  async run(definition: unknown, input: unknown, context: { actorId: string; globalPrompt?: string }): Promise<ExecutionResult> {
+    // 与 Agent 共用超时配置，多等 30 秒让 Agent 先返回超时结果。
+    const seconds = Number(this.config.get('WORKFLOW_RUN_TIMEOUT_SECONDS') ?? 270);
+    const value = (await this.post('run', {
+      definition, input, actor: { id: context.actorId },
+      ...(context.globalPrompt ? { globalPrompt: context.globalPrompt } : {}),
+    }, ((Number.isFinite(seconds) && seconds > 0 ? seconds : 270) + 30) * 1000)) as ExecutionResult;
     if (
       !value ||
       !['SUCCEEDED', 'FAILED'].includes(value.status) ||

@@ -7,7 +7,7 @@
   padding: 11px 16px;
   border: 1px solid;
   border-radius: 8px;
-  box-shadow: 0 10px 30px rgba(37, 34, 50, 0.14);
+  box-shadow: 0 10px 30px var(--shadow-sm);
   font-size: 13px;
   font-weight: 590;
   line-height: 1.45;
@@ -17,15 +17,15 @@
 }
 
 .app-notice--success {
-  color: #176d50;
-  border-color: #bfe2d4;
-  background: #f1fbf7;
+  color: var(--success-700);
+  border-color: var(--success-200);
+  background: var(--success-100);
 }
 
 .app-notice--error {
-  color: #a92b3e;
-  border-color: #f0c4cc;
-  background: #fff5f6;
+  color: var(--danger-700);
+  border-color: var(--danger-200);
+  background: var(--danger-100);
 }
 
 @keyframes app-notice-in {

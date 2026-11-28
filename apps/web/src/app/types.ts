@@ -1,7 +1,8 @@
 import type { ComponentType } from 'react';
 
 import type { IconName } from '@minicoze/ui/components';
-export type { IconName } from '@minicoze/ui/components';
+
+export type { IconName };
 
 export interface FeatureManifest {
   id: string;

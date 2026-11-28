@@ -17,6 +17,7 @@ import {
   UpdateWorkflowDto,
 } from './workflows.dto';
 import { WorkflowsRepository } from './workflows.repository';
+import { UsersService } from '../users/users.service';
 
 /**
  * 将已通过请求校验的 JSON 值转换为 Prisma 写入类型。
@@ -57,6 +58,7 @@ export class WorkflowsService {
   constructor(
     private readonly repository: WorkflowsRepository,
     private readonly agent: WorkflowAgentClient,
+    private readonly users: UsersService,
   ) {}
 
   /**
@@ -237,6 +239,9 @@ export class WorkflowsService {
    */
   async run(id: string, input: Record<string, unknown>, userId: string) {
     const row = await this.owned(id, userId);
+    // 每轮只读一次，作为本轮所有 LLM 节点共用的快照。
+    const user = await this.users.findById(userId);
+    const globalPrompt = user?.globalPrompt?.trim() || undefined;
     let validation;
     try {
       validation = await this.agent.validate(row.draftDefinition, input);
@@ -265,7 +270,10 @@ export class WorkflowsService {
     });
     let result: ExecutionResult;
     try {
-      result = await this.agent.run(row.draftDefinition, input);
+      result = await this.agent.run(row.draftDefinition, input, {
+        actorId: userId,
+        ...(globalPrompt ? { globalPrompt } : {}),
+      });
     } catch (error) {
       result = {
         status: 'FAILED',

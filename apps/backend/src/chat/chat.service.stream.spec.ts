@@ -42,6 +42,7 @@ function createHarness() {
       },
     }),
     message: { findMany: jest.fn().mockResolvedValue([]), update },
+    user: { findUnique: jest.fn().mockResolvedValue({ globalPrompt: null }) },
   } as unknown as PrismaService;
   const conversations = {
     assertOwned: jest.fn().mockResolvedValue({

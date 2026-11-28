@@ -24,6 +24,17 @@
 }
 .api-doc-hero::before { content: ''; display: block; width: 64px; height: 7px; margin-bottom: 22px; border-radius: 3px; background: linear-gradient(90deg,var(--block-violet) 0 28%,transparent 28% 35%,var(--block-cyan) 35% 65%,transparent 65% 72%,var(--block-coral) 72%); }
 
+.api-doc-hero::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  width: 92px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--violet-500));
+}
+
 .api-doc-eyebrow {
   margin: 0 0 15px;
   color: var(--violet-600);
@@ -60,12 +71,137 @@
   text-transform: uppercase;
 }
 
-.api-doc-hero > p:last-child {
+.api-doc-hero > p:not(.api-doc-eyebrow) {
   max-width: 710px;
   margin: 20px 0 0;
   color: var(--ink-600);
   font-size: 15px;
   line-height: 1.9;
+}
+
+.api-doc-hero-facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 28px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.66);
+  box-shadow: 0 12px 32px rgba(53, 36, 91, 0.05);
+}
+
+.api-doc-hero-facts > div {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+  padding: 15px 16px;
+  border-right: 1px solid var(--line);
+}
+
+.api-doc-hero-facts > div:last-child {
+  border-right: 0;
+}
+
+.api-doc-hero-facts span {
+  color: var(--ink-500);
+  font-size: 9px;
+  font-weight: 680;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.api-doc-hero-facts code,
+.api-doc-hero-facts strong {
+  overflow: hidden;
+  color: var(--ink-900);
+  font-size: 11px;
+  font-weight: 620;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.api-doc-hero-facts code {
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+}
+
+.api-doc-endpoint-overview {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 28px;
+}
+
+.api-doc-endpoint-overview > a {
+  position: relative;
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  padding: 20px;
+  color: inherit;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 100% 0, rgba(139, 104, 223, 0.1), transparent 44%),
+    rgba(255, 255, 255, 0.72);
+  text-decoration: none;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.api-doc-endpoint-overview > a:hover {
+  border-color: var(--violet-300);
+  box-shadow: 0 14px 34px rgba(74, 48, 128, 0.1);
+  transform: translateY(-2px);
+}
+
+.api-doc-endpoint-overview__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-500);
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.api-doc-method {
+  padding: 3px 7px;
+  color: #fff;
+  border-radius: 5px;
+  background: var(--violet-600);
+  letter-spacing: 0.05em;
+}
+
+.api-doc-endpoint-overview > a > code {
+  color: var(--ink-900);
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 14px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.api-doc-endpoint-overview p {
+  margin: 0;
+  color: var(--ink-600);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.api-doc-card-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--violet-700);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.api-doc-card-link span {
+  transition: transform 160ms ease;
+}
+
+.api-doc-endpoint-overview > a:hover .api-doc-card-link span {
+  transform: translateX(3px);
 }
 
 .api-doc-section {
@@ -95,6 +231,39 @@
   font-size: 16px;
   font-weight: 650;
   letter-spacing: -0.012em;
+}
+
+.api-doc-auth-method {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--violet-200);
+  border-radius: 10px;
+  background: linear-gradient(120deg, var(--violet-50), rgba(255, 255, 255, 0.72));
+}
+
+.api-doc-auth-method > span {
+  color: var(--ink-500);
+  font-size: 9px;
+  font-weight: 680;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.api-doc-auth-method > code {
+  color: var(--violet-700);
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.api-doc-auth-method > small {
+  grid-column: 2;
+  color: var(--ink-500);
+  font-size: 10px;
 }
 
 .api-doc-section p code,
@@ -189,21 +358,45 @@
   border: 1px solid rgba(196, 182, 232, 0.2);
   border-radius: 10px;
   background: #211c31;
-  box-shadow: 0 14px 36px rgba(42, 30, 73, 0.1);
+  box-shadow: 0 16px 38px rgba(42, 30, 73, 0.12);
 }
 
 .api-doc-code__header {
-  min-height: 40px;
+  min-height: 42px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 14px 0 16px;
+  padding: 0 12px 0 16px;
   color: #aaa1ba;
   border-bottom: 1px solid rgba(223, 215, 243, 0.1);
   background: rgba(255, 255, 255, 0.025);
   font-size: 10px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.api-doc-code__header > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.api-doc-code__header > span::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  margin-right: 20px;
+  border-radius: 50%;
+  background: #8e74c9;
+  box-shadow: 10px 0 0 #675986, 20px 0 0 #4b435c;
+}
+
+.api-doc-code__header button:focus-visible,
+.api-doc-tabs button:focus-visible,
+.api-doc-endpoint-overview > a:focus-visible,
+.api-doc-text-link:focus-visible {
+  outline: 2px solid var(--violet-400);
+  outline-offset: 3px;
 }
 
 .api-doc-code__header button {
@@ -229,10 +422,22 @@
 
 .api-doc-code pre {
   margin: 0;
-  padding: 19px 18px 22px;
+  padding: 20px 20px 24px;
   overflow-x: auto;
   color: #ddd6eb;
   tab-size: 2;
+  scrollbar-color: #665581 transparent;
+  scrollbar-width: thin;
+}
+
+.api-doc-code pre::-webkit-scrollbar {
+  height: 8px;
+}
+
+.api-doc-code pre::-webkit-scrollbar-thumb {
+  border: 2px solid #211c31;
+  border-radius: 999px;
+  background: #665581;
 }
 
 .api-doc-code code {
@@ -268,7 +473,9 @@
 }
 
 .api-doc-callout--warning {
-  border-left-color: #c47b2d;
+  border: 1px solid #efd7b7;
+  border-left: 3px solid #c47b2d;
+  border-radius: 8px;
   background: #fff9f1;
 }
 
@@ -369,6 +576,14 @@
   vertical-align: top;
 }
 
+.api-doc-table tbody tr {
+  transition: background-color 140ms ease;
+}
+
+.api-doc-table tbody tr:hover {
+  background: rgba(245, 242, 252, 0.52);
+}
+
 .api-doc-table th {
   color: var(--ink-500);
   background: rgba(245, 242, 252, 0.62);
@@ -386,6 +601,124 @@
   font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
   font-size: 11px;
   overflow-wrap: anywhere;
+}
+
+.api-doc-param-name {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.api-doc-param-name > span {
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.api-doc-param-name > .is-required {
+  color: #9c3d46;
+  background: #fff0f1;
+}
+
+.api-doc-param-name > .is-optional {
+  color: var(--ink-500);
+  background: #f4f2f7;
+}
+
+.api-doc-response {
+  margin-top: 30px;
+  padding: 2px 16px 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.api-doc-response > h3 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.api-doc-response > h3 > span {
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.api-doc-response--success {
+  border-color: rgba(75, 142, 91, 0.22);
+  background: linear-gradient(180deg, rgba(235, 248, 238, 0.52), transparent 92px);
+}
+
+.api-doc-response--success > h3 > span {
+  color: #357448;
+  background: #e8f6ec;
+}
+
+.api-doc-response--error {
+  border-color: rgba(190, 92, 93, 0.2);
+  background: linear-gradient(180deg, rgba(255, 241, 241, 0.58), transparent 92px);
+}
+
+.api-doc-response--error > h3 > span {
+  color: #9c4548;
+  background: #ffeded;
+}
+
+.api-doc-code-chip,
+.api-doc-status-code {
+  display: inline-flex;
+  min-height: 23px;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 5px;
+}
+
+.api-doc-code-chip {
+  background: var(--violet-50);
+}
+
+.api-doc-status-code.is-success {
+  color: #337447;
+  background: #eaf7ed;
+}
+
+.api-doc-status-code.is-warning {
+  color: #8a621f;
+  background: #fff6df;
+}
+
+.api-doc-status-code.is-error {
+  color: #9a4147;
+  background: #ffeded;
+}
+
+.api-doc-event-name {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.api-doc-event-name > span {
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.api-doc-event-row.is-success .api-doc-event-name > span {
+  color: #337447;
+  background: #eaf7ed;
+}
+
+.api-doc-event-row.is-error .api-doc-event-name > span {
+  color: #994249;
+  background: #ffeded;
 }
 
 .api-doc-faq {
@@ -508,7 +841,28 @@
     font-size: 38px;
   }
 
-  .api-doc-hero > p:last-child {
+  .api-doc-hero-facts,
+  .api-doc-endpoint-overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .api-doc-hero-facts > div:nth-child(2) {
+    border-right: 0;
+  }
+
+  .api-doc-hero-facts > div:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--line);
+  }
+
+  .api-doc-auth-method {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .api-doc-auth-method > small {
+    grid-column: 1;
+  }
+
+  .api-doc-hero > p:not(.api-doc-eyebrow) {
     font-size: 14px;
   }
 
@@ -540,9 +894,29 @@
   }
 }
 
+@media (max-width: 520px) {
+  .api-doc-hero-facts,
+  .api-doc-endpoint-overview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .api-doc-hero-facts > div,
+  .api-doc-hero-facts > div:nth-child(2) {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .api-doc-hero-facts > div:last-child {
+    border-bottom: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .api-doc-tabs button::after,
   .api-doc-code__header button,
+  .api-doc-endpoint-overview > a,
+  .api-doc-card-link span,
+  .api-doc-table tbody tr,
   .api-doc-text-link span,
   .api-doc-toc a {
     transition: none;

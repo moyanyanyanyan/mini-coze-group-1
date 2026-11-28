@@ -2,6 +2,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
+from app.runtime.schemas import Actor, GlobalPrompt
 
 from .validation import validate, validate_input
 from .execution import execute
@@ -17,6 +18,8 @@ class ValidateBody(BaseModel):
 
 class RunBody(ValidateBody):
     input: dict[str, Any] = Field(default_factory=dict)
+    actor: Actor | None = None
+    globalPrompt: GlobalPrompt = ""
 
 
 @router.post("/validate")
@@ -39,4 +42,4 @@ async def run_workflow(body: RunBody, request: Request):
     if errors:
         raise HTTPException(400, detail=errors)
     provider = getattr(request.app.state, "workflow_complete", None)
-    return await execute(body.definition, body.input, RuntimeAdapter(provider))
+    return await execute(body.definition, body.input, RuntimeAdapter(provider, global_prompt=body.globalPrompt))

@@ -15,6 +15,7 @@ import {
   type Connection,
 } from '@xyflow/react';
 import { navigate } from '../../../shared/routing/navigation';
+import { useTheme } from '../../../shared/theme/theme-store';
 import { getWorkflow, saveDraft, validateWorkflow } from '../services/workflow';
 import type {
   NodeData,
@@ -101,6 +102,7 @@ function defaultDataFor(type: NodeType): NodeData {
 
 function WorkflowEditorInner({ workflowId }: Props) {
   const reactFlow = useReactFlow();
+  const theme = useTheme();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [workflowName, setWorkflowName] = useState('');
@@ -494,6 +496,7 @@ function WorkflowEditorInner({ workflowId }: Props) {
   };
 
   return <WorkflowEditorCanvas
+    theme={theme}
     propertyPanel={
       <PropertyPanelController
         onClose={() => setRightOpen(false)}

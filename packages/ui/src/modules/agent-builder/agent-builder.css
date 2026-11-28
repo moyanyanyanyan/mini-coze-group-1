@@ -46,7 +46,7 @@
 }
 
 .ab-btn-primary {
-  color: #fff;
+  color: var(--surface-raised);
   background: var(--violet-600);
 }
 
@@ -57,13 +57,13 @@
 .ab-btn-ghost {
   color: var(--ink-700);
   border-color: var(--line-strong);
-  background: rgba(255, 255, 255, 0.64);
+  background: var(--panel-bg-soft);
 }
 
 .ab-btn-ghost:hover {
   color: var(--violet-700);
   border-color: var(--violet-300);
-  background: #fff;
+  background: var(--surface-raised);
 }
 
 /* ========== List View ========== */
@@ -97,7 +97,7 @@
   padding: 0 14px;
   border: 1px solid var(--line-strong);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.64);
+  background: var(--panel-bg-soft);
   color: var(--ink-900);
   font-size: 13px;
   transition: border-color 180ms ease, background-color 180ms ease;
@@ -106,7 +106,7 @@
 .ab-search:focus {
   outline: none;
   border-color: var(--violet-400);
-  background: #fff;
+  background: var(--surface-raised);
 }
 
 .ab-visually-hidden {
@@ -128,7 +128,7 @@
   padding: 0 10px;
   border: 1px solid var(--line-strong);
   border-radius: 7px;
-  background: rgba(255, 255, 255, 0.64);
+  background: var(--panel-bg-soft);
   color: var(--ink-700);
   font-size: 12px;
   font-family: inherit;
@@ -140,7 +140,7 @@
 .ab-status-select:focus {
   outline: none;
   border-color: var(--violet-400);
-  background: #fff;
+  background: var(--surface-raised);
 }
 
 /* Card grid */
@@ -158,7 +158,7 @@
   padding: 18px 20px 16px;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: #fff;
+  background: var(--surface-raised);
   text-align: left;
   cursor: pointer;
   transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
@@ -204,8 +204,8 @@
 }
 
 .status-draft { color: var(--ink-500); background: var(--violet-50); }
-.status-active { color: #1a7a4a; background: #e6f5ed; }
-.status-archived { color: var(--ink-500); background: #f0eeef; }
+.status-active { color: var(--success-700); background: var(--success-100); }
+.status-archived { color: var(--ink-500); background: var(--line); }
 
 .ab-card-name {
   flex: 1;
@@ -276,7 +276,7 @@
   transition: color 180ms ease;
 }
 
-.ab-card-delete:hover { color: #c33; }
+.ab-card-delete:hover { color: var(--danger-700); }
 
 /* Create card */
 .ab-card-create {
@@ -324,15 +324,15 @@
   z-index: 100;
   display: grid;
   place-items: center;
-  background: rgba(37, 34, 50, 0.38);
+  background: var(--overlay);
   backdrop-filter: blur(2px);
 }
 
 .ab-modal {
   width: min(460px, calc(100% - 48px));
   border-radius: 14px;
-  background: #fff;
-  box-shadow: 0 8px 32px rgba(37, 34, 50, 0.18);
+  background: var(--surface-raised);
+  box-shadow: 0 8px 32px var(--shadow-lg);
   overflow: hidden;
 }
 
@@ -544,7 +544,7 @@
   max-width: 85%;
   padding: 10px 14px;
   border-radius: 12px 12px 12px 4px;
-  background: #fff;
+  background: var(--surface-raised);
   border: 1px solid var(--line);
   color: var(--ink-900);
   font-size: 13px;
@@ -589,7 +589,7 @@
   gap: 8px;
   padding: 10px 12px;
   border-top: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface-raised);
 }
 
 .ab-chat-input {
@@ -880,7 +880,7 @@
   font-weight: 620;
 }
 
-.ab-required { color: #c33; }
+.ab-required { color: var(--danger-700); }
 
 .ab-field-value {
   color: var(--violet-600);
@@ -898,7 +898,7 @@ select.ab-input {
   padding: 0 12px;
   border: 1px solid var(--line-strong);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--panel-bg);
   color: var(--ink-900);
   font-size: 13px;
   font-family: inherit;
@@ -917,7 +917,7 @@ select.ab-input {
 .ab-textarea:focus {
   outline: none;
   border-color: var(--violet-400);
-  background: #fff;
+  background: var(--surface-raised);
 }
 
 .ab-range {
@@ -972,7 +972,7 @@ select.ab-input {
 
 .ab-readonly-field:hover {
   border-color: var(--violet-400);
-  background: #fff;
+  background: var(--surface-raised);
 }
 
 .ab-readonly-field--multi {
@@ -1005,10 +1005,10 @@ select.ab-input {
 }
 
 .ab-error {
-  color: #c33;
+  color: var(--danger-700);
   font-size: 12px;
   padding: 8px 12px;
-  background: #fdecea;
+  background: var(--danger-100);
   border-radius: 6px;
 }
 
@@ -1029,7 +1029,7 @@ select.ab-input {
   padding: 12px 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fff;
+  background: var(--surface-raised);
   transition: opacity 180ms ease, border-color 180ms ease;
 }
 
@@ -1103,8 +1103,8 @@ select.ab-input {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  background: var(--surface-raised);
+  box-shadow: 0 1px 3px var(--shadow-sm);
   transition: transform 180ms ease;
 }
 
@@ -1122,7 +1122,7 @@ select.ab-input {
 .ab-identity-row .ab-field { flex: 1; min-width: 0; max-width: 420px; }
 .ab-field-hint { color: var(--ink-500); font-size: 12px; line-height: 1.6; }
 .ab-range { accent-color: var(--violet-600); }
-.ab-preview-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; position: sticky; top: 0; background: white; z-index: 1; padding-bottom: 12px; }
+.ab-preview-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; position: sticky; top: 0; background: var(--surface-raised); z-index: 1; padding-bottom: 12px; }
 .ab-detail-title { font-size: 22px; overflow-wrap: anywhere; }
 .ab-detail-header { flex-wrap: wrap; }
 .ab-detail-actions { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -1145,7 +1145,7 @@ select.ab-input {
   width: min(380px, 92vw);
   padding: 20px;
   overflow-y: auto;
-  background: #fff;
+  background: var(--surface-raised);
   box-shadow: -8px 0 32px rgba(37, 34, 50, 0.18);
 }
 
@@ -1181,8 +1181,8 @@ select.ab-input {
 .ab-btn .ab-spinner {
   width: 12px;
   height: 12px;
-  border: 2px solid rgba(255, 255, 255, 0.45);
-  border-top-color: #fff;
+  border: 2px solid var(--panel-bg-soft);
+  border-top-color: var(--surface-raised);
   border-radius: 50%;
   margin-right: 6px;
   animation: ab-spin 0.7s linear infinite;
@@ -1213,13 +1213,13 @@ select.ab-input {
 }
 
 .ab-save-feedback--saved {
-  color: #166534;
-  background: #dcfce7;
+  color: var(--success-700);
+  background: var(--success-200);
 }
 
 .ab-save-feedback--error {
-  color: #b91c1c;
-  background: #fee2e2;
+  color: var(--danger-700);
+  background: var(--danger-100);
 }
 
 .ab-save-feedback--dirty {
@@ -1276,24 +1276,24 @@ select.ab-input {
 }
 
 .ab-btn-success {
-  color: #fff;
-  background: #16a34a;
+  color: var(--surface-raised);
+  background: var(--success-600);
 }
 
 .ab-btn-success:hover:not(:disabled) {
-  background: #15803d;
+  background: var(--success-700);
 }
 
 .ab-btn-danger-ghost {
-  color: #b91c1c;
-  border-color: #fecaca;
-  background: rgba(239, 68, 68, 0.06);
+  color: var(--danger-700);
+  border-color: var(--danger-200);
+  background: var(--danger-100);
 }
 
 .ab-btn-danger-ghost:hover:not(:disabled) {
-  color: #991b1b;
-  border-color: #fca5a5;
-  background: rgba(239, 68, 68, 0.12);
+  color: var(--danger-700);
+  border-color: var(--danger-200);
+  background: var(--danger-200);
 }
 
 /* ========== Section title row (title + action button) ========== */
@@ -1368,7 +1368,7 @@ select.ab-input {
 .ab-picker-item {
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: #fff;
+  background: var(--surface-raised);
   transition: border-color 160ms ease, background-color 160ms ease;
 }
 
@@ -1400,7 +1400,7 @@ select.ab-input {
   margin-top: 2px;
   border: 1.5px solid var(--line-strong);
   border-radius: 4px;
-  background: #fff;
+  background: var(--surface-raised);
   transition: border-color 160ms ease, background-color 160ms ease;
 }
 
@@ -1416,7 +1416,7 @@ select.ab-input {
   top: 1.5px;
   width: 5px;
   height: 9px;
-  border: solid #fff;
+  border: solid var(--surface-raised);
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
@@ -1452,8 +1452,8 @@ select.ab-input {
 }
 
 .ab-versions-error {
-  color: #b91c1c;
-  background: #fee2e2;
+  color: var(--danger-700);
+  background: var(--danger-100);
   border-radius: 6px;
   padding: 8px 12px;
 }
@@ -1480,7 +1480,7 @@ select.ab-input {
 }
 
 .ab-version-item:hover {
-  background: rgba(111, 86, 217, 0.06);
+  background: var(--line-soft);
 }
 
 .ab-version-num {
@@ -1500,8 +1500,8 @@ select.ab-input {
 .ab-version-current {
   font-size: 10px;
   font-weight: 620;
-  color: #166534;
-  background: #dcfce7;
+  color: var(--success-700);
+  background: var(--success-200);
   padding: 2px 8px;
   border-radius: 999px;
   white-space: nowrap;
@@ -1589,8 +1589,8 @@ select.ab-input {
 }
 
 .ab-snapshot-tag-kb {
-  color: #1a7a4a;
-  background: #e6f5ed;
+  color: var(--success-700);
+  background: var(--success-100);
 }
 
 .ab-snapshot-empty-inline {
