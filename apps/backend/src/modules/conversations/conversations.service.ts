@@ -88,4 +88,19 @@ export class ConversationsService {
       );
     }
   }
+
+  async rename(id: string, userId: string, title: string): Promise<ConversationSummary> {
+    const result = await this.prisma.conversation.updateMany({
+      where: { id, userId },
+      data: { title: title.trim() },
+    });
+    if (result.count === 0) {
+      throw new HttpException(
+        { code: 'NOT_FOUND', message: '会话不存在' },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    const updated = await this.assertOwned(id, userId);
+    return this.toSummary(updated);
+  }
 }

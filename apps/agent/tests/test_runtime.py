@@ -197,6 +197,39 @@ def test_no_match_event_has_empty_citations(settings, body):
     asyncio.run(verify())
 
 
+@pytest.mark.parametrize("explicit_query", ["What is the reimbursement limit?", None])
+def test_attachment_context_is_separate_from_bounded_knowledge_query(settings, body, explicit_query):
+    body["agentConfig"]["knowledgeBaseIds"] = ["kb1"]
+    body["message"] = "What is the reimbursement limit?\nAttachment:\n" + "A" * 12000
+    if explicit_query is not None:
+        body["retrievalQuery"] = explicit_query
+    settings.context_token_limit = 32000
+
+    class KnowledgeStub:
+        async def get_context(self, request):
+            assert request.query == (explicit_query or body["message"][:8000])
+            assert 0 < len(request.query) <= 8000
+            return KnowledgeResult(status="no_match", chunks=[])
+
+    async def verify():
+        def handler(request):
+            messages = json.loads(request.content)["messages"]
+            assert messages[-1]["content"] == body["message"]
+            return httpx.Response(200, content=stream_bytes(), headers={"content-type": "text/event-stream"})
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            events = await collect(RuntimeService(settings, knowledge=KnowledgeStub(), client=client), body)
+        assert events[1]["type"] == "knowledge.result"
+        assert events[-1]["type"] == "run.completed"
+    asyncio.run(verify())
+
+
+@pytest.mark.parametrize("query", ["", "   ", "A" * 8001, 123])
+def test_retrieval_query_contract_rejects_invalid_values(body, query):
+    body["retrievalQuery"] = query
+    with pytest.raises(ValidationError):
+        RuntimeRequest.model_validate(body)
+
+
 def test_context_rejected_does_not_announce_unused_citations(settings, body):
     class LargeKnowledge:
         async def get_context(self, request):

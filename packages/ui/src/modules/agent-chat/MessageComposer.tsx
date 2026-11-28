@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import type { ChangeEvent, ClipboardEvent, DragEvent, FormEvent, KeyboardEvent } from 'react';
 import { Icon } from '../../components';
 import type { ComposerAttachment } from './types';
+import { ContextUsageIndicator, type ContextUsageSnapshot } from './ContextUsageIndicator';
 import styles from './agent-chat.module.css';
 
 const ACCEPT = '.pdf,.docx,.md,.xlsx,.csv,.png,.jpg,.jpeg,.webp,.pptx,.html';
@@ -13,6 +14,9 @@ interface MessageComposerProps {
   streaming?: boolean;
   unavailable?: boolean;
   onStop?: () => void;
+  contextRemaining?: number;
+  contextMax?: number;
+  contextUsage?: ContextUsageSnapshot;
   /** 已上传（含解析中/失败）的附件，展示在输入框上方 */
   attachments?: ComposerAttachment[];
   uploading?: boolean;
@@ -23,6 +27,7 @@ interface MessageComposerProps {
 
 export function MessageComposer({
   disabled, onSend, streaming, unavailable, onStop, sendBlocked,
+  contextRemaining, contextMax, contextUsage,
   attachments = [], uploading = false, attachmentError, onSelectFiles, onRemoveAttachment,
 }: MessageComposerProps) {
   const [draft, setDraft] = useState('');
@@ -37,7 +42,7 @@ export function MessageComposer({
 
   const sendingRef = useRef(false);
   const hasBlockingAttachment = attachments.some((attachment) => attachment.status !== 'READY');
-  const canSend = !disabled && !sendBlocked && !uploading && !hasBlockingAttachment && draft.trim().length > 0;
+  const canSend = !disabled && !sendBlocked && !uploading && !hasBlockingAttachment && (draft.trim().length > 0 || attachments.length > 0);
 
   const send = async () => {
     const content = draft.trim();
@@ -69,14 +74,14 @@ export function MessageComposer({
     const files = Array.from(event.target.files ?? []);
     // 清空 value，下一次选同一个文件才会再次触发 change
     event.target.value = '';
-    if (files.length > 0) {
+    if (!disabled && !streaming && !uploading && files.length > 0) {
       onSelectFiles?.(files);
     }
   };
 
   const handleDragOver = (event: DragEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setDragActive(true);
+    if (!disabled && !streaming && !uploading) setDragActive(true);
   };
 
   const handleDragLeave = () => {
@@ -87,7 +92,7 @@ export function MessageComposer({
     event.preventDefault();
     setDragActive(false);
     const files = Array.from(event.dataTransfer.files ?? []);
-    if (files.length > 0) {
+    if (!disabled && !streaming && !uploading && files.length > 0) {
       onSelectFiles?.(files);
     }
   };
@@ -97,7 +102,7 @@ export function MessageComposer({
     const files = Array.from(event.clipboardData.files ?? []);
     if (files.length > 0) {
       event.preventDefault();
-      onSelectFiles?.(files);
+      if (!disabled && !streaming && !uploading) onSelectFiles?.(files);
     }
   };
 
@@ -109,6 +114,30 @@ export function MessageComposer({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      <div className={styles.contextIndicators}>
+      {contextRemaining !== undefined && contextMax !== undefined ? <div
+        className={styles.contextMeter}
+        role="meter"
+        aria-label="上下文历史轮次余量"
+        aria-valuemin={0}
+        aria-valuemax={contextMax}
+        aria-valuenow={contextRemaining}
+        title={`最多参考最近 ${contextMax} 轮完整历史对话；模型 Token 预算可能进一步裁剪历史。`}
+      >
+        <svg className={styles.contextRing} viewBox="0 0 24 24" aria-hidden="true">
+          <circle className={styles.contextTrack} cx="12" cy="12" r="9" />
+          <circle
+            className={styles.contextValue}
+            cx="12"
+            cy="12"
+            r="9"
+            strokeDasharray={`${(2 * Math.PI * 9 * contextRemaining) / contextMax} ${2 * Math.PI * 9}`}
+          />
+        </svg>
+        <span>{contextRemaining} 轮可用</span>
+      </div> : null}
+      {contextUsage ? <ContextUsageIndicator usage={contextUsage} /> : null}
+      </div>
       {attachments.length > 0 && (
         <div className={styles.composerAttachments}>
           {attachments.map((attachment) => (
@@ -118,7 +147,7 @@ export function MessageComposer({
             >
               <span className={styles.attachmentName} title={attachment.fileName}>{attachment.fileName}</span>
               <span className={styles.attachmentMeta}>
-                {attachment.status === 'PARSING' ? '解析中' : attachment.status === 'FAILED' ? '解析失败' : formatFileSize(attachment.byteSize)}
+                {attachment.status === 'PARSING' ? '解析中' : attachment.status === 'FAILED' ? attachment.errorMessage || '解析失败' : formatFileSize(attachment.byteSize)}
               </span>
               {onRemoveAttachment && (
                 <button
@@ -134,6 +163,7 @@ export function MessageComposer({
           ))}
         </div>
       )}
+      {uploading ? <p className={styles.attachmentProgress} role="status">附件上传并解析中…</p> : null}
       {attachmentError ? <p className={styles.attachmentError} role="alert">{attachmentError}</p> : null}
       <input
         ref={fileRef}

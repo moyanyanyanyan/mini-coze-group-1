@@ -40,6 +40,8 @@ export interface RuntimeRequestBody {
   agentConfig: RuntimeAgentConfig;
   history: RuntimeHistoryMessage[];
   message: string;
+  /** 原始问题；没有文字时使用截取的附件内容，与发给模型的消息分开传递。 */
+  retrievalQuery?: string;
 }
 
 // Runtime返回的事件

@@ -8,6 +8,7 @@ export interface ChatAttachmentView {
   byteSize: number;
   status: ChatAttachmentStatus;
   errorCode?: string | null;
+  errorMessage?: string | null;
 }
 
 export type ComposerAttachment = ChatAttachmentView;
@@ -24,11 +25,13 @@ export interface ChatAgentOption {
   id: string;
   name: string;
   avatarUrl?: string;
+  status?: 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
 }
 
 export interface ChatConversationItem {
   id: string;
   title: string;
+  agentId: string | null;
   updatedAt: string;
 }
 

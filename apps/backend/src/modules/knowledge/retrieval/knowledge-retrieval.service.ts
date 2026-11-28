@@ -4,6 +4,11 @@ import { PrismaService } from '../../../database/prisma.service';
 import { EmbeddingClient, EmbeddingUnavailableError } from '../../../integrations/embedding.client';
 import { OperationTelemetryService } from '../../operations/collection/telemetry.service';
 
+import {
+  parseChunkSourceRanges,
+  type ChunkSourceRanges,
+} from '../documents/office-chunk-source';
+
 interface RetrievalScope { ownerId: string; agentId?: string; runId?: string; source: 'chat' | 'preview'; }
 
 export interface KnowledgeHit {
@@ -12,8 +17,15 @@ export interface KnowledgeHit {
   documentId: string;
   documentTitle: string;
   content: string;
+  startOffset: number;
+  endOffset: number;
+  sourceRanges: ChunkSourceRanges | null;
   score: number;
 }
+
+type RawKnowledgeHit = Omit<KnowledgeHit, 'sourceRanges'> & {
+  sourceRanges: unknown;
+};
 
 @Injectable()
 export class KnowledgeRetrievalService {
@@ -36,7 +48,7 @@ export class KnowledgeRetrievalService {
       if (scope) await this.telemetry.record({ ownerId: scope.ownerId, kind: 'retrieval', status: result?.status ?? 'FAILED',
         startedAt, durationMs: Date.now() - startedAt.getTime(), knowledgeBaseId: knowledgeBaseIds.length === 1 ? knowledgeBaseIds[0] : null,
         agentId: scope.agentId, runId: scope.runId, itemCount: result?.hits.length ?? 0,
-        data: { query: query.trim(), baseIds: knowledgeBaseIds, source: scope.source, hits: result?.hits.map(hit => ({ ...hit })) ?? [] } });
+        data: { query: query.trim(), baseIds: knowledgeBaseIds, source: scope.source, hits: result?.hits.map(hit => ({ ...hit, sourceRanges: hit.sourceRanges as unknown as Prisma.InputJsonValue })) ?? [] } });
     }
   }
 
@@ -85,9 +97,10 @@ export class KnowledgeRetrievalService {
 
     const hits: KnowledgeHit[] = [];
     for (const knowledgeBaseId of ids) {
-      const rows = await this.prisma.$queryRaw<KnowledgeHit[]>(Prisma.sql`
+      const rows = await this.prisma.$queryRaw<RawKnowledgeHit[]>(Prisma.sql`
           SELECT c.id AS "chunkId", c."knowledgeBaseId", c."documentId",
-                 d.title AS "documentTitle", c.content,
+                 d.title AS "documentTitle", c.content, c."startOffset", c."endOffset",
+                 c."sourceRanges" AS "sourceRanges",
                  (1 - (${distance}))::double precision AS score
           FROM "KnowledgeChunk" c
           JOIN "KnowledgeChunkVector" v ON v."chunkId" = c.id
@@ -99,7 +112,10 @@ export class KnowledgeRetrievalService {
           ORDER BY ${distance}, c.id
           LIMIT ${topK}
       `);
-      hits.push(...rows);
+      hits.push(...rows.map((row) => ({
+        ...row,
+        sourceRanges: parseChunkSourceRanges(row.sourceRanges),
+      })));
     }
     hits.sort((a, b) => b.score - a.score || a.knowledgeBaseId.localeCompare(b.knowledgeBaseId) ||
       a.documentId.localeCompare(b.documentId) || a.chunkId.localeCompare(b.chunkId));

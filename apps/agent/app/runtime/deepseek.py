@@ -66,7 +66,11 @@ async def model_client(client: httpx.AsyncClient | None, *, trust_env: bool = Tr
     if client is not None:
         yield client
     else:
-        async with httpx.AsyncClient(follow_redirects=False, trust_env=trust_env) as owned:
+        # 强制走 IPv4：本机到 api.siliconflow.cn 的 IPv6 链路在 TLS 握手阶段会被对端重置，
+        # 而 async 客户端（anyio）只在 TCP 建连时选路，一旦落到 IPv6 就整条请求失败，
+        # 不会像同步客户端那样回落到 IPv4。绑定 0.0.0.0 让 socket 只能是 IPv4。
+        transport = httpx.AsyncHTTPTransport(local_address="0.0.0.0", trust_env=trust_env)
+        async with httpx.AsyncClient(follow_redirects=False, transport=transport) as owned:
             yield owned
 
 

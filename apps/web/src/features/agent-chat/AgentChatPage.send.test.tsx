@@ -43,14 +43,14 @@ beforeEach(() => {
   harness.stream.mockReset();
   harness.cursor = 0;
   harness.setters = [];
-  harness.values = ['conversation', [], [], 'agent', [], {}, null, '', [attachment], false, '', false, '', false];
+  harness.values = ['conversation', [], [{ id: 'agent', status: 'PUBLISHED', contextLimit: 10, knowledgeBaseBindings: [], model: 'test-model', systemPrompt: '' }], 'agent', [], null, {}, null, null, false, '', [attachment], false, '', false, '', false];
 });
 
 it.each(['SERVICE_NOT_READY', 'ATTACHMENT_INVALID'])('restores attachments and rejects drafts on HTTP %s', async code => {
   harness.stream.mockRejectedValue(new ApiError(code === 'SERVICE_NOT_READY' ? 503 : 400, code, '请求未接受'));
   const view = AgentChatPage();
   expect(await view.props.handleSend('我的问题')).toBe(false);
-  expect(harness.setters[8]).toHaveBeenLastCalledWith([attachment]);
+  expect(harness.setters[11]).toHaveBeenLastCalledWith([attachment]);
 });
 
 it('restores attachments on an SSE readiness race before run.started', async () => {
@@ -59,7 +59,7 @@ it('restores attachments on an SSE readiness race before run.started', async () 
   });
   const view = AgentChatPage();
   expect(await view.props.handleSend('我的问题')).toBe(false);
-  expect(harness.setters[8]).toHaveBeenLastCalledWith([attachment]);
+  expect(harness.setters[11]).toHaveBeenLastCalledWith([attachment]);
   expect(harness.refresh).toHaveBeenCalledOnce();
 });
 
@@ -70,11 +70,11 @@ it('does not restore bound attachments after run.started', async () => {
   });
   const view = AgentChatPage();
   expect(await view.props.handleSend('我的问题')).toBe(true);
-  expect(harness.setters[8]).toHaveBeenCalledExactlyOnceWith([]);
+  expect(harness.setters[11]).toHaveBeenCalledExactlyOnceWith([]);
 });
 
 it.each(['PARSING', 'FAILED'])('does not accept drafts with %s attachments', async status => {
-  harness.values[8] = [{ ...attachment, status }];
+  harness.values[11] = [{ ...attachment, status }];
   const view = AgentChatPage();
   expect(await view.props.handleSend('我的问题')).toBe(false);
   expect(harness.stream).not.toHaveBeenCalled();

@@ -1,4 +1,4 @@
-import pdfParse from 'pdf-parse';
+import pdfParse from 'pdf-parse-legacy';
 import { AttachmentError, type AttachmentInput } from '../attachment.types';
 import { normalizeText } from './text.parser';
 

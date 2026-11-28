@@ -29,12 +29,55 @@ describe('KnowledgeRetrievalService', () => {
     ]);
     prisma.knowledgeChunk.findFirst.mockResolvedValueOnce({ id: 'chunk-1' }).mockResolvedValueOnce(null);
     embedding.embed.mockResolvedValue({ model: 'model@revision', vectors: [Array(512).fill(0.01)] });
-    const first = { chunkId: 'chunk-1', knowledgeBaseId: 'kb-1', documentId: 'doc-1', documentTitle: 'A', content: 'A', score: 0.7 };
-    const second = { chunkId: 'chunk-2', knowledgeBaseId: 'kb-2', documentId: 'doc-2', documentTitle: 'B', content: 'B', score: 0.9 };
+    const sourceRanges = {
+      version: 1 as const,
+      ranges: [{
+        path: 'content.0', kind: 'paragraph' as const,
+        startOffset: 10, endOffset: 20, overlap: false,
+      }],
+    };
+    const first = { chunkId: 'chunk-1', knowledgeBaseId: 'kb-1', documentId: 'doc-1', documentTitle: 'A', content: 'A', startOffset: 10, endOffset: 20, sourceRanges, score: 0.7 };
+    const second = { chunkId: 'chunk-2', knowledgeBaseId: 'kb-2', documentId: 'doc-2', documentTitle: 'B', content: 'B', startOffset: 0, endOffset: 8, sourceRanges: null, score: 0.9 };
     prisma.$queryRaw.mockResolvedValueOnce([first]).mockResolvedValueOnce([second]);
 
     await expect(service.searchAuthorized(['kb-1', 'kb-2'], '报销标准', 5)).resolves.toEqual({ status: 'HIT', hits: [second, first] });
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns null sourceRanges for legacy chunks and strips unknown JSON fields', async () => {
+    const { service, prisma, embedding } = createService();
+    prisma.knowledgeBase.findMany.mockResolvedValue([{ id: 'kb-1', workspaceId: 'ws-1' }]);
+    prisma.knowledgeChunk.findFirst.mockResolvedValueOnce({ id: 'chunk-1' }).mockResolvedValueOnce(null);
+    embedding.embed.mockResolvedValue({ model: 'model@revision', vectors: [Array(512).fill(0.01)] });
+    prisma.$queryRaw.mockResolvedValue([
+      {
+        chunkId: 'legacy', knowledgeBaseId: 'kb-1', documentId: 'doc-1', documentTitle: 'Old',
+        content: 'old', startOffset: 0, endOffset: 3, sourceRanges: null, score: 0.5,
+      },
+      {
+        chunkId: 'office', knowledgeBaseId: 'kb-1', documentId: 'doc-2', documentTitle: 'Office',
+        content: 'office', startOffset: 0, endOffset: 6, score: 0.6,
+        sourceRanges: {
+          version: 1,
+          ranges: [{
+            path: 'content.0', kind: 'paragraph',
+            startOffset: 0, endOffset: 6, overlap: false, extra: '<script>',
+          }],
+          extra: true,
+        },
+      },
+    ]);
+
+    const result = await service.searchAuthorized(['kb-1'], '问题', 5);
+    const byId = new Map(result.hits.map((hit) => [hit.chunkId, hit]));
+    expect(byId.get('legacy')?.sourceRanges).toBeNull();
+    expect(byId.get('office')?.sourceRanges).toEqual({
+      version: 1,
+      ranges: [{
+        path: 'content.0', kind: 'paragraph',
+        startOffset: 0, endOffset: 6, overlap: false,
+      }],
+    });
   });
 
   it.each([601, 8000])('长问题的全部 %i 个字符都参与检索', async (length) => {

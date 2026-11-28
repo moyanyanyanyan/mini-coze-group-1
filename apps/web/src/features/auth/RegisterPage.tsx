@@ -83,6 +83,7 @@ export function RegisterPage() {
       LinkComponent={AppLink}
       footerRoute="/login"
       fieldErrors={fieldErrors}
+      homeRoute="/"
     />
   );
 }

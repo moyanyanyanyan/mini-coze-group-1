@@ -10,23 +10,58 @@ export interface KnowledgeBaseItem {
 export interface KnowledgeDocumentItem {
   id: string;
   title: string;
-  sourceType: 'TEXT' | 'TXT' | 'JSON' | 'PDF' | 'DOCX' | 'MD' | 'XLSX' | 'CSV' | 'PNG' | 'JPG' | 'JPEG' | 'WEBP' | 'PPTX' | 'HTML';
+  sourceType: 'TEXT' | 'TXT' | 'JSON' | 'PDF' | 'IMAGE' | 'DOCX' | 'PPTX' | 'MARKDOWN' | 'HTML' | 'MD' | 'XLSX' | 'CSV' | 'PNG' | 'JPG' | 'JPEG' | 'WEBP';
   status: 'PROCESSING' | 'READY' | 'FAILED';
   stage: string;
   chunkCount: number;
   error: { message: string } | null;
+  originalFileName?: string | null;
   createdAt: string;
 }
 
-export interface KnowledgeChunks {
-  items: { id: string; position: number; content: string; startOffset: number; endOffset: number }[];
-  total: number;
-  pageSize: number;
+export type KnowledgeSourceKind =
+  | 'paragraph'
+  | 'heading'
+  | 'listItem'
+  | 'tableCell'
+  | 'imageOcr';
+
+export interface KnowledgeSourceRange {
+  path: string;
+  slideNumber?: number;
+  bounds?: { x: number; y: number; width: number; height: number };
+  kind: KnowledgeSourceKind;
+  startOffset: number;
+  endOffset: number;
+  overlap: boolean;
+  headingLevel?: number;
+  list?: {
+    listId?: string;
+    listType: 'ordered' | 'unordered';
+    level: number;
+    itemIndex: number;
+    marker?: string;
+  };
+}
+
+export interface KnowledgeSourceRanges {
+  version: 1;
+  ranges: KnowledgeSourceRange[];
 }
 
 export interface KnowledgeSearchPreview {
   status: 'HIT' | 'NO_HIT';
-  hits: { chunkId: string; knowledgeBaseId: string; documentId: string; documentTitle: string; content: string; score: number }[];
+  hits: {
+    chunkId: string;
+    knowledgeBaseId: string;
+    documentId: string;
+    documentTitle: string;
+    content: string;
+    startOffset: number | null;
+    endOffset: number | null;
+    sourceRanges: KnowledgeSourceRanges | null;
+    score: number;
+  }[];
 }
 
 export interface KnowledgeCatalogState {
@@ -45,7 +80,7 @@ export interface KnowledgeCatalogState {
   canCreate: boolean;
 }
 
-export type KnowledgeTab = 'documents' | 'chunks' | 'search';
+export type KnowledgeTab = 'documents' | 'search';
 export type DocumentSourceMode = 'text' | 'file';
 
 export interface KnowledgeDocumentsState {
@@ -61,23 +96,29 @@ export interface KnowledgeDocumentsState {
   documentText: string;
   selectedDocumentId: string | null;
   selectedDocument: KnowledgeDocumentItem | undefined;
+  documentDrawerOpen: boolean;
   readyDocuments: KnowledgeDocumentItem[];
   hasProcessing: boolean;
-}
-
-export interface KnowledgeChunkState {
-  chunkPage: number;
-  chunks: KnowledgeChunks | null;
-  chunkLoading: boolean;
-  chunkError: string;
 }
 
 export interface KnowledgeSearchState {
   query: string;
   searchResult: KnowledgeSearchPreview | null;
+  contentByDocumentId: Record<string, string>;
   searching: boolean;
   searchError: string;
   canSearch: boolean;
+}
+
+export interface KnowledgeDocumentContentState {
+  content: string | null;
+  loading: boolean;
+  error: string;
+  hasMore?: boolean;
+  totalLength?: number;
+  sourceRanges: KnowledgeSourceRange[];
+  sourceRangesLoading: boolean;
+  sourceRangesError: string;
 }
 
 export interface KnowledgeActions {
@@ -88,6 +129,7 @@ export interface KnowledgeActions {
   onDescriptionChange: (value: string) => void;
   handleCreate: (event: FormEvent<HTMLFormElement>) => void;
   handleToggleBaseStatus: () => void;
+  onEditKnowledgeBase: () => void;
   handleDeleteBase: () => void;
   onActiveTabChange: (tab: KnowledgeTab) => void;
   onToggleDocumentForm: () => void;
@@ -98,9 +140,10 @@ export interface KnowledgeActions {
   handleDocumentSubmit: (event: FormEvent<HTMLFormElement>) => void;
   handleRetry: (id: string) => void;
   onViewDocumentChunks: (id: string) => void;
+  onCloseDocumentDrawer: () => void;
   handleDeleteDocument: (id: string) => void;
+  onReadDocument: (id: string) => void;
   onSelectedDocumentChange: (id: string | null) => void;
-  onChunkPageChange: (page: number) => void;
   onQueryChange: (value: string) => void;
   handleSearch: (event: FormEvent<HTMLFormElement>) => void;
 }
@@ -108,9 +151,40 @@ export interface KnowledgeActions {
 export interface KnowledgeViewProps {
   catalog: KnowledgeCatalogState;
   documentState: KnowledgeDocumentsState;
-  chunkState: KnowledgeChunkState;
+  documentContentState: KnowledgeDocumentContentState;
   searchState: KnowledgeSearchState;
   actions: KnowledgeActions;
   confirmation: ReactNode;
   fileInputRef: RefObject<HTMLInputElement | null>;
+  onBackToCenter: () => void;
+  editDialogOpen: boolean;
+  editName: string;
+  editDescription: string;
+  editSaving: boolean;
+  onEditNameChange: (value: string) => void;
+  onEditDescriptionChange: (value: string) => void;
+  onEditSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onCloseEditDialog: () => void;
+}
+
+export interface KnowledgeCenterAction {
+  onToggleCreate: () => void;
+  onNameChange: (value: string) => void;
+  onDescriptionChange: (value: string) => void;
+  handleCreate: (event: FormEvent<HTMLFormElement>) => void;
+  onOpenDetail: (id: string) => void;
+  onOpenEdit: (id: string) => void;
+}
+
+export interface KnowledgeCenterViewProps {
+  items: KnowledgeBaseItem[];
+  editingItem: KnowledgeBaseItem | null;
+  loading: boolean;
+  error: string;
+  name: string;
+  description: string;
+  saving: boolean;
+  creatingBase: boolean;
+  canCreate: boolean;
+  actions: KnowledgeCenterAction;
 }

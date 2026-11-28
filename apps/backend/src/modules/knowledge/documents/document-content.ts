@@ -1,12 +1,17 @@
 import { extname } from 'node:path';
 import { AttachmentError, type AttachmentSourceType } from '../../attachments/attachment.types';
 import { resolveSourceType, maxBytesFor } from '../../attachments/parsers/file-type';
+import { pdfMaxBytes, imageMaxBytes, officeMaxBytes } from '../../../config/upload-limits';
+export { MAX_PDF_DOCUMENT_BYTES, pdfMaxBytes } from '../../../config/upload-limits';
 
 export const MAX_DOCUMENT_BYTES = 1024 * 1024;
-export const MAX_KNOWLEDGE_UPLOAD_BYTES = 20 * 1024 * 1024;
-export type KnowledgeSourceType = 'TEXT' | 'TXT' | 'JSON' | AttachmentSourceType;
+export type KnowledgeSourceType = 'TEXT' | 'TXT' | 'JSON' | 'IMAGE' | 'MARKDOWN' | AttachmentSourceType;
 
 export function documentMaxBytes(type: KnowledgeSourceType) {
+  if (type === 'PDF') return pdfMaxBytes();
+  if (type === 'IMAGE') return imageMaxBytes();
+  if (type === 'DOCX' || type === 'PPTX') return officeMaxBytes();
+  if (type === 'MARKDOWN' || type === 'HTML') return MAX_DOCUMENT_BYTES;
   return type === 'TEXT' || type === 'TXT' || type === 'JSON' ? MAX_DOCUMENT_BYTES : maxBytesFor(type);
 }
 
@@ -27,10 +32,20 @@ export function decodeUploadFilename(filename: string): string {
   }
 }
 
-export function sourceTypeFromFilename(filename: string): Exclude<KnowledgeSourceType, 'TEXT'> {
+export type DocumentSourceType = Exclude<KnowledgeSourceType, 'TEXT'>;
+
+export type FileDocumentSourceType = DocumentSourceType;
+
+export function sourceTypeFromFilename(filename: string): DocumentSourceType {
   const extension = extname(filename).toLowerCase();
   if (extension === '.txt') return 'TXT';
   if (extension === '.json') return 'JSON';
+  if (extension === '.md' || extension === '.markdown') return 'MARKDOWN';
+  if (extension === '.html' || extension === '.htm') return 'HTML';
+  if (extension === '.pdf') return 'PDF';
+  if (extension === '.docx') return 'DOCX';
+  if (extension === '.pptx') return 'PPTX';
+  if (extension === '.png' || extension === '.jpg' || extension === '.jpeg') return 'IMAGE';
   try { return resolveSourceType(filename); }
   catch (error) {
     if (error instanceof AttachmentError) throw new DocumentContentError(error.code, error.message);
@@ -38,19 +53,79 @@ export function sourceTypeFromFilename(filename: string): Exclude<KnowledgeSourc
   }
 }
 
-export function extractDocumentText(sourceType: 'TEXT' | 'TXT' | 'JSON', bytes: Uint8Array): string {
+const ZIP_LOCAL_FILE_HEADER = [0x50, 0x4b, 0x03, 0x04];
+
+/**
+ * DOCX/PPTX are ZIP/OOXML packages. The upload path checks the ZIP container
+ * synchronously; officeparser later proves the package is the declared OOXML type.
+ */
+export function assertOfficeUpload(filename: string, bytes: Uint8Array): 'DOCX' | 'PPTX' {
+  const sourceType = sourceTypeFromFilename(filename);
+  if (sourceType !== 'DOCX' && sourceType !== 'PPTX') {
+    throw new DocumentContentError('UNSUPPORTED_FILE', '只支持 .docx 和 .pptx 文件');
+  }
+  const hasZipHeader = bytes.byteLength >= ZIP_LOCAL_FILE_HEADER.length &&
+    ZIP_LOCAL_FILE_HEADER.every((value, index) => bytes[index] === value);
+  if (!hasZipHeader) {
+    throw new DocumentContentError('UNSUPPORTED_FILE', `${sourceType} 文件不是有效的 OOXML 压缩包`);
+  }
+  return sourceType;
+}
+
+export interface DocumentTextPage {
+  content: string;
+  nextCursor: string | null;
+  hasMore: boolean;
+  totalLength: number;
+}
+
+function decodeTextCursor(cursor?: string): number {
+  if (!cursor) return 0;
+  try {
+    const value = Number(Buffer.from(cursor, 'base64url').toString('utf8'));
+    if (!Number.isInteger(value) || value < 0) throw new Error('invalid cursor');
+    return value;
+  } catch {
+    throw new DocumentContentError('INVALID_CURSOR', '文本分页位置无效');
+  }
+}
+
+export function readDocumentTextPage(text: string, cursor?: string, requestedLimit = 4000): DocumentTextPage {
+  const characters = Array.from(text);
+  const start = decodeTextCursor(cursor);
+  if (start > characters.length) throw new DocumentContentError('INVALID_CURSOR', '文本分页位置无效');
+  const limit = Math.min(Math.max(Math.trunc(requestedLimit) || 4000, 100), 5000);
+  const targetEnd = Math.min(start + limit, characters.length);
+  let end = targetEnd;
+  if (targetEnd < characters.length) {
+    const newline = characters.lastIndexOf('\n', targetEnd - 1);
+    if (newline >= start + Math.floor(limit / 2)) end = newline + 1;
+  }
+  const hasMore = end < characters.length;
+  return {
+    content: characters.slice(start, end).join(''),
+    nextCursor: hasMore ? Buffer.from(String(end), 'utf8').toString('base64url') : null,
+    hasMore,
+    totalLength: characters.length,
+  };
+}
+
+export function decodeDocumentBytes(bytes: Uint8Array): string {
   if (bytes.byteLength === 0) throw new DocumentContentError('EMPTY_CONTENT', '资料内容不能为空');
   if (bytes.byteLength > MAX_DOCUMENT_BYTES) throw new DocumentContentError('FILE_TOO_LARGE', '资料不能超过 1 MB');
 
-  let decoded: string;
   try {
-    decoded = new TextDecoder('utf-8', { fatal: true }).decode(bytes).replace(/^\uFEFF/, '');
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes).replace(/^\uFEFF/, '');
   } catch {
     throw new DocumentContentError('INVALID_ENCODING', '资料必须使用 UTF-8 编码');
   }
+}
+
+export function extractDocumentText(sourceType: 'TEXT' | 'TXT' | 'JSON', bytes: Uint8Array): string {
+  const decoded = decodeDocumentBytes(bytes);
 
   if (sourceType !== 'JSON') {
-    const text = decoded.trim();
+    const text = decoded.replace(/\r\n?/g, '\n').trim();
     if (!text) throw new DocumentContentError('EMPTY_CONTENT', '资料内容不能为空');
     return text;
   }

@@ -12,7 +12,7 @@ export interface KnowledgeDocument {
   id: string;
   knowledgeBaseId: string;
   title: string;
-  sourceType: 'TEXT' | 'TXT' | 'JSON' | 'PDF' | 'DOCX' | 'MD' | 'XLSX' | 'CSV' | 'PNG' | 'JPG' | 'JPEG' | 'WEBP' | 'PPTX' | 'HTML';
+  sourceType: 'TEXT' | 'TXT' | 'JSON' | 'PDF' | 'IMAGE' | 'DOCX' | 'PPTX' | 'MARKDOWN' | 'HTML' | 'MD' | 'XLSX' | 'CSV' | 'PNG' | 'JPG' | 'JPEG' | 'WEBP';
   originalFileName: string | null;
   status: 'PROCESSING' | 'READY' | 'FAILED';
   stage: 'VALIDATING' | 'EXTRACTING' | 'CHUNKING' | 'EMBEDDING' | 'PERSISTING' | 'COMPLETED' | 'FAILED';
@@ -22,6 +22,44 @@ export interface KnowledgeDocument {
   updatedAt: string;
 }
 
+export interface KnowledgeDocumentContent {
+  documentId: string;
+  content: string;
+}
+
+export interface KnowledgeDocumentContentPage {
+  documentId: string;
+  content: string;
+  nextCursor: string | null;
+  hasMore: boolean;
+  totalLength: number;
+}
+
+export interface KnowledgeChunkSourceRange {
+  path: string;
+  slideNumber?: number;
+  bounds?: { x: number; y: number; width: number; height: number };
+  kind: 'paragraph' | 'heading' | 'listItem' | 'tableCell' | 'imageOcr';
+  startOffset: number;
+  endOffset: number;
+  overlap: boolean;
+  headingLevel?: number;
+  list?: {
+    listId?: string;
+    listType: 'ordered' | 'unordered';
+    level: number;
+    itemIndex: number;
+    marker?: string;
+  };
+}
+
+export interface KnowledgeChunkSourceRanges {
+  version: 1;
+  ranges: KnowledgeChunkSourceRange[];
+}
+
+export type KnowledgeSourceRange = KnowledgeChunkSourceRange;
+
 export interface KnowledgeChunkPreview {
   id: string;
   position: number;
@@ -29,6 +67,7 @@ export interface KnowledgeChunkPreview {
   startOffset: number;
   endOffset: number;
   enabled: boolean;
+  sourceRanges: KnowledgeChunkSourceRanges | null;
 }
 
 export interface KnowledgeChunkPage {
@@ -44,6 +83,9 @@ export interface KnowledgeSearchHit {
   documentId: string;
   documentTitle: string;
   content: string;
+  startOffset: number | null;
+  endOffset: number | null;
+  sourceRanges: KnowledgeChunkSourceRanges | null;
   score: number;
 }
 
@@ -121,6 +163,25 @@ export async function deleteKnowledgeDocument(documentId: string, workspaceId: s
   await readResponse<{ id: string }>(response);
 }
 
+export async function getKnowledgeDocumentContent(documentId: string, workspaceId: string): Promise<KnowledgeDocumentContent> {
+  const params = new URLSearchParams({ workspaceId });
+  const response = await fetch(`${apiBase}/documents/${encodeURIComponent(documentId)}/content?${params}`, { credentials: 'include' });
+  return readResponse<KnowledgeDocumentContent>(response);
+}
+
+export async function getKnowledgeDocumentContentPage(documentId: string, workspaceId: string, cursor?: string, limit = 4000): Promise<KnowledgeDocumentContentPage> {
+  const params = new URLSearchParams({ workspaceId, limit: String(limit) });
+  if (cursor) params.set('cursor', cursor);
+  const response = await fetch(`${apiBase}/documents/${encodeURIComponent(documentId)}/content-page?${params}`, { credentials: 'include' });
+  return readResponse<KnowledgeDocumentContentPage>(response);
+}
+
+export async function getKnowledgeDocument(documentId: string, workspaceId: string): Promise<KnowledgeDocument> {
+  const params = new URLSearchParams({ workspaceId });
+  const response = await fetch(`${apiBase}/documents/${encodeURIComponent(documentId)}?${params}`, { credentials: 'include' });
+  return readResponse<KnowledgeDocument>(response);
+}
+
 export async function listDocumentChunks(knowledgeBaseId: string, documentId: string, workspaceId: string, page: number): Promise<KnowledgeChunkPage> {
   const params = new URLSearchParams({ workspaceId, page: String(page) });
   const response = await fetch(`${apiBase}/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/documents/${encodeURIComponent(documentId)}/chunks?${params}`, { credentials: 'include' });
@@ -157,6 +218,13 @@ export async function createKnowledgeBase(input: {
 export async function updateKnowledgeBaseStatus(knowledgeBaseId: string, workspaceId: string, status: 'ACTIVE' | 'DISABLED'): Promise<KnowledgeBase> {
   const response = await fetch(`${apiBase}/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/status`, {
     method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ workspaceId, status }),
+  });
+  return readResponse<KnowledgeBase>(response);
+}
+
+export async function updateKnowledgeBase(knowledgeBaseId: string, input: { workspaceId: string; name: string; description: string }): Promise<KnowledgeBase> {
+  const response = await fetch(`${apiBase}/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}`, {
+    method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
   });
   return readResponse<KnowledgeBase>(response);
 }

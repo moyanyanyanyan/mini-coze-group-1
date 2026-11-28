@@ -23,7 +23,10 @@ enum KnowledgeDocumentSourceType {
   TXT
   JSON
   PDF
+  IMAGE
   DOCX
+  PPTX
+  MARKDOWN
   MD
   XLSX
   CSV
@@ -31,7 +34,6 @@ enum KnowledgeDocumentSourceType {
   JPG
   JPEG
   WEBP
-  PPTX
   HTML
 }
 
@@ -84,6 +86,7 @@ model KnowledgeChunk {
   startOffset     Int
   endOffset       Int
   enabled         Boolean               @default(true)
+  sourceRanges    Json?
   vector          KnowledgeChunkVector?
 
   @@unique([documentId, position])

@@ -1,11 +1,13 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ChatBubble } from './ChatBubble';
 import { MessageComposer } from './MessageComposer';
 import { AgentSwitcher } from './AgentSwitcher';
-import { Icon, ActionMenu } from '../../components';
+import { ConversationHistory } from './ConversationHistory';
+import { Icon } from '../../components';
 import type { LinkComponentType } from '../../layouts/types';
 import type { ChatViewport } from './useChatViewport';
 import type { ChatMessageView, ChatAgentOption, ChatConversationItem, ComposerAttachment } from './types';
+import type { ContextUsageSnapshot } from './ContextUsageIndicator';
 import styles from './agent-chat.module.css';
 
 export interface AgentChatViewProps {
@@ -16,6 +18,10 @@ export interface AgentChatViewProps {
   messages: ChatMessageView[];
   citationsByMessage: Record<string, { title: string }[]>;
   streamingId: string | null;
+  generationPhase: 'connecting' | 'thinking' | 'generating' | null;
+  contextRemaining: number;
+  contextMax: number;
+  contextUsage: ContextUsageSnapshot;
   sendError: string;
   readiness?: 'starting' | 'ready' | 'failed' | 'unavailable';
   onReadinessRetry?: () => void;
@@ -30,6 +36,7 @@ export interface AgentChatViewProps {
   handleNewConversation: () => void;
   handleConversationChange: (id: string) => void;
   handleDeleteConversation: (id: string) => void;
+  handleRenameConversation: (id: string, title: string) => Promise<boolean>;
   handleAgentChange: (id: string) => void;
   handleSend: (content: string) => void | Promise<boolean | void>;
   handleStop: () => void;
@@ -44,15 +51,46 @@ export interface AgentChatViewProps {
 
 export function AgentChatView({
   conversationId, conversations, agents, selectedAgentId, messages, citationsByMessage,
-  streamingId, sendError, needsAgent, bootError, switching, suggestedPrompts, viewport,
+  streamingId, generationPhase, contextRemaining, contextMax, contextUsage, sendError, needsAgent, bootError, switching, suggestedPrompts, viewport,
   confirmation, LinkComponent, createAgentRoute, handleNewConversation, handleConversationChange,
-  handleDeleteConversation, handleAgentChange, handleSend, handleStop, onRetry, readiness = 'ready', onReadinessRetry,
+  handleDeleteConversation, handleRenameConversation, handleAgentChange, handleSend, handleStop, onRetry, readiness = 'ready', onReadinessRetry,
   pendingAttachments, attaching, attachmentError, onSelectFiles, onRemoveAttachment,
   memoryPanel,
 }: AgentChatViewProps) {
   const selectedAgent = agents.find(agent => agent.id === selectedAgentId);
+  const selectedConversation = conversations.find(conversation => conversation.id === conversationId);
+  const fallbackAgentName = selectedConversation && !selectedAgent
+    ? selectedConversation.agentId ? `已删除的智能体 (${selectedConversation.agentId.slice(0, 6)})` : '未归类对话'
+    : undefined;
   const { conversationsOpen, setConversationsOpen, conversationPanelRef, conversationDrawer,
     streamRef, onScroll, awayFromBottom, jumpToLatest } = viewport;
+  const [activePromptId, setActivePromptId] = useState<string | null>(null);
+  const promptRefs = useRef(new Map<string, HTMLDivElement>());
+  const promptMarkRefs = useRef(new Map<string, HTMLButtonElement>());
+  const userPrompts = messages.filter((message) => message.role === 'user');
+  const updateTurnRail = () => {
+    const stream = streamRef.current;
+    if (!stream) return;
+    const streamTop = stream.getBoundingClientRect().top;
+    let active: string | null = null;
+    for (const message of userPrompts) {
+      const element = promptRefs.current.get(message.id);
+      if (!element) continue;
+      const top = element.getBoundingClientRect().top - streamTop;
+      const mark = promptMarkRefs.current.get(message.id);
+      if (mark) mark.style.top = `${top + 13}px`;
+      if (top <= 140) active = message.id;
+    }
+    setActivePromptId(active);
+  };
+  useEffect(() => {
+    updateTurnRail();
+    const stream = streamRef.current;
+    if (!stream || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(updateTurnRail);
+    observer.observe(stream);
+    return () => observer.disconnect();
+  }, [messages]);
 
   return (
     <section className={`${styles.page} ${conversationsOpen ? styles.panelOpen : styles.panelClosed}`} aria-label="智能体聊天">
@@ -68,47 +106,42 @@ export function AgentChatView({
           <button
             type="button"
             className={styles.newConversation}
-            disabled={!selectedAgentId || streamingId !== null || switching}
+            disabled={!agents.some((agent) => agent.id === selectedAgentId && agent.status !== 'ARCHIVED') || streamingId !== null || switching || attaching}
             onClick={() => void handleNewConversation()}
           >
             <Icon name="plus" /> 新建对话
           </button>
-        <div className={styles.conversationList}>
-          {conversations.map((conversation) => (
-            <div
-              key={conversation.id}
-              className={`${styles.conversationItem}${conversation.id === conversationId ? ` ${styles.conversationItemActive}` : ''}`}
-            >
-              <button
-                type="button"
-                className={styles.conversationSelect}
-                onClick={() => void handleConversationChange(conversation.id)}
-              >
-                <span>{conversation.title || '新对话'}</span>
-                <small>{new Date(conversation.updatedAt).toLocaleDateString('zh-CN')}</small>
-              </button>
-              <ActionMenu label={`会话操作：${conversation.title || '新对话'}`}><button
-                type="button"
-                className={styles.conversationDelete}
-                disabled={switching || streamingId !== null}
-                aria-label={`删除会话 ${conversation.title || '新对话'}`}
-                onClick={() => void handleDeleteConversation(conversation.id)}
-              >
-                删除对话
-              </button></ActionMenu>
-            </div>
-          ))}
-        </div>
+        <ConversationHistory conversations={conversations} agents={agents} conversationId={conversationId}
+          disabled={switching || attaching || streamingId !== null} onSelect={handleConversationChange}
+          onDelete={handleDeleteConversation} onRename={handleRenameConversation} />
       </aside>
 
       <div className={styles.chatMain}>
         <header className={styles.header}>
           <button className={styles.panelToggle} aria-label="历史对话" title="历史对话" aria-expanded={conversationsOpen} onClick={() => setConversationsOpen(!conversationsOpen)}><Icon name="panel" /></button>
-          <AgentSwitcher agents={agents} value={selectedAgentId} disabled={streamingId !== null || switching} onChange={(id) => void handleAgentChange(id)} />
-          {(switching || streamingId) && <span className={styles.activity} role="status">{switching ? '正在加载…' : '正在回复…'}</span>}
+          <AgentSwitcher agents={agents} value={selectedAgentId} disabled={streamingId !== null || switching || attaching}
+            fallbackName={fallbackAgentName} onChange={(id) => void handleAgentChange(id)} />
+          {(switching || streamingId) && <span className={styles.activity} role="status">{generationPhase === 'connecting' ? '正在连接…' : generationPhase === 'thinking' ? '正在思考…' : generationPhase === 'generating' ? '正在生成…' : '正在加载…'}</span>}
         </header>
 
-        <div className={styles.stream} ref={streamRef} onScroll={onScroll}>
+        <div className={styles.streamFrame}>
+          <nav className={styles.turnRail} aria-label="本轮对话提问">
+            {userPrompts.map((message, index) => {
+              const promptLabel = message.content.trim() || message.attachments?.map((attachment) => attachment.fileName).join('、') || '附件';
+              return <button key={message.id} type="button"
+                ref={(element) => {
+                  if (element) promptMarkRefs.current.set(message.id, element);
+                  else promptMarkRefs.current.delete(message.id);
+                }}
+                className={`${styles.turnMark}${activePromptId === message.id ? ` ${styles.turnMarkActive}` : ''}`}
+                title={`第 ${index + 1} 轮：${promptLabel}`}
+                aria-label={`跳转到第 ${index + 1} 轮提问：${promptLabel}`}
+                aria-current={activePromptId === message.id ? 'location' : undefined}
+                onClick={() => promptRefs.current.get(message.id)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+              />;
+            })}
+          </nav>
+        <div className={styles.stream} ref={streamRef} onScroll={() => { onScroll(); updateTurnRail(); }}>
         {bootError && agents.length === 0 ? (
           <div className={styles.empty}>
             <span className={styles.emptyIcon} aria-hidden="true"><Icon name="plug" /></span>
@@ -117,13 +150,13 @@ export function AgentChatView({
             <button className={styles.createAgent} type="button" onClick={onRetry}>重新连接</button>
           </div>
         ) : null}
-        {needsAgent && !bootError && (
+        {needsAgent && !bootError && !conversationId && (
           <div className={styles.empty}>
             <strong>创建智能体，开始对话</strong>
             <LinkComponent className={styles.createAgent} to={createAgentRoute}>创建智能体</LinkComponent>
           </div>
         )}
-        {conversationId && messages.length === 0 ? (
+        {selectedAgent && selectedAgent.status !== 'ARCHIVED' && !switching && messages.length === 0 ? (
           <div className={styles.empty}>
             <span className={styles.emptyIcon} aria-hidden="true">
               <Icon name="chat" />
@@ -135,7 +168,7 @@ export function AgentChatView({
                 <button
                   type="button"
                   key={prompt}
-                  disabled={!conversationId || streamingId !== null || switching || readiness !== 'ready'}
+                  disabled={!selectedAgentId || switching || streamingId !== null || readiness !== 'ready'}
                   onClick={() => void handleSend(prompt)}
                 >
                   {prompt}
@@ -145,9 +178,20 @@ export function AgentChatView({
           </div>
         ) : null}
 
-        {messages.map((message) => (
-          <div key={message.id}>
-            <ChatBubble message={message} agentName={selectedAgent?.name} avatarUrl={selectedAgent?.avatarUrl} />
+        {messages.map((message, index) => (
+          <div key={message.id}
+            ref={message.role === 'user' ? (element) => {
+              if (element) promptRefs.current.set(message.id, element);
+              else promptRefs.current.delete(message.id);
+            } : undefined}
+            className={message.role === 'user' ? styles.userTurnAnchor : undefined}
+          >
+            <ChatBubble message={message} agentName={selectedAgent?.name} avatarUrl={selectedAgent?.avatarUrl}
+              active={message.id === streamingId}
+              phase={message.id === streamingId ? generationPhase ?? undefined : undefined}
+              onRetry={(message.status === 'failed' || ((message.status === 'running' || message.status === 'pending') && message.id !== streamingId)) && messages[index - 1]?.role === 'user' && !messages[index - 1].attachments?.length && pendingAttachments.length === 0 && !attaching && !switching && !streamingId
+                ? () => handleSend(messages[index - 1].content) : undefined}
+            />
             {citationsByMessage[message.id]?.length ? (
               <div className={styles.citations} aria-label="本次检索来源">
                 来源：{citationsByMessage[message.id].map((source) => source.title).join('、')}
@@ -156,6 +200,7 @@ export function AgentChatView({
           </div>
         ))}
 
+        </div>
         </div>
 
         <div className={styles.footer}>
@@ -169,11 +214,14 @@ export function AgentChatView({
 
           {awayFromBottom && <button className={styles.latestButton} onClick={jumpToLatest}><Icon name="arrowDown" />回到最新消息</button>}
 
-        {conversationId && (
+        {selectedAgent && selectedAgent.status !== 'ARCHIVED' && (
           <>
             <MessageComposer
               disabled={streamingId !== null || switching}
               sendBlocked={readiness !== 'ready'}
+              contextRemaining={contextRemaining}
+              contextMax={contextMax}
+              contextUsage={contextUsage}
               streaming={streamingId !== null}
               onStop={handleStop}
               onSend={handleSend}

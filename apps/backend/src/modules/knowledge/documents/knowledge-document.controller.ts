@@ -4,9 +4,8 @@ import type { Request } from 'express';
 import { CreateTextDocumentDto } from '../dto/create-text-document.dto';
 import { resolveKnowledgeWorkspace } from '../knowledge-local-access';
 import { KnowledgeWorkspaceGuard } from '../knowledge-workspace.guard';
-import { MAX_KNOWLEDGE_UPLOAD_BYTES } from './document-content';
 import { KnowledgeDocumentService } from './knowledge-document.service';
-import { isImageType, mimeTypeFor } from '../../attachments/parsers/file-type';
+import { isImageType, mimeTypeFor, resolveSourceType } from '../../attachments/parsers/file-type';
 import type { AttachmentSourceType } from '../../attachments/attachment.types';
 
 @Controller()
@@ -17,8 +16,9 @@ export class KnowledgeDocumentController {
   @Get('documents/:id/file')
   async original(@Req() request: Request, @Param('id') id: string, @Query('workspaceId') workspaceId: string, @Query('inline') inline?: string) {
     const file = await this.documents.original(id, resolveKnowledgeWorkspace(request, workspaceId));
-    const canPreview = inline === '1' && (file.sourceType === 'PDF' || isImageType(file.sourceType as AttachmentSourceType));
-    return new StreamableFile(file.bytes, { type: canPreview ? mimeTypeFor(file.sourceType as AttachmentSourceType) : 'application/octet-stream', disposition: `${canPreview ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(file.filename).replace(/'/g, '%27')}`, length: file.bytes.length });
+    const previewType = file.sourceType === 'IMAGE' ? resolveSourceType(file.filename) : file.sourceType;
+    const canPreview = inline === '1' && (previewType === 'PDF' || isImageType(previewType as AttachmentSourceType));
+    return new StreamableFile(file.bytes, { type: canPreview ? mimeTypeFor(previewType as AttachmentSourceType) : 'application/octet-stream', disposition: `${canPreview ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(file.filename).replace(/'/g, '%27')}`, length: file.bytes.length });
   }
 
   @Get('knowledge-bases/:id/documents')
@@ -29,6 +29,18 @@ export class KnowledgeDocumentController {
   @Get('documents/:id')
   async get(@Req() request: Request, @Param('id') id: string, @Query('workspaceId') workspaceId: string) {
     return { code: 200, message: 'ok', data: await this.documents.get(id, resolveKnowledgeWorkspace(request, workspaceId)) };
+  }
+
+  @Get('documents/:id/content')
+  async content(@Req() request: Request, @Param('id') id: string, @Query('workspaceId') workspaceId: string) {
+    return { code: 200, message: 'ok', data: await this.documents.content(id, resolveKnowledgeWorkspace(request, workspaceId)) };
+  }
+
+  @Get('documents/:id/content-page')
+  async contentPage(@Req() request: Request, @Param('id') id: string, @Query('workspaceId') workspaceId: string, @Query('cursor') cursor?: string, @Query('limit') limit?: string) {
+    const parsedLimit = limit === undefined ? 4000 : Number(limit);
+    if (!Number.isInteger(parsedLimit) || parsedLimit < 100 || parsedLimit > 5000) throw new BadRequestException('文本分页长度无效');
+    return { code: 200, message: 'ok', data: await this.documents.contentPage(id, resolveKnowledgeWorkspace(request, workspaceId), cursor, parsedLimit) };
   }
 
   @Delete('documents/:id')
@@ -51,8 +63,8 @@ export class KnowledgeDocumentController {
 
   @Post('knowledge-bases/:id/documents/files')
   @HttpCode(202)
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_KNOWLEDGE_UPLOAD_BYTES } }))
-  async createFile(@Req() request: Request, @Param('id') id: string, @Body() body: { workspaceId?: string; title?: string }, @UploadedFile() file?: { originalname: string; buffer: Buffer; size: number }) {
+  @UseInterceptors(FileInterceptor('file'))
+  async createFile(@Req() request: Request, @Param('id') id: string, @Body() body: { workspaceId?: string; title?: string }, @UploadedFile() file?: { originalname: string; buffer: Buffer; size: number; mimetype?: string }) {
     if (typeof body.workspaceId !== 'string' || (body.title !== undefined && typeof body.title !== 'string')) {
       throw new BadRequestException('上传字段格式无效');
     }

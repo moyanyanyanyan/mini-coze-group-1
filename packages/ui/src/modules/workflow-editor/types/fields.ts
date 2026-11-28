@@ -5,4 +5,3 @@ export interface UpstreamField {
   nodeLabel: string;
   type: string;
 }
-

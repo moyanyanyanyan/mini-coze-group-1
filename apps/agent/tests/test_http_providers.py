@@ -21,7 +21,10 @@ def knowledge_request():
 
 def hit(index=0, kb="kb1"):
     return {"knowledgeBaseId": kb, "documentId": "doc1", "chunkId": str(index), "documentTitle": "规则",
-            "content": "参考内容", "score": index / 100, "position": {"page": 2}}
+            "content": "参考内容", "score": index / 100, "position": {"page": 2},
+            "startOffset": 10, "endOffset": 20,
+            "sourceRanges": {"version": 1, "ranges": [{"path": "content.0", "kind": "paragraph",
+                                                           "startOffset": 10, "endOffset": 20, "overlap": False}]}}
 
 
 def wrapped(data):
@@ -41,6 +44,24 @@ def test_retrieval_http_and_mapping(settings):
         assert result.status == "matched"
         assert result.chunks[0].citation.title == "规则"
         assert result.chunks[0].citation.position == {"page": 2}
+    asyncio.run(verify())
+
+
+@pytest.mark.parametrize("source_ranges", [None, {
+    "version": 1,
+    "ranges": [{"path": "content.0", "kind": "paragraph", "startOffset": 10, "endOffset": 20, "overlap": False}],
+}])
+def test_retrieval_accepts_backend_source_range_fields(settings, source_ranges):
+    async def verify():
+        payload = {"knowledgeBaseId": "kb1", "documentId": "doc1", "chunkId": "1", "documentTitle": "规则",
+                   "content": "参考内容", "score": 0.8, "startOffset": 10, "endOffset": 20,
+                   "sourceRanges": source_ranges}
+        async with httpx.AsyncClient(transport=httpx.MockTransport(lambda r: wrapped({"status": "HIT", "hits": [payload]}))) as client:
+            result = await HttpKnowledgeProvider(settings, client).get_context(knowledge_request())
+        assert result.status == "matched"
+        assert result.chunks[0].content == "参考内容"
+        assert result.chunks[0].citation.chunkId == "1"
+        assert result.chunks[0].citation.position is None
     asyncio.run(verify())
 
 

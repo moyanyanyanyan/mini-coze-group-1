@@ -9,7 +9,7 @@ describe('chat stream transport', () => {
     const encoded = new TextEncoder().encode(': heartbeat\n\n' + frame('run.started', { assistantMessageId: 'reply-1' })
       + frame('message.delta', { content: '你好' })
       + frame('knowledge.result', { status: 'HIT', citations: [{ title: '文档' }] })
-      + frame('run.completed', { content: '完整回答' }).trimEnd());
+      + frame('run.completed', { content: '完整回答', usage: { promptTokens: 30, completionTokens: 10, totalTokens: 40 } }).trimEnd());
     const body = new ReadableStream<Uint8Array>({ start(controller) {
       for (const byte of encoded) controller.enqueue(Uint8Array.of(byte));
       controller.close();
@@ -22,7 +22,7 @@ describe('chat stream transport', () => {
     expect(handlers.onStarted).toHaveBeenCalledWith('reply-1');
     expect(handlers.onDelta).toHaveBeenCalledWith('你好');
     expect(handlers.onKnowledge).toHaveBeenCalledWith('HIT', [{ title: '文档' }]);
-    expect(handlers.onCompleted).toHaveBeenCalledWith('完整回答');
+    expect(handlers.onCompleted).toHaveBeenCalledWith('完整回答', { promptTokens: 30, completionTokens: 10, totalTokens: 40 });
     expect(fetchMock).toHaveBeenCalledWith('/api/conversations/conversation-1/messages/stream',
       expect.objectContaining({ method: 'POST', credentials: 'include', signal: controller.signal,
         body: JSON.stringify({ content: '问题' }) }));
@@ -105,4 +105,52 @@ describe('attachment upload', () => {
 it('preserves readiness error codes in the backend numeric envelope', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ code: 503, errorCode: 'SERVICE_NOT_READY', message: '准备中', data: null }), { status: 503 })));
   await expect(streamMessage('conversation', '问题', { onDelta: vi.fn() })).rejects.toMatchObject({ status: 503, code: 'SERVICE_NOT_READY' });
+});
+
+const frame = (type: string, data: Record<string, unknown>) =>
+  `event: ${type}\ndata: ${JSON.stringify({ type, data })}\n\n`;
+
+function streamResponse(payload: string) {
+  return new Response(new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode(payload));
+      controller.close();
+    },
+  }), { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+}
+
+
+describe('streamMessage', () => {
+  it('signals connection, streams deltas, and delivers the final answer', async () => {
+    const payload = frame('run.started', { assistantMessageId: 'assistant-1' })
+      + frame('message.delta', { content: '你好' })
+      + frame('run.completed', { content: '你好！' });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(streamResponse(payload)));
+    const events: string[] = [];
+
+    await streamMessage('conversation-1', '问题', {
+      onConnected: () => events.push('connected'),
+      onStarted: (id) => events.push(id),
+      onDelta: (text) => events.push(text),
+      onCompleted: (text) => events.push(text),
+    });
+
+    expect(events).toEqual(['connected', 'assistant-1', '你好', '你好！']);
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/conversations/conversation-1/messages/stream'),
+      expect.objectContaining({ body: JSON.stringify({ content: '问题' }), credentials: 'include' }),
+    );
+  });
+
+  it('does not deliver buffered frames after stopping', async () => {
+    const controller = new AbortController();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(streamResponse(frame('message.delta', { content: 'late' }))));
+    const onDelta = vi.fn();
+
+    await expect(streamMessage('conversation-1', '问题', {
+      onConnected: () => controller.abort(),
+      onDelta,
+    }, controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+    expect(onDelta).not.toHaveBeenCalled();
+  });
 });
