@@ -1,0 +1,29 @@
+/// 聊天附件：上传即解析，发送时绑定 messageId。
+/// 不保留二进制，只保留解析文本与元信息；status 用 String，新增格式不需要迁移。
+model MessageAttachment {
+  id             String   @id @default(uuid()) @db.Uuid
+  conversationId String   @db.Uuid
+  /// 发送前为 null，绑定后写入；已绑定的附件不能被另一条消息复用
+  messageId      String?  @db.Uuid
+  /// 仅用于展示，禁止参与路径拼接
+  fileName       String
+  mimeType       String
+  /// PDF/DOCX/MD/XLSX/CSV/PNG/JPG/JPEG/WEBP/PPTX/HTML
+  sourceType     String
+  byteSize       Int
+  /// PARSING/READY/FAILED
+  status         String
+  errorCode      String?
+  errorMessage   String?
+  extractedText  String?  @db.Text
+  /// UTF-8 字节数，注入预算用
+  textBytes      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  message      Message?     @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@index([messageId])
+}

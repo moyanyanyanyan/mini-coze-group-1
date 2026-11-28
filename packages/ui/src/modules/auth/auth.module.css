@@ -1,0 +1,437 @@
+.page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(340px, 44%) minmax(0, 1fr);
+}
+
+/* —— 左侧品牌面板 —— */
+.panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 44px 48px;
+  overflow: hidden;
+  color: #fff;
+  background:
+    radial-gradient(1100px 480px at -12% -8%, rgba(111, 86, 217, 0.55), transparent 62%),
+    radial-gradient(720px 420px at 112% 108%, rgba(111, 86, 217, 0.38), transparent 58%),
+    var(--inverse-surface);
+}
+
+/* 细网格：给深底一点「图纸」质感 */
+.panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 56px 56px;
+  pointer-events: none;
+}
+
+.panel::after {
+  content: '';
+  position: absolute;
+  right: 10%;
+  bottom: 13%;
+  width: 54px;
+  height: 48px;
+  border-radius: 12px;
+  background: var(--block-cyan);
+  box-shadow:
+    62px -24px 0 -7px var(--block-coral),
+    88px 35px 0 -12px var(--block-yellow),
+    -45px 38px 0 -14px var(--block-green);
+  transform: rotate(-8deg);
+  opacity: .82;
+}
+
+/* 左上角：返回首页 + 品牌，竖向一组，不改变面板原先的上中下三段布局 */
+.panelTop {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 22px;
+}
+
+/* 「返回首页」：深色面板上的半透明胶囊，保持轻量、不抢品牌 */
+.homeLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px 7px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-pill);
+  color: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.07);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  backdrop-filter: blur(6px);
+  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
+}
+
+.homeLink:hover {
+  border-color: rgba(255, 255, 255, 0.34);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.homeLink:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.55);
+  outline-offset: 2px;
+}
+
+.homeIcon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+/* 移动端（隐藏左侧面板时）用的浅色版本 */
+.homeLinkMobile {
+  display: none;
+  align-self: flex-start;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px 8px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  color: var(--ink-700);
+  background: var(--surface-raised);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  box-shadow: var(--shadow-xs);
+  transition: color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.homeLinkMobile:hover {
+  border-color: var(--ink-400);
+  color: var(--ink-900);
+  box-shadow: var(--shadow-sm);
+}
+
+.homeLinkMobile:focus-visible {
+  outline: 2px solid var(--violet-300);
+  outline-offset: 2px;
+}
+
+.panelBrand {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.brandMark {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  box-shadow: var(--shadow-xs);
+}
+
+.panelBody {
+  position: relative;
+  max-width: 420px;
+  margin: auto 0;
+}
+
+.panelBody::before {
+  content: '';
+  display: block;
+  width: 58px;
+  height: 8px;
+  margin-bottom: 26px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--block-cyan) 0 28%, transparent 28% 34%, var(--block-coral) 34% 65%, transparent 65% 71%, var(--block-yellow) 71%);
+}
+
+.panelEyebrow {
+  margin: 0 0 18px;
+  color: var(--violet-300);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+}
+
+.panelTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(30px, 3.2vw, 42px);
+  font-weight: 400;
+  line-height: 1.34;
+}
+
+/* 「能跑」用斜体点色，衬线斜体是编辑感的经典手法 */
+.panelTitle em {
+  font-style: italic;
+  color: var(--violet-300);
+}
+
+.panelText {
+  margin: 18px 0 0;
+  max-width: 34em;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 14px;
+  line-height: 1.9;
+}
+
+.panelFoot {
+  position: relative;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.4);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+}
+
+/* —— 右侧表单区 —— */
+.main {
+  display: grid;
+  place-items: center;
+  padding: 40px 24px;
+  background: var(--surface);
+}
+
+.card {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  padding: 36px 36px 32px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-sm);
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 34px;
+  width: 68px;
+  height: 10px;
+  border-radius: 6px 6px 3px 3px;
+  background: linear-gradient(90deg, var(--block-violet) 0 44%, transparent 44% 51%, var(--block-cyan) 51%);
+}
+
+.title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.description {
+  margin: 8px 0 26px;
+  color: var(--ink-500);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.form {
+  display: grid;
+  gap: 15px;
+}
+
+.field {
+  display: grid;
+  gap: 7px;
+}
+
+.label {
+  color: var(--ink-700);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.input {
+  height: 42px;
+  padding: 0 13px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  color: var(--ink-900);
+  font-size: 14px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-xs);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.input:hover {
+  border-color: var(--ink-500);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--violet-500);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.input::placeholder {
+  color: var(--ink-400);
+}
+
+.fieldError {
+  color: var(--danger-600);
+  font-size: 12px;
+}
+
+.alert {
+  margin: 0;
+  padding: 10px 13px;
+  border: 1px solid var(--danger-200);
+  border-left: 3px solid var(--danger-600);
+  border-radius: var(--radius-sm);
+  color: var(--danger-600);
+  background: var(--danger-100);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 主按钮用墨色而不是品牌紫：把彩色留给点缀，按钮回归工具感 */
+.submit {
+  height: 44px;
+  margin-top: 4px;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--accent-button-fg);
+  background: var(--accent-button-bg);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow-xs);
+  transition: background-color 160ms ease, box-shadow 160ms ease, transform 120ms ease;
+}
+
+.submit:hover:not(:disabled) {
+  background: var(--accent-button-bg-hover);
+  box-shadow: var(--shadow-sm);
+}
+
+.submit:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* —— 第三方登录 —— */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--ink-400);
+  font-size: 12px;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.dividerText {
+  flex: none;
+}
+
+.googleButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 44px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  color: var(--ink-800);
+  background: var(--surface-raised);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow-xs);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.googleButton:hover {
+  border-color: var(--ink-500);
+  box-shadow: var(--shadow-sm);
+}
+
+.googleIcon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+/* —— 卡片底部 —— */
+.footer {
+  margin: 22px 0 0;
+  color: var(--ink-500);
+  font-size: 13px;
+  text-align: center;
+}
+
+.footerLink {
+  margin-left: 4px;
+  color: var(--ink-900);
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 1px solid var(--violet-300);
+  padding-bottom: 1px;
+  transition: border-color 140ms ease;
+}
+
+.footerLink:hover {
+  border-color: var(--violet-600);
+}
+
+@media (max-width: 880px) {
+  .page {
+    grid-template-columns: 1fr;
+  }
+
+  .panel {
+    display: none;
+  }
+
+  /* 面板隐藏后，返回首页入口回到表单区顶部；卡片仍尽量垂直居中 */
+  .main {
+    display: flex;
+    flex-direction: column;
+    padding: 24px 20px 32px;
+  }
+
+  .homeLinkMobile {
+    display: inline-flex;
+  }
+
+  .card {
+    margin: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .card {
+    padding: 28px 22px 26px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+}

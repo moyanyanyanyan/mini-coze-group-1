@@ -7,6 +7,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -23,6 +24,7 @@ import { ConversationsService } from './conversations.service';
 import { MessagesService } from './messages.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { SendMessageDto } from './dto/send-message.dto';
+import { RenameConversationDto } from './dto/rename-conversation.dto';
 
 // 路由：/api/conversations（api 是 main.ts 里的全局前缀）
 @Controller('conversations')
@@ -58,6 +60,15 @@ export class ConversationsController {
     await this.conversations.remove(id, user.id);
   }
 
+  @Patch(':id')
+  async rename(
+    @Param('id') id: string,
+    @Body() dto: RenameConversationDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ): Promise<ConversationSummary> {
+    return this.conversations.rename(id, user.id, dto.title);
+  }
+
   /** 历史消息。进方法第一件事是校验归属，顺序不能反 */
   @Get(':id/messages')
   async listMessages(
@@ -76,6 +87,6 @@ export class ConversationsController {
     @CurrentUser() user: CurrentUserPayload,
   ): Promise<SendMessageResult> {
     await this.conversations.assertOwned(id, user.id);
-    return this.messages.send(id, dto.content);
+    return this.messages.send(id, dto.content, dto.attachmentIds);
   }
 }

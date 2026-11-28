@@ -1,0 +1,150 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { streamMessage, uploadAttachment } from './chat-api';
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe('chat stream transport', () => {
+  it('decodes split UTF-8 frames, citations and final content, then releases the reader', async () => {
+    const frame = (type: string, data: object) => `data: ${JSON.stringify({ type, data })}\n\n`;
+    const encoded = new TextEncoder().encode(': heartbeat\n\n' + frame('run.started', { assistantMessageId: 'reply-1' })
+      + frame('message.delta', { content: '你好' })
+      + frame('knowledge.result', { status: 'HIT', citations: [{ title: '文档' }] })
+      + frame('run.completed', { content: '完整回答', usage: { promptTokens: 30, completionTokens: 10, totalTokens: 40 } }).trimEnd());
+    const body = new ReadableStream<Uint8Array>({ start(controller) {
+      for (const byte of encoded) controller.enqueue(Uint8Array.of(byte));
+      controller.close();
+    } });
+    const fetchMock = vi.fn(async () => new Response(body));
+    vi.stubGlobal('fetch', fetchMock);
+    const handlers = { onStarted: vi.fn(), onDelta: vi.fn(), onKnowledge: vi.fn(), onCompleted: vi.fn() };
+    const controller = new AbortController();
+    await streamMessage('conversation-1', '问题', handlers, controller.signal);
+    expect(handlers.onStarted).toHaveBeenCalledWith('reply-1');
+    expect(handlers.onDelta).toHaveBeenCalledWith('你好');
+    expect(handlers.onKnowledge).toHaveBeenCalledWith('HIT', [{ title: '文档' }]);
+    expect(handlers.onCompleted).toHaveBeenCalledWith('完整回答', { promptTokens: 30, completionTokens: 10, totalTokens: 40 });
+    expect(fetchMock).toHaveBeenCalledWith('/api/conversations/conversation-1/messages/stream',
+      expect.objectContaining({ method: 'POST', credentials: 'include', signal: controller.signal,
+        body: JSON.stringify({ content: '问题' }) }));
+    expect(body.locked).toBe(false);
+  });
+
+  it('propagates cancellation and releases the reader without completing the message', async () => {
+    const controller = new AbortController();
+    const body = new ReadableStream<Uint8Array>({ start(stream) {
+      controller.signal.addEventListener('abort', () => stream.error(new DOMException('Stopped', 'AbortError')));
+    } });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(body)));
+    const onCompleted = vi.fn();
+    const pending = streamMessage('conversation-1', '问题', { onDelta: vi.fn(), onCompleted }, controller.signal);
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    expect(onCompleted).not.toHaveBeenCalled();
+    expect(body.locked).toBe(false);
+  });
+
+  it('keeps stream failures distinct from HTTP authentication errors', async () => {
+    const onFailed = vi.fn();
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('data: {"type":"run.failed","data":{"code":"MODEL_ERROR","message":"生成失败","retryable":true}}\n\n')));
+    await streamMessage('conversation-1', '问题', { onDelta: vi.fn(), onFailed });
+    expect(onFailed).toHaveBeenCalledWith('MODEL_ERROR', '生成失败', true);
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ code: 'UNAUTHORIZED', message: '请登录' }), { status: 401 })));
+    await expect(streamMessage('conversation-1', '问题', { onDelta: vi.fn() })).rejects.toMatchObject({ status: 401, message: '请登录' });
+  });
+
+  it('only sends attachmentIds when the caller provides them', async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(
+      'data: {"type":"run.completed","data":{"content":"好"}}\n\n',
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await streamMessage('conversation-1', '问题', { onDelta: vi.fn() }, undefined, { attachmentIds: ['a1', 'a2'] });
+    await streamMessage('conversation-1', '问题', { onDelta: vi.fn() });
+
+    const [withIds, withoutIds] = fetchMock.mock.calls.map((call) => JSON.parse(String(call[1]?.body)));
+    expect(withIds).toEqual({ content: '问题', attachmentIds: ['a1', 'a2'] });
+    expect(withoutIds).toEqual({ content: '问题' });
+    expect(String(fetchMock.mock.calls[1][1]?.body)).not.toContain('attachmentIds');
+  });
+});
+
+describe('attachment upload', () => {
+  it('posts the file as FormData and returns the attachment metadata', async () => {
+    const data = { id: 'a1', fileName: 'x.md', mimeType: 'text/markdown', sourceType: 'FILE', byteSize: 4, status: 'READY', textBytes: 4, preview: '# x' };
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(
+      JSON.stringify({ code: 200, message: 'ok', data }),
+      { status: 201 },
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await uploadAttachment('c1', new File(['# x'], 'x.md', { type: 'text/markdown' }));
+
+    expect(result).toEqual(data);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('/api/conversations/c1/attachments');
+    expect(init?.method).toBe('POST');
+    expect(init?.credentials).toBe('include');
+    expect(init?.body).toBeInstanceOf(FormData);
+    const uploaded = (init?.body as FormData).get('file');
+    expect(uploaded).toBeInstanceOf(File);
+    expect((uploaded as File).name).toBe('x.md');
+  });
+
+  it('turns a rejected upload envelope into ApiError with the backend code', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(
+      JSON.stringify({ code: 400, message: 'UNSUPPORTED_FILE' }),
+      { status: 400 },
+    )));
+
+    await expect(uploadAttachment('c1', new File(['x'], 'x.exe')))
+      .rejects.toMatchObject({ name: 'ApiError', status: 400, code: 400, message: 'UNSUPPORTED_FILE' });
+  });
+});
+
+const frame = (type: string, data: Record<string, unknown>) =>
+  `event: ${type}\ndata: ${JSON.stringify({ type, data })}\n\n`;
+
+function streamResponse(payload: string) {
+  return new Response(new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode(payload));
+      controller.close();
+    },
+  }), { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+}
+
+
+describe('streamMessage', () => {
+  it('signals connection, streams deltas, and delivers the final answer', async () => {
+    const payload = frame('run.started', { assistantMessageId: 'assistant-1' })
+      + frame('message.delta', { content: '你好' })
+      + frame('run.completed', { content: '你好！' });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(streamResponse(payload)));
+    const events: string[] = [];
+
+    await streamMessage('conversation-1', '问题', {
+      onConnected: () => events.push('connected'),
+      onStarted: (id) => events.push(id),
+      onDelta: (text) => events.push(text),
+      onCompleted: (text) => events.push(text),
+    });
+
+    expect(events).toEqual(['connected', 'assistant-1', '你好', '你好！']);
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/conversations/conversation-1/messages/stream'),
+      expect.objectContaining({ body: JSON.stringify({ content: '问题' }), credentials: 'include' }),
+    );
+  });
+
+  it('does not deliver buffered frames after stopping', async () => {
+    const controller = new AbortController();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(streamResponse(frame('message.delta', { content: 'late' }))));
+    const onDelta = vi.fn();
+
+    await expect(streamMessage('conversation-1', '问题', {
+      onConnected: () => controller.abort(),
+      onDelta,
+    }, controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+    expect(onDelta).not.toHaveBeenCalled();
+  });
+});

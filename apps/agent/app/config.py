@@ -31,9 +31,28 @@ class Settings(BaseSettings):
     provider_timeout: float = Field(default=15, gt=0, validation_alias="PROVIDER_TIMEOUT_SECONDS")
     model_timeout: float = Field(default=60, gt=0, validation_alias="MODEL_TIMEOUT_SECONDS")
     run_timeout: float = Field(default=180, gt=0, validation_alias="RUN_TIMEOUT_SECONDS")
+    workflow_run_timeout: float = Field(
+        default=270, gt=0, validation_alias="WORKFLOW_RUN_TIMEOUT_SECONDS"
+    )
     context_token_limit: int = Field(default=32768, ge=1024, validation_alias="CONTEXT_TOKEN_LIMIT")
+    vision_enabled: bool = Field(default=False, validation_alias="VISION_ENABLED")
+    vision_base_url: str = Field(
+        default="https://api.siliconflow.cn/v1", validation_alias="VISION_BASE_URL"
+    )
+    vision_api_key: SecretStr = Field(default="", validation_alias="VISION_API_KEY")
+    vision_model: str = Field(
+        default="deepseek-ai/DeepSeek-V4.1-Flash", validation_alias="VISION_MODEL"
+    )
+    vision_timeout_seconds: float = Field(
+        default=60, gt=0, validation_alias="VISION_TIMEOUT_SECONDS"
+    )
 
     model_config = SettingsConfigDict(env_file=ROOT_ENV_FILE, extra="ignore")
+
+    @property
+    def vision_available(self) -> bool:
+        """未开启或没配 Key 时静默退化为纯 OCR，不影响上传。"""
+        return self.vision_enabled and bool(self.vision_api_key.get_secret_value().strip())
 
     @property
     def effective_backend_service_url(self) -> str:

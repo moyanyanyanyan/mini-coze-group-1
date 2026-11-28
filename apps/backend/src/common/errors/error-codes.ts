@@ -34,11 +34,35 @@ export const ErrorCode = {
   // ---- 通用兜底（任何模块都可能用到）----
   VALIDATION_FAILED: 'VALIDATION_FAILED',
   NOT_FOUND: 'NOT_FOUND',
-    CONFLICT: 'CONFLICT',
+  CONFLICT: 'CONFLICT',
   INTERNAL_ERROR: 'INTERNAL_ERROR',
+
+  // ---- 模型管理 ----
+  /** Agent 保存时引用了不存在或已停用的模型 */
+  MODEL_NOT_AVAILABLE: 'MODEL_NOT_AVAILABLE',
+  /** Agent 未绑定模型配置，无法运行 */
+  MODEL_NOT_BOUND: 'MODEL_NOT_BOUND',
   // ---- 聊天 ----
   /** 同一会话正在生成中，又来了一条新消息 */
   CONVERSATION_BUSY: 'CONVERSATION_BUSY',
+
+  // ---- 聊天附件 ----
+  /** 扩展名不在支持列表内 */
+  UNSUPPORTED_FILE: 'UNSUPPORTED_FILE',
+  /** 超过该类别的上传上限 */
+  FILE_TOO_LARGE: 'FILE_TOO_LARGE',
+  /** 文件损坏、加密，或文件头与扩展名不匹配 */
+  CORRUPT_FILE: 'CORRUPT_FILE',
+  /** 解析成功但没有任何文本 */
+  EMPTY_CONTENT: 'EMPTY_CONTENT',
+  /** OCR 服务未配置或不可用 */
+  OCR_UNAVAILABLE: 'OCR_UNAVAILABLE',
+  /** 视觉理解服务未配置或不可用（图片仍会保留 OCR 结果） */
+  VISION_UNAVAILABLE: 'VISION_UNAVAILABLE',
+  /** 附件不属于当前会话，或已被其他消息绑定 */
+  ATTACHMENT_INVALID: 'ATTACHMENT_INVALID',
+  /** 附件仍在解析或解析失败 */
+  ATTACHMENT_NOT_READY: 'ATTACHMENT_NOT_READY',
 } as const;
 
 
@@ -60,6 +84,10 @@ export const DEFAULT_CODE_BY_STATUS: Record<number, ErrorCode> = {
 
 /** 白名单，用于校验业务代码传进来的 code 是不是合法值 */
 const VALID_CODES = new Set<string>(Object.values(ErrorCode));
+
+export function isErrorCode(value: unknown): value is ErrorCode {
+  return typeof value === 'string' && VALID_CODES.has(value);
+}
 
 /**
  * 决定最终 code：优先用业务指定的，没有就按状态码兜底，

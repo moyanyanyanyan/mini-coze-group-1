@@ -17,6 +17,7 @@ const agentConfig = {
   name: 'Public Agent',
   systemPrompt: 'Published prompt',
   model: 'deepseek-chat',
+  modelConfigId: 'model-config-1',
   temperature: 0.3,
   maxTokens: 1024,
   knowledgeBaseIds: [],
@@ -28,10 +29,17 @@ function createHarness() {
     .mockResolvedValueOnce({ id: 'user-message' })
     .mockResolvedValueOnce({ id: 'assistant-message' });
   const update = jest.fn().mockResolvedValue({});
+  const attachmentFindMany = jest.fn().mockResolvedValue([]);
+  const attachmentUpdateMany = jest.fn().mockResolvedValue({ count: 0 });
+  const titleUpdateMany = jest.fn().mockResolvedValue({ count: 1 });
   const prisma = {
     $transaction: (callback: (tx: unknown) => Promise<unknown>) => callback({
       message: { findFirst: jest.fn().mockResolvedValue(null), create },
-      conversation: { update: jest.fn().mockResolvedValue({}) },
+      conversation: { update: jest.fn().mockResolvedValue({}), updateMany: titleUpdateMany },
+      messageAttachment: {
+        findMany: attachmentFindMany,
+        updateMany: attachmentUpdateMany,
+      },
     }),
     message: { findMany: jest.fn().mockResolvedValue([]), update },
     user: { findUnique: jest.fn().mockResolvedValue({ globalPrompt: null }) },
@@ -55,7 +63,16 @@ function createHarness() {
     runtime as unknown as RuntimeClientService,
     agents,
   );
-  return { service, runtime, update, agents };
+  return {
+    service,
+    runtime,
+    update,
+    agents,
+    create,
+    attachmentFindMany,
+    attachmentUpdateMany,
+    titleUpdateMany,
+  };
 }
 
 function event(
@@ -74,12 +91,18 @@ function event(
   };
 }
 
-async function collect(service: ChatService, agentSnapshot = true) {
+async function collect(
+  service: ChatService,
+  agentSnapshot = true,
+  attachmentIds?: string[],
+  content = '问题',
+) {
   const events: RuntimeSseEvent[] = [];
   for await (const item of service.run({
     conversationId: 'conversation-1',
     userId: 'owner-1',
-    content: '问题',
+    content,
+    attachmentIds,
     signal: new AbortController().signal,
     agentId: agentSnapshot ? 'agent-1' : undefined,
     agentConfig: agentSnapshot ? agentConfig : undefined,
@@ -112,7 +135,18 @@ describe('ChatService stream persistence', () => {
 
     const events = await collect(harness.service);
 
-    expect(request?.agentConfig).toEqual(agentConfig);
+    expect(request?.agentConfig).toEqual({
+      id: agentConfig.id,
+      revision: agentConfig.revision,
+      name: agentConfig.name,
+      systemPrompt: agentConfig.systemPrompt,
+      model: agentConfig.model,
+      modelConfigId: agentConfig.modelConfigId,
+      temperature: agentConfig.temperature,
+      maxTokens: agentConfig.maxTokens,
+      knowledgeBaseIds: agentConfig.knowledgeBaseIds,
+      pluginIds: agentConfig.pluginIds,
+    });
     expect(harness.agents.getAgentConfig).not.toHaveBeenCalled();
     expect(events.map((item) => item.type)).toEqual([
       'run.started',
@@ -348,5 +382,91 @@ describe('ChatService stream persistence', () => {
     expect(logged).toContain('errorType=Error');
     expect(logged).not.toContain('敏感半截内容');
     errorSpy.mockRestore();
+  });
+
+  it.each(['问题', '', '  '])('injects attachment text while preserving raw content %j', async (content) => {
+    const harness = createHarness();
+    harness.attachmentFindMany.mockResolvedValue([
+      {
+        id: 'attachment-1',
+        fileName: '季度报表.xlsx',
+        sourceType: 'XLSX',
+        status: 'READY',
+        extractedText: '资产编号 ZC-001\n' + 'A'.repeat(9000),
+      },
+    ]);
+    harness.attachmentUpdateMany.mockResolvedValue({ count: 1 });
+    let request: RuntimeRequestBody | undefined;
+    harness.runtime.stream.mockImplementation(async function* (body: RuntimeRequestBody) {
+      request = body;
+      yield event(body, 1, 'run.started', { assistantMessageId: body.assistantMessageId });
+      yield event(body, 2, 'run.completed', {
+        runId: body.runId,
+        conversationId: body.conversationId,
+        assistantMessageId: body.assistantMessageId,
+        status: 'completed',
+        content: '',
+        finishReason: 'stop',
+        usage: null,
+        citations: [],
+        toolResults: [],
+      });
+    });
+
+    await collect(harness.service, true, ['attachment-1'], content);
+
+    expect(harness.attachmentUpdateMany).toHaveBeenCalledWith({
+      where: {
+        id: { in: ['attachment-1'] },
+        conversationId: 'conversation-1',
+        messageId: null,
+      },
+      data: { messageId: 'user-message' },
+    });
+    expect(request?.message).toContain('不可信资料');
+    expect(request?.message).toContain('ZC-001');
+    expect(request?.message.length).toBeGreaterThan(8000);
+    if (content.trim()) {
+      expect(request?.retrievalQuery).toBe(content);
+    } else {
+      expect(request?.retrievalQuery).toContain('ZC-001');
+      expect(Array.from(request!.retrievalQuery!)).toHaveLength(8000);
+    }
+    expect(harness.titleUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'conversation-1', title: '新对话' },
+      data: { title: content.trim() || '季度报表.xlsx' },
+    });
+    // 数据库只存用户原文，附件正文留在 MessageAttachment
+    expect(harness.create).toHaveBeenNthCalledWith(1, {
+      data: expect.objectContaining({ content, role: 'user' }),
+    });
+  });
+
+  it('rejects attachments that are not ready before calling Runtime', async () => {
+    const harness = createHarness();
+    harness.attachmentFindMany.mockResolvedValue([
+      {
+        id: 'attachment-1',
+        fileName: 'broken.pdf',
+        sourceType: 'PDF',
+        status: 'FAILED',
+        extractedText: null,
+      },
+    ]);
+
+    await expect(collect(harness.service, true, ['attachment-1'])).rejects.toMatchObject({
+      response: { code: 'ATTACHMENT_NOT_READY' },
+    });
+    expect(harness.runtime.stream).not.toHaveBeenCalled();
+  });
+
+  it('rejects attachments that do not belong to the conversation', async () => {
+    const harness = createHarness();
+    harness.attachmentFindMany.mockResolvedValue([]);
+
+    await expect(collect(harness.service, true, ['attachment-unknown'])).rejects.toMatchObject({
+      response: { code: 'ATTACHMENT_INVALID' },
+    });
+    expect(harness.create).not.toHaveBeenCalled();
   });
 });

@@ -22,7 +22,7 @@ def check_tool_budget(value, tools, messages, settings):
         raise ModelError("INVALID_REQUEST", "工具上下文超过本服务预算", 400)
 
 
-async def stream_tool_loop(value, tools, request, settings, plugins, client):
+async def stream_tool_loop(value, tools, request, settings, plugins, client, connection=None):
     messages = [message.model_dump() for message in value.messages]
     allowed = {tool.name: tool for tool in tools}
     seen = set()
@@ -34,7 +34,8 @@ async def stream_tool_loop(value, tools, request, settings, plugins, client):
         check_tool_budget(value, tools, messages, settings)
         turn = None
         async with aclosing(stream_model(value, settings=settings, client=client,
-                                        tools=tools, messages=messages)) as events:
+                                        tools=tools, messages=messages,
+                                        connection=connection)) as events:
             async for item in events:
                 if isinstance(item, str):
                     content.append(item)

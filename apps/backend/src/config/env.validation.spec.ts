@@ -7,10 +7,26 @@ const required = {
 };
 
 describe('validateEnvironment', () => {
+  it('defaults PDF_MAX_BYTES to 64 MiB and accepts a positive byte override', () => {
+    expect(validateEnvironment(required)).toMatchObject({ PDF_MAX_BYTES: 64 * 1024 * 1024 });
+    expect(validateEnvironment({ ...required, PDF_MAX_BYTES: '33554432' })).toMatchObject({ PDF_MAX_BYTES: 33554432 });
+  });
+
+  it.each(['0', '-1', '1.5', 'invalid'])('rejects an invalid PDF byte limit: %s', (value) => {
+    expect(() => validateEnvironment({ ...required, PDF_MAX_BYTES: value })).toThrow();
+  });
+
+  it('defaults OFFICE_MAX_BYTES to 32 MiB and validates overrides', () => {
+    expect(validateEnvironment(required)).toMatchObject({ OFFICE_MAX_BYTES: 32 * 1024 * 1024 });
+    expect(validateEnvironment({ ...required, OFFICE_MAX_BYTES: '33554432' }))
+      .toMatchObject({ OFFICE_MAX_BYTES: 33554432 });
+    for (const value of ['0', '-1', '1.5', 'invalid']) {
+      expect(() => validateEnvironment({ ...required, OFFICE_MAX_BYTES: value })).toThrow();
+    }
+  });
   it('preserves model, internal authentication and OAuth configuration together', () => {
     const config = {
       ...required,
-      AGENT_MODEL: 'custom-model',
       INTERNAL_SERVICE_TOKEN: 'test-internal-token',
       GOOGLE_CLIENT_ID: 'test-client',
       GOOGLE_CLIENT_SECRET: 'test-client-secret',
@@ -26,7 +42,6 @@ describe('validateEnvironment', () => {
       GOOGLE_CALLBACK_URL: '',
       AUTH_GOOGLE_MOCK: '',
     })).toMatchObject({
-      AGENT_MODEL: 'deepseek-chat',
       INTERNAL_SERVICE_TOKEN: '',
     });
   });

@@ -17,6 +17,7 @@ const agentConfig = {
   name: 'Published Agent',
   systemPrompt: 'Published prompt',
   model: 'deepseek-chat',
+  modelConfigId: 'model-config-1',
   temperature: 0.3,
   maxTokens: 1024,
   knowledgeBaseIds: ['kb-1'],
@@ -156,13 +157,34 @@ describe('ChatService.runOnce', () => {
     expect(harness.messageFindMany).toHaveBeenCalledWith({
       where: { conversationId: 'conversation-1', status: { in: ['completed'] } },
       orderBy: { seq: 'asc' },
+      include: {
+        attachments: {
+          select: {
+            fileName: true,
+            sourceType: true,
+            extractedText: true,
+            status: true,
+          },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
     });
     expect(requestBody).toMatchObject({
       actor: { id: 'owner-1' },
       conversationId: 'conversation-1',
       userMessageId: 'user-current',
       assistantMessageId: 'assistant-current',
-      agentConfig,
+      agentConfig: {
+        id: 'agent-public',
+        revision: 4,
+        name: 'Published Agent',
+        systemPrompt: 'Published prompt',
+        model: 'deepseek-chat',
+        temperature: 0.3,
+        maxTokens: 1024,
+        knowledgeBaseIds: ['kb-1'],
+        pluginIds: ['plugin_echo'],
+      },
       history: [
         { id: 'old-user', role: 'user', content: '上一问' },
         { id: 'old-assistant', role: 'assistant', content: '上一答' },

@@ -26,21 +26,28 @@
   --ink-400: #787283;
 
   /* —— 线与面 —— */
-  --line: #e4e4eb;
-  --line-strong: #c9cad6;
+  --line: #e7e3ee;
+  --line-strong: #cdc6db;
   --line-soft: rgba(111, 86, 217, 0.055);
-  --surface: #faf9f5;
+  --surface: #fbfaf6;
   --surface-raised: #ffffff;
-  --surface-sunken: #f3f1ea;
+  --surface-sunken: #f3f0e9;
+
+  /* —— 妙搭积木色 —— */
+  --block-violet: #7258d6;
+  --block-cyan: #5fc9c3;
+  --block-coral: #f68a72;
+  --block-yellow: #eebd51;
+  --block-green: #67a982;
 
   /* —— 字体（衬线做标题点缀、等宽做小标签，编辑感的关键） —— */
   --font-display: Georgia, "Times New Roman", "Songti SC", "STSong", "SimSun", serif;
   --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, "Courier New", monospace;
 
   /* —— 圆角 —— */
-  --radius-sm: 8px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
+  --radius-sm: 9px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
   --radius-pill: 999px;
 
   /* —— 阴影（多层复合：贴地 1px + 漫射，代替廉价单层投影） —— */
@@ -296,6 +303,9 @@ body {
   min-height: 100vh;
   margin: 0;
   font-size: calc(16px * var(--ui-font-scale));
+  background:
+    radial-gradient(circle at 85% 0%, rgba(114, 88, 214, .05), transparent 28rem),
+    var(--surface);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

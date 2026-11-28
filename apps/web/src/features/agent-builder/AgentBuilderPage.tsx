@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
-import { AgentListView } from './AgentListView';
-import { CreateAgentModal } from './CreateAgentModal';
-import { AgentDetailView } from './AgentDetailView';
+import { useEffect, useState } from 'react';
+import { AgentListController } from './AgentListController';
+import { CreateAgentController } from './CreateAgentController';
+import { AgentDetailController } from './AgentDetailController';
 import {
   createAgent,
-  deleteAgent,
-  listAgents,
+  getAgent,
   listKnowledgeBases,
   listPlugins,
   replaceKnowledgeBindings,
@@ -14,49 +13,59 @@ import {
   type Agent,
   type AgentStatus,
   type KnowledgeBaseSummary,
+  type KnowledgeBindingItemInput,
   type PluginSummary,
   type UpdateAgentInput,
 } from './agent.api';
-import './agent-builder.css';
+import { AgentBuilderView, type AgentModelOption } from '@minicoze/ui/agent-builder';
+import { loadAgentModels } from './agentModels';
 
-type View = { type: 'list' } | { type: 'detail'; agentId: string };
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
+/** 已发布 Agent 保存即生成新版本并生效；草稿只保存不生效。 */
+function saveSuccessText(agent: Agent): string {
+  if (agent.published && agent.configVersion !== undefined) {
+    return `已保存并生效（版本 v${agent.configVersion}）`;
+  }
+  return '已保存；发布后生效';
+}
+
 export function AgentBuilderPage() {
-  const [agents, setAgents] = useState<Agent[]>([]);
+  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBaseSummary[]>([]);
   const [plugins, setPlugins] = useState<PluginSummary[]>([]);
-  const [view, setView] = useState<View>({ type: 'list' });
-  const [createOpen, setCreateOpen] = useState(false);
+  const target = new URLSearchParams(window.location.search).get('id');
+  const [createOpen, setCreateOpen] = useState(() => new URLSearchParams(window.location.search).get('action') === 'new');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [knowledgeError, setKnowledgeError] = useState(false);
   const [pluginError, setPluginError] = useState(false);
+  const [modelOptions, setModelOptions] = useState<AgentModelOption[]>([]);
+  const [modelNotice, setModelNotice] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [saveMessage, setSaveMessage] = useState<string>('');
 
-  const refreshAgents = useCallback(async () => {
-    const res = await listAgents();
-    setAgents(res.items);
-  }, []);
-
   useEffect(() => {
+    let active = true;
     (async () => {
       const results = await Promise.allSettled([
-        refreshAgents(),
+        target ? getAgent(target) : Promise.resolve(null),
         listKnowledgeBases(),
         listPlugins(),
+        loadAgentModels(),
       ]);
 
-      const [agentsRes, kbRes, pluginsRes] = results;
+      if (!active) return;
+      const [agentsRes, kbRes, pluginsRes, modelsRes] = results;
 
       if (agentsRes.status === 'fulfilled') {
+        setSelectedAgent(agentsRes.value);
         setError(null);
       } else {
         setError(
           agentsRes.reason instanceof Error
             ? agentsRes.reason.message
-            : '加载 Agent 列表失败',
+            : '加载智能体列表失败',
         );
       }
 
@@ -72,22 +81,29 @@ export function AgentBuilderPage() {
         setPluginError(true);
       }
 
+      if (modelsRes.status === 'fulfilled') {
+        setModelOptions(modelsRes.value.options);
+        setModelNotice(modelsRes.value.error);
+      }
+
       setLoading(false);
     })();
-  }, [refreshAgents]);
+    return () => { active = false; };
+  }, [target]);
 
-  const selectedAgent =
-    view.type === 'detail' ? agents.find((a) => a.id === view.agentId) ?? null : null;
-
-  const handleCreate = async (data: { name: string; description: string }) => {
+  const handleCreate = async (data: {
+    name: string;
+    description: string;
+    modelConfigId: string;
+    openingMessage: string;
+  }) => {
     try {
       const created = await createAgent(data);
-      setAgents((list) => [created, ...list]);
+      setSelectedAgent(created);
       setCreateOpen(false);
       setError(null);
-      setView({ type: 'detail', agentId: created.id });
     } catch (err) {
-      setError(err instanceof Error ? err.message : '创建 Agent 失败');
+      setError(err instanceof Error ? err.message : '创建智能体失败');
     }
   };
 
@@ -96,72 +112,69 @@ export function AgentBuilderPage() {
     setSaveMessage('保存中…');
     try {
       const saved = await updateAgent(agentId, updates);
-      setAgents((list) => list.map((a) => (a.id === agentId ? saved : a)));
+      setSelectedAgent((current) => current?.id === agentId ? saved : current);
       setSaveState('saved');
-      setSaveMessage('已保存');
+      setSaveMessage(saveSuccessText(saved));
       setError(null);
       window.setTimeout(() => {
         setSaveState('idle');
         setSaveMessage('');
       }, 2200);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '保存失败';
+      const msg = err instanceof Error ? err.message : '未知错误';
       setSaveState('error');
-      setSaveMessage(msg);
-      setError(msg);
+      setSaveMessage(`保存失败：${msg}`);
     }
   };
 
-  const handleDelete = async (agentId: string) => {
-    try {
-      await deleteAgent(agentId);
-      setAgents((list) => list.filter((a) => a.id !== agentId));
-      if (view.type === 'detail' && view.agentId === agentId) setView({ type: 'list' });
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '删除失败');
-    }
+  const flashSaved = (message: string) => {
+    setSaveState('saved');
+    setSaveMessage(message);
+    window.setTimeout(() => {
+      setSaveState('idle');
+      setSaveMessage('');
+    }, 2200);
   };
 
-  const handleStatusTransition = async (agentId: string, nextStatus: AgentStatus) => {
+  const handleStatusTransition = async (agentId: string, nextStatus: AgentStatus, updates?: UpdateAgentInput) => {
     const verb = nextStatus === 'ACTIVE' ? '发布' : '撤回为草稿';
-    if (!window.confirm(`确定要${verb}吗？`)) return;
 
     setSaveState('saving');
     setSaveMessage(`${verb}中…`);
     try {
-      const saved = await updateAgent(agentId, { status: nextStatus });
-      setAgents((list) => list.map((a) => (a.id === agentId ? saved : a)));
-      setSaveState('saved');
-      setSaveMessage(`已${verb}`);
+      const saved = await updateAgent(agentId, { ...updates, status: nextStatus });
+      setSelectedAgent((current) => current?.id === agentId ? saved : current);
       setError(null);
-      window.setTimeout(() => {
-        setSaveState('idle');
-        setSaveMessage('');
-      }, 2200);
+      if (nextStatus === 'ACTIVE') {
+        flashSaved(saved.configVersion !== undefined
+          ? `已发布并生效（版本 v${saved.configVersion}）`
+          : '已发布并生效');
+      } else {
+        flashSaved('已撤回为草稿；修改需重新发布后生效');
+      }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '状态变更失败';
+      const msg = err instanceof Error ? err.message : '未知错误';
       setSaveState('error');
-      setSaveMessage(msg);
-      setError(msg);
+      setSaveMessage(`${verb}失败：${msg}`);
     }
   };
 
   const handleUpdateKnowledgeBindings = async (
     agentId: string,
-    bindings: Array<{ knowledgeBaseId: string; enabled: boolean }>,
+    bindings: KnowledgeBindingItemInput[],
   ) => {
     try {
-      await replaceKnowledgeBindings(agentId, {
-        bindings: bindings.map((b) => ({
-          knowledgeBaseId: b.knowledgeBaseId,
-          enabled: b.enabled,
-        })),
-      });
-      await refreshAgents();
+      const saved = await replaceKnowledgeBindings(agentId, { bindings });
+      setSelectedAgent((current) => current?.id === agentId ? { ...current, knowledgeBaseBindings: saved } : current);
       setError(null);
+      flashSaved(selectedAgent?.status === 'ACTIVE'
+        ? '知识库绑定已保存并生效'
+        : '知识库绑定已保存；发布后生效');
     } catch (err) {
-      setError(err instanceof Error ? err.message : '更新知识库绑定失败');
+      const msg = err instanceof Error ? err.message : '未知错误';
+      setError(`更新知识库绑定失败：${msg}`);
+      setSaveState('error');
+      setSaveMessage(`知识库绑定保存失败：${msg}`);
     }
   };
 
@@ -169,66 +182,52 @@ export function AgentBuilderPage() {
     agentId: string,
     bindings: Array<{ pluginId: string; enabled: boolean }>,
   ) => {
-    try {
-      await replacePluginBindings(agentId, {
-        bindings: bindings.map((b) => ({
-          pluginId: b.pluginId,
-          enabled: b.enabled,
-        })),
-      });
-      await refreshAgents();
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '更新插件绑定失败');
-    }
+    const saved = await replacePluginBindings(agentId, { bindings });
+    setSelectedAgent((current) => current?.id === agentId ? { ...current, pluginBindings: saved } : current);
+    setError(null);
+    flashSaved(selectedAgent?.status === 'ACTIVE'
+      ? '插件绑定已保存并生效'
+      : '插件绑定已保存；发布后生效');
   };
 
   return (
-    <section className="feature-page agent-builder" aria-label="智能体创建">
-      {error && <div className="agent-builder__error">{error}</div>}
-      {loading ? (
-        <div className="agent-builder__loading">加载中...</div>
-      ) : (
-        <>
-          {view.type === 'list' && (
-            <AgentListView
-              agents={agents}
-              onSelect={(agentId) => setView({ type: 'detail', agentId })}
-              onCreate={() => setCreateOpen(true)}
-              onDelete={handleDelete}
-            />
-          )}
-
-          {view.type === 'detail' && selectedAgent && (
-            <AgentDetailView
-              agent={selectedAgent}
-              knowledgeBases={knowledgeBases}
-              plugins={plugins}
-              saveState={saveState}
-              saveMessage={saveMessage}
-              onBack={() => setView({ type: 'list' })}
-              onSave={(updates) => handleSave(selectedAgent.id, updates)}
-              onStatusTransition={(next) => handleStatusTransition(selectedAgent.id, next)}
-              onUpdateKnowledgeBindings={(ids) => handleUpdateKnowledgeBindings(selectedAgent.id, ids)}
-              onUpdatePluginBindings={(ids) => handleUpdatePluginBindings(selectedAgent.id, ids)}
-            />
-          )}
-
-          {knowledgeError && (
-            <div className="agent-builder__note">知识库目录暂时不可用</div>
-          )}
-          {pluginError && (
-            <div className="agent-builder__note">插件目录暂时不可用</div>
-          )}
-
-          {createOpen && (
-            <CreateAgentModal
-              onClose={() => setCreateOpen(false)}
-              onSubmit={handleCreate}
-            />
-          )}
-        </>
+    <AgentBuilderView
+      loading={loading}
+      error={error}
+      knowledgeError={knowledgeError}
+      pluginError={pluginError}
+      createDialog={createOpen && (
+        <CreateAgentController
+          modelOptions={modelOptions}
+          modelNotice={modelNotice}
+          onClose={() => setCreateOpen(false)}
+          onSubmit={handleCreate}
+        />
       )}
-    </section>
+    >
+      {!selectedAgent && (
+        <AgentListController
+          onSelect={setSelectedAgent}
+          onCreate={() => setCreateOpen(true)}
+        />
+      )}
+
+      {selectedAgent && (
+        <AgentDetailController
+          key={selectedAgent.id}
+          agent={selectedAgent}
+          knowledgeBases={knowledgeBases}
+          plugins={plugins}
+          modelNotice={modelNotice}
+          saveState={saveState}
+          saveMessage={saveMessage}
+          onBack={() => setSelectedAgent(null)}
+          onSave={(updates) => handleSave(selectedAgent.id, updates)}
+          onStatusTransition={(next, updates) => handleStatusTransition(selectedAgent.id, next, updates)}
+          onUpdateKnowledgeBindings={(ids) => handleUpdateKnowledgeBindings(selectedAgent.id, ids)}
+          onUpdatePluginBindings={(ids) => handleUpdatePluginBindings(selectedAgent.id, ids)}
+        />
+      )}
+    </AgentBuilderView>
   );
 }

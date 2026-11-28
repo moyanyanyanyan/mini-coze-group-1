@@ -19,7 +19,7 @@ import {
   type FontSizePreference,
   type ThemePreference,
 } from '../../shared/theme/theme-store';
-import { Icon } from '../../shared/ui/Icon';
+import { Icon } from '@minicoze/ui/components';
 import './profile.css';
 
 type ProfileSection = 'profile' | 'security' | 'account' | 'appearance' | 'personalization';

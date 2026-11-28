@@ -1,6 +1,6 @@
-# MiniCoze
+# 妙搭
 
-MiniCoze MVP 的多人协作 Monorepo。当前包含应用骨架、领域目录、健康检查、数据库工具链与 Week 2 Agent Runtime；登录、配置管理、真实 RAG/插件和工作流执行仍需对应模块接入。
+妙搭是一个一站式 AI Agent 工作空间，将角色、知识库、插件和工作流像积木一样组合，让智能体从想法走向执行。项目内部仍保留 `minicoze` 包名与服务标识，以避免破坏现有依赖和运行配置。
 
 ## 目录
 
@@ -12,10 +12,17 @@ MiniCoze MVP 的多人协作 Monorepo。当前包含应用骨架、领域目录�
 
 ## 环境要求
 
-- Node.js 22.12+
+- Node.js 26.13.1（统一版本；officeparser 8.9.0 要求 `>=26.12.1`。如沿用 Node 24，必须 `>=24.22.1`）
 - pnpm 12+
 - Python 3.11+
+- 运行 Python 测试时设置 `PYTHONUTF8=1`，避免中文夹具按系统 GBK 解码
 - Docker Desktop（用于 PostgreSQL/pgvector）
+
+本机已按解析分支的 GitHub 最新说明安装 Node 26.13.1 和 pnpm 12.9.1。
+在本仓库的新 PowerShell 终端运行 `. ./scripts/use-project-env.ps1`，为当前终端加载固定版本并设置 `PYTHONUTF8=1`。
+该脚本使用 `%LOCALAPPDATA%/minicoze-tools` 中的本机工具，不修改系统 PATH；其他机器可按 `.nvmrc` 和 `packageManager` 安装相同版本。
+脚本还会为 Windows esbuild 配置专用临时目录及其完整性标签，避免大文件转换时无法删除交接文件；不更改仓库或工具程序的完整性标签。
+安装来源和合并差异见 [本次合并记录](docs/parsing-merge-2026-11-25.md)，迁移、真实 OCR 上传与构建结果见 [恢复验收记录](docs/parsing-upload-acceptance-2026-11-25.md)。
 
 ## 首次安装（Windows PowerShell）
 
@@ -27,6 +34,13 @@ python -m venv .venv
 python -m pip install -r apps/agent/requirements.txt
 pnpm --filter @minicoze/backend prisma:generate
 ```
+
+## 插件 MVP 边界
+
+- 页面仅提供现有插件目录和智能体绑定，不开放自定义插件创建或直接测试。
+- 后端启动时在事务内同步内置插件，保留已有启停状态；从代码移除的内置插件只停用、不删除历史记录。插件 ID 或工具名冲突会阻止启动，不覆盖其他类型插件。
+- 数据库必须可用，不再以可执行内存目录降级。目录在启动或 `reload()` 时刷新；执行前另查数据库，已停用或移除的工具返回 `TOOL_NOT_FOUND`，状态查询失败返回 HTTP 503。已经开始的调用不会被撤销。
+- `PUT /api/agents/:agentId/plugins` 的绑定项仅接受 `pluginId` 和 `enabled`。显式传入 `autoInvoke`、`sortOrder` 或 `config` 返回 400；历史字段保留但不参与 MVP 执行，普通启停不清空历史配置。解除绑定会删除对应绑定记录。
 
 ## 本地启动
 

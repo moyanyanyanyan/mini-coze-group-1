@@ -145,7 +145,7 @@ describe('Users (e2e)', () => {
         .send({ currentPassword: 'wrong-password', newPassword: 'newpass888' })
         .expect(401);
 
-      expect(res.body.code).toBe(401);
+      expect(res.body.code).toBe('INVALID_CREDENTIALS');
     });
 
     it('纯 Google 账号：不用旧密码即可首次设置密码', async () => {

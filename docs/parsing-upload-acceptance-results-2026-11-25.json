@@ -1,0 +1,329 @@
+{
+  "date": "2026-11-25",
+  "scope": {
+    "database": "minicoze_t93_20261125",
+    "backend": "http://127.0.0.1:3100",
+    "businessDatabaseModified": false,
+    "rootEnvModified": false
+  },
+  "uploads": {
+    "run": 1795605393110,
+    "base": "http://127.0.0.1:3100",
+    "cases": [
+      {
+        "name": "TEXT",
+        "sourceType": "TEXT",
+        "knowledgeBaseId": "7c7b2fb3-ed1e-481f-a95f-43cf2c00a3e7",
+        "documentId": "1de4ba70-88b7-43b5-9955-3b4c3b5e18a2",
+        "uploadHttp": 202,
+        "status": "READY",
+        "error": null,
+        "chunkCount": 1,
+        "rawTextLength": 67,
+        "checkedChunks": 1,
+        "retrieval": "HIT",
+        "sourceRanges": 0
+      },
+      {
+        "name": "acceptance.txt",
+        "sourceType": "TXT",
+        "knowledgeBaseId": "9521d377-be54-44bb-911b-f368d4f84b98",
+        "documentId": "6401f6b7-f24e-4d5a-9e0f-15d7edde32ab",
+        "bytes": 57,
+        "uploadHttp": 202,
+        "status": "READY",
+        "error": null,
+        "chunkCount": 1,
+        "rawTextLength": 57,
+        "checkedChunks": 1,
+        "retrieval": "HIT",
+        "sourceRanges": 0
+      },
+      {
+        "name": "acceptance.json",
+        "sourceType": "JSON",
+        "knowledgeBaseId": "df63b908-fd02-4092-92ca-ca2e18c39193",
+        "documentId": "3a69dd1d-6d72-486b-8b6b-227696c20ce3",
+        "bytes": 71,
+        "uploadHttp": 202,
+        "status": "READY",
+        "error": null,
+        "chunkCount": 1,
+        "rawTextLength": 66,
+        "checkedChunks": 1,
+        "retrieval": "HIT",
+        "sourceRanges": 0
+      },
+      {
+        "name": "acceptance.md",
+        "sourceType": "MARKDOWN",
+        "knowledgeBaseId": "5a1a04c6-2e60-4115-a4a6-a7b2fc9c052b",
+        "documentId": "cf141695-7f2d-498d-9a69-1d8c60ce3b17",
+        "bytes": 84,
+        "uploadHttp": 202,
+        "status": "READY",
+        "error": null,
+        "chunkCount": 1,
+        "rawTextLength": 82,
+        "checkedChunks": 1,
+        "retrieval": "HIT",
+        "sourceRanges": 0
+      },
+      {
+        "name": "acceptance.html",
+        "sourceType": "HTML",
+        "knowledgeBaseId": "f377c8f5-60cb-4d50-bd74-c4a3dcc4dcb0",
+        "documentId": "748e5caa-df54-4598-9604-502e14cdea4c",
+        "bytes": 118,
+        "uploadHttp": 202,
+        "status": "READY",
+        "error": null,
+        "chunkCount": 1,
+        "rawTextLength": 58,
+        "checkedChunks": 1,
+        "retrieval": "HIT",
+        "sourceRanges": 0
+      },
+      {
+        "name": "native.pdf",
+        "sourceType": "PDF",
+        "knowledgeBaseId": "a7a7c428-83e3-429b-890a-288290226576",
+        "documentId": "54d2a7e8-f9a9-44e7-a0b4-68847e232b07",
+        "bytes": 708,
+        "uploadHttp": 202,
+        "status": "READY",
+        "error": null,
+        "chunkCount": 1,
+        "rawTextLength": 19,
+        "checkedChunks": 1,
+        "retrieval": "HIT",
+        "sourceRanges": 0
+      },
+      {
+        "name": "acceptance-scan.pdf",
+        "sourceType": "PDF",
+        "knowledgeBaseId": "9760ea89-0599-4c75-8a12-122deb8125eb",
+        "documentId": "23d7fdf2-bb60-4020-972a-4fc6ce323e22",
+        "bytes": 34120,
+        "uploadHttp": 202,
+        "status": "READY",
+        "error": null,
+        "chunkCount": 1,
+        "rawTextLength": 106,
+        "checkedChunks": 1,
+        "retrieval": "HIT",
+        "sourceRanges": 0
+      },
+      {
+        "name": "acceptance.png",
+        "sourceType": "IMAGE",
+        "knowledgeBaseId": "b954a8ef-33e9-4bf1-9511-85f0499aa3ac",
+        "documentId": "0f280e12-d869-4a3f-8717-26ca5fa6376c",
+        "bytes": 1801142,
+        "uploadHttp": 202,
+        "status": "READY",
+        "error": null,
+        "chunkCount": 1,
+        "rawTextLength": 108,
+        "checkedChunks": 1,
+        "retrieval": "HIT",
+        "sourceRanges": 0
+      },
+      {
+        "name": "acceptance.jpg",
+        "sourceType": "IMAGE",
+        "knowledgeBaseId": "43e1f000-7391-4046-8741-c09cdda989ea",
+        "documentId": "558b4956-ab95-4f50-815e-969303e5ba15",
+        "bytes": 53610,
+        "uploadHttp": 202,
+        "status": "READY",
+        "error": null,
+        "chunkCount": 1,
+        "rawTextLength": 108,
+        "checkedChunks": 1,
+        "retrieval": "HIT",
+        "sourceRanges": 0
+      },
+      {
+        "name": "acceptance.docx",
+        "sourceType": "DOCX",
+        "knowledgeBaseId": "4c09b2a4-f72d-48a3-b779-e0c3bd55bbbc",
+        "documentId": "9da6d84e-b23f-414c-adf5-42594959f172",
+        "bytes": 39123,
+        "uploadHttp": 202,
+        "status": "READY",
+        "error": null,
+        "chunkCount": 1,
+        "rawTextLength": 85,
+        "checkedChunks": 1,
+        "retrieval": "HIT",
+        "sourceRanges": 1
+      },
+      {
+        "name": "acceptance.pptx",
+        "sourceType": "PPTX",
+        "knowledgeBaseId": "ef10c7ad-d226-4c01-8fd4-bb70e350cded",
+        "documentId": "632213c0-7083-4de9-8bf4-c62ea61c920e",
+        "bytes": 35383,
+        "uploadHttp": 202,
+        "status": "READY",
+        "error": null,
+        "chunkCount": 1,
+        "rawTextLength": 111,
+        "checkedChunks": 1,
+        "retrieval": "HIT",
+        "sourceRanges": 1
+      }
+    ],
+    "rejections": [
+      {
+        "name": "bad.gif",
+        "http": 400,
+        "expected": 400
+      },
+      {
+        "name": "bad.png",
+        "http": 400,
+        "expected": 400
+      },
+      {
+        "name": "bad.docx",
+        "http": 400,
+        "expected": 400
+      },
+      {
+        "name": "large.txt",
+        "http": 400,
+        "expected": 400
+      },
+      {
+        "name": "large.png",
+        "http": 413,
+        "expected": 413
+      },
+      {
+        "name": "large.docx",
+        "http": 413,
+        "expected": 413
+      }
+    ],
+    "retry": {
+      "documentId": "c4514ec1-b7ef-4c7c-ad7b-212a79e0ff15",
+      "firstError": {
+        "code": "INVALID_PDF",
+        "message": "PDF 文件无法解析"
+      },
+      "retryHttp": 202,
+      "finalError": {
+        "code": "INVALID_PDF",
+        "message": "PDF 文件无法解析"
+      },
+      "chunks": 0
+    },
+    "complete": true,
+    "retryRecovery": {
+      "documentId": "6d9f91d0-5446-403c-967b-b586cff00d45",
+      "initialStatus": "FAILED",
+      "initialError": "OCR_WORKER_AUTH_FAILED",
+      "retryHttp": 202,
+      "finalStatus": "READY",
+      "chunks": 1
+    }
+  },
+  "databaseVerification": {
+    "database": "minicoze_t93_20261125",
+    "originalDocuments": {
+      "count": 5,
+      "digest": "1b1c8a9c9a6fe7a6a9e752fec7613c06"
+    },
+    "originalChunks": {
+      "count": 25,
+      "digest": "5bb954a17caf92f76fd857112240c705"
+    },
+    "indexedChunks": 12,
+    "vectors": 12,
+    "allVectorDimensions512": true,
+    "migrations": [
+      {
+        "migration_name": "20261019123105_init_user",
+        "finished": true
+      },
+      {
+        "migration_name": "20261023161823_add_conversation_and_message",
+        "finished": true
+      },
+      {
+        "migration_name": "20261103144000_add_google_oauth_fields",
+        "finished": true
+      },
+      {
+        "migration_name": "20261103171900_add_agent",
+        "finished": true
+      },
+      {
+        "migration_name": "20261103172000_add_api_keys",
+        "finished": true
+      },
+      {
+        "migration_name": "20261105130654_align_main_schema",
+        "finished": true
+      },
+      {
+        "migration_name": "20261106140000_cascade_knowledge_base_bindings",
+        "finished": true
+      },
+      {
+        "migration_name": "20261123190000_add_pdf_document_source_type",
+        "finished": true
+      },
+      {
+        "migration_name": "20261125020000_add_image_document_source_type",
+        "finished": true
+      },
+      {
+        "migration_name": "20261125020100_backfill_image_document_source_type",
+        "finished": true
+      },
+      {
+        "migration_name": "20261125122000_add_office_document_source_type",
+        "finished": true
+      },
+      {
+        "migration_name": "20261125122100_add_chunk_source_ranges",
+        "finished": true
+      },
+      {
+        "migration_name": "20261125170000_add_markdown_html_source_types",
+        "finished": true
+      },
+      {
+        "migration_name": "20261125180000_add_historical_document_source_types",
+        "finished": true
+      }
+    ]
+  },
+  "checks": {
+    "backend": {
+      "suites": 46,
+      "tests": 423,
+      "passed": true
+    },
+    "web": {
+      "files": 9,
+      "tests": 28,
+      "passed": true
+    },
+    "ui": {
+      "files": 15,
+      "tests": 52,
+      "passed": true
+    },
+    "ocrWorker": {
+      "tests": 11,
+      "passed": true,
+      "model": "fake model for offline tests; actual model used in upload acceptance"
+    },
+    "backendBuild": true,
+    "webBuild": true
+  }
+}

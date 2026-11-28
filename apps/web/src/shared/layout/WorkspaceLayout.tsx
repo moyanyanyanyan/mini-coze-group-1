@@ -1,6 +1,7 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { WorkspaceLayoutView } from '@minicoze/ui/layouts';
 import { workspaceNavigation } from '../../app/feature-registry';
+import { ApiError } from '../api/http';
 import { getMe, logout } from '../../features/auth/api/auth-api';
 import { getCurrentUser, setCurrentUser, useCurrentUser } from '../user/current-user';
 import { AppLink } from '../routing/AppLink';
@@ -22,8 +23,10 @@ export function WorkspaceLayout({ pathname, children }: WorkspaceLayoutProps) {
       .then((user) => {
         if (alive) setCurrentUser(user);
       })
-      .catch(() => {
-        // cookie 过期等情况：不弹错，底部显示兜底文案
+      .catch((caught) => {
+        if (caught instanceof ApiError && caught.status === 401) {
+          navigate('/login');
+        }
       });
     return () => {
       alive = false;
@@ -34,7 +37,7 @@ export function WorkspaceLayout({ pathname, children }: WorkspaceLayoutProps) {
     try {
       await logout();
     } catch {
-      // 后端就算没清掉也不拦着走，cookie 大不了 7 天后自然过期
+      // 即使退出接口不可用，也允许用户回到登录页。
     }
     navigate('/login');
   };

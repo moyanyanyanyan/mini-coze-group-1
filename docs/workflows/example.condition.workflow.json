@@ -1,0 +1,28 @@
+{
+  "version": "1.0",
+  "nodes": [
+    {"id":"node-start-1","type":"start","position":{"x":80,"y":160},"data":{"inputs":[{"name":"query","type":"string","required":true}]}},
+    {"id":"node-llm-intent","type":"llm","position":{"x":320,"y":160},"data":{"model":"deepseek-flash","systemPrompt":"判断用户意图，只输出一个词：退款、发票或其他","userPromptTemplate":"{{node-start-1.query}}","outputs":[{"name":"text","type":"string"}]}},
+    {"id":"node-cond-1","type":"condition","position":{"x":560,"y":160},"data":{"branches":[
+      {"id":"refund","logic":"and","conditions":[{"left":"node-llm-intent.text","op":"contains","right":{"type":"literal","value":"退款"}}]},
+      {"id":"invoice","logic":"or","conditions":[{"left":"node-llm-intent.text","op":"contains","right":{"type":"literal","value":"发票"}},{"left":"node-start-1.query","op":"contains","right":{"type":"literal","value":"开票"}}]}
+    ]}},
+    {"id":"node-llm-refund","type":"llm","position":{"x":800,"y":40},"data":{"model":"deepseek-flash","systemPrompt":"你是退款客服","userPromptTemplate":"{{node-start-1.query}}"}},
+    {"id":"node-llm-invoice","type":"llm","position":{"x":800,"y":160},"data":{"model":"deepseek-flash","systemPrompt":"你是发票客服","userPromptTemplate":"{{node-start-1.query}}"}},
+    {"id":"node-llm-other","type":"llm","position":{"x":800,"y":280},"data":{"model":"deepseek-flash","systemPrompt":"你是通用客服","userPromptTemplate":"{{node-start-1.query}}"}},
+    {"id":"node-end-1","type":"end","position":{"x":1040,"y":160},"data":{"outputs":[
+      {"name":"result","type":"string","valueFrom":["node-llm-refund.text","node-llm-invoice.text","node-llm-other.text"]},
+      {"name":"intent","type":"string","valueFrom":"node-cond-1.branch"}
+    ]}}
+  ],
+  "edges": [
+    {"id":"edge-1","source":"node-start-1","target":"node-llm-intent"},
+    {"id":"edge-2","source":"node-llm-intent","target":"node-cond-1"},
+    {"id":"edge-3","source":"node-cond-1","target":"node-llm-refund","sourceHandle":"refund"},
+    {"id":"edge-4","source":"node-cond-1","target":"node-llm-invoice","sourceHandle":"invoice"},
+    {"id":"edge-5","source":"node-cond-1","target":"node-llm-other","sourceHandle":"else"},
+    {"id":"edge-6","source":"node-llm-refund","target":"node-end-1"},
+    {"id":"edge-7","source":"node-llm-invoice","target":"node-end-1"},
+    {"id":"edge-8","source":"node-llm-other","target":"node-end-1"}
+  ]
+}

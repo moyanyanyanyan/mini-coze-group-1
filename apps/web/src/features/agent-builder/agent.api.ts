@@ -1,10 +1,6 @@
-export type AgentStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
+import { API_BASE } from '../../shared/api/http';
 
-export const modelOptions = [
-  { value: 'deepseek-ai/DeepSeek-V4.1-Flash', label: 'DeepSeek V4.1 Flash (硅基流动)' },
-  { value: 'deepseek-ai/DeepSeek-V3.2', label: 'DeepSeek V3.2 (旧配置)' },
-  { value: 'deepseek-chat', label: 'DeepSeek Chat (旧配置)' },
-];
+export type AgentStatus = 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
 
 export const contextLimitOptions = [0, 5, 10, 20, 50, 100];
 
@@ -39,11 +35,16 @@ export interface Agent {
   avatarUrl?: string;
   systemPrompt: string;
   model: string;
+  modelConfigId?: string | null;
   temperature: number;
   maxTokens: number;
+  /** Optional model context window, supplied by future model configuration APIs. */
+  contextWindowTokens?: number | null;
   contextLimit: number;
   openingMessage?: string;
   status: AgentStatus;
+  configVersion?: number;
+  published?: boolean;
   createdAt: string;
   updatedAt: string;
   pluginBindings: AgentPluginBinding[];
@@ -79,7 +80,7 @@ export interface CreateAgentInput {
   description?: string;
   avatarUrl?: string;
   systemPrompt?: string;
-  model?: string;
+  modelConfigId: string;
   temperature?: number;
   maxTokens?: number;
   contextLimit?: number;
@@ -92,7 +93,7 @@ export interface UpdateAgentInput {
   description?: string;
   avatarUrl?: string;
   systemPrompt?: string;
-  model?: string;
+  modelConfigId?: string | null;
   temperature?: number;
   maxTokens?: number;
   contextLimit?: number;
@@ -105,12 +106,10 @@ export interface KnowledgeBindingItemInput {
   config?: { topK?: number; minScore?: number } | null;
 }
 
+/** MVP 仅支持绑定和启停，历史配置只读。 */
 export interface PluginBindingItemInput {
   pluginId: string;
   enabled?: boolean;
-  autoInvoke?: boolean;
-  sortOrder?: number;
-  config?: Record<string, unknown> | null;
 }
 
 export interface ReplaceKnowledgeBindingsInput {
@@ -126,8 +125,6 @@ interface ApiEnvelope<T> {
   message: string;
   data: T;
 }
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '';
 
 async function getCurrentUserId(): Promise<string> {
   const response = await fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' });
@@ -147,9 +144,24 @@ async function readResponse<T>(response: Response): Promise<T> {
   return body.data;
 }
 
-export async function listAgents(): Promise<AgentListResponse> {
-  const response = await fetch(`${API_BASE}/api/agents`, { credentials: 'include' });
+export async function listAgents(params = new URLSearchParams()): Promise<AgentListResponse> {
+  const query = params.toString();
+  const response = await fetch(`${API_BASE}/api/agents${query ? '?' + query : ''}`, { credentials: 'include' });
   return readResponse<AgentListResponse>(response);
+}
+
+export interface ChatModelOption {
+  id: string;
+  name: string;
+  modelIdentifier: string;
+}
+
+/** Agent 只能绑定「已启用」的对话模型配置；地址与 Key 由模型管理统一维护。 */
+export async function listChatModelOptions(): Promise<ChatModelOption[]> {
+  const params = new URLSearchParams({ type: 'CHAT', status: 'enabled', pageSize: '100' });
+  const response = await fetch(`${API_BASE}/api/model-configs?${params.toString()}`, { credentials: 'include' });
+  const page = await readResponse<{ items: ChatModelOption[] }>(response);
+  return page.items;
 }
 
 export async function getAgent(agentId: string): Promise<Agent> {

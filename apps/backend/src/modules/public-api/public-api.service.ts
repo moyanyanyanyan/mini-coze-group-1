@@ -11,9 +11,9 @@ import {
   RequestTimeoutException,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import type { RuntimeAgentConfig } from '../agents/types';
 import {
   RuntimeCallError,
-  type RuntimeAgentConfig,
   type RuntimeResult,
   type RuntimeSseEvent,
 } from '../../chat/runtime-client.service';
@@ -181,7 +181,7 @@ export class PublicApiService {
       };
     }
 
-    if (event.type !== 'run.failed') return event;
+    if (event.type !== 'run.failed') {return event;}
 
     const rawCode = typeof event.data.code === 'string' ? event.data.code : '';
     const code = RUNTIME_ERROR_HTTP_STATUS[rawCode] ? rawCode : 'INTERNAL_ERROR';

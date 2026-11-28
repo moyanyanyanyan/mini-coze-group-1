@@ -1,12 +1,13 @@
 import { plainToInstance, Type } from 'class-transformer';
-import { 
-  IsInt, 
+import { MAX_IMAGE_DOCUMENT_BYTES, MAX_OFFICE_DOCUMENT_BYTES, MAX_PDF_DOCUMENT_BYTES } from './upload-limits';
+import {
+  IsInt,
   IsIn,
   IsOptional,
-  IsString, 
-  IsUrl, 
-  Max, 
-  Min, 
+  IsString,
+  IsUrl,
+  Max,
+  Min,
   validateSync,
   MinLength,
   ValidateIf
@@ -28,6 +29,38 @@ class EnvironmentVariables {
   @IsUrl({ require_tld: false })
   AGENT_SERVICE_URL = 'http://localhost:8000';
 
+  @IsUrl({ require_tld: false })
+  OCR_WORKER_URL = 'http://127.0.0.1:8001';
+
+  // OCR is optional until its client is invoked; never include this value in validation errors.
+  @IsOptional()
+  @IsString()
+  OCR_WORKER_TOKEN = '';
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  OCR_WORKER_TIMEOUT_MS = 600_000;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(Number.MAX_SAFE_INTEGER)
+  PDF_MAX_BYTES = MAX_PDF_DOCUMENT_BYTES;
+
+  // Must match the OCR Worker's OCR_IMAGE_MAX_BYTES; both sides default to 10 MiB.
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(Number.MAX_SAFE_INTEGER)
+  OCR_IMAGE_MAX_BYTES = MAX_IMAGE_DOCUMENT_BYTES;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(Number.MAX_SAFE_INTEGER)
+  OFFICE_MAX_BYTES = MAX_OFFICE_DOCUMENT_BYTES;
+
   // Runtime 未配置时后端仍可启动，实际内部调用时再明确报错。
   @IsOptional()
   @IsString()
@@ -36,6 +69,11 @@ class EnvironmentVariables {
   // 传给 Runtime 的模型名，随模型供应商不同而不同
   @IsString()
   AGENT_MODEL = 'deepseek-chat';
+
+  // 模型管理凭据加密密钥；未配置时保存模型配置会明确报错，不会明文落库
+  @IsOptional()
+  @IsString()
+  MODEL_CREDENTIAL_SECRET = '';
 
   @IsString()
   DATABASE_URL!: string;

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ApiError } from '../../shared/api/http';
 import { changePassword } from './api/profile-api';
 import type { ProfileUser } from './api/profile-api';
-import { Icon } from '../../shared/ui/Icon';
+import { Icon } from '@minicoze/ui/components';
 
 interface Feedback {
   type: 'ok' | 'error';

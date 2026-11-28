@@ -11,6 +11,14 @@ Identifier = Annotated[str, Field(min_length=1, max_length=200)]
 GlobalPrompt = Annotated[str, Field(strict=True, max_length=4000)]
 
 
+class ModelConnection(DTO):
+    """NestJS 模型管理在运行时下发的连接信息；Key 只存在于内存请求体。"""
+    protocol: Literal["openai_compatible"]
+    model: str = Field(min_length=1, max_length=200)
+    baseUrl: str = Field(min_length=1, max_length=500)
+    apiKey: str = Field(min_length=1, max_length=500)
+
+
 class ChatMessage(DTO):
     role: Literal["system", "user", "assistant"]
     content: str = Field(min_length=1, max_length=32000)
@@ -41,6 +49,8 @@ class AgentConfig(DTO):
     name: str = Field(min_length=1, max_length=200)
     systemPrompt: str = Field(max_length=16000)
     model: str = Field(min_length=1, max_length=100)
+    modelConfigId: Identifier | None = None
+    connection: ModelConnection | None = None
     temperature: float = Field(ge=0, le=2, allow_inf_nan=False)
     maxTokens: int = Field(ge=1, le=8192)
     knowledgeBaseIds: list[Identifier] = Field(max_length=10)
@@ -66,7 +76,8 @@ class RuntimeRequest(DTO):
     assistantMessageId: Identifier
     agentConfig: AgentConfig
     history: list[HistoryMessage] = Field(max_length=20)
-    message: str = Field(min_length=1, max_length=8000)
+    message: str = Field(min_length=1, max_length=20000)
+    retrievalQuery: str | None = Field(default=None, min_length=1, max_length=8000, pattern=r"\S")
 
     @model_validator(mode="after")
     def validate_history(self) -> Self:
@@ -159,6 +170,18 @@ class ToolFailure(DTO):
     toolName: Identifier
     status: Literal["failed"]
     error: dict[str, str]
+
+
+class ModelTestRequest(DTO):
+    connection: ModelConnection
+    type: Literal["chat", "embedding"] = "chat"
+
+
+class ModelTestResult(DTO):
+    ok: bool
+    latencyMs: int = Field(ge=0)
+    errorType: str | None = None
+    dimension: int | None = None
 
 
 class RuntimeResult(ModelResult):

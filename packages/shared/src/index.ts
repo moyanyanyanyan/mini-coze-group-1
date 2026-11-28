@@ -58,10 +58,20 @@ export interface ConversationSummary {
   id: string;
   /** 默认「新对话」，发第一条消息后改成用户第一句话的前 20 字 */
   title: string;
-  /** 可有可无：陈弘毅的 Agent 表合进来之前允许为空 */
+  /** 旧会话可能为空；新会话创建时必须写入真实 Agent ID。 */
   agentId: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** 消息附件元信息。历史接口只回元信息，不回解析文本 */
+export interface ChatMessageAttachment {
+  id: string;
+  fileName: string;
+  sourceType: string;
+  byteSize: number;
+  status: 'READY' | 'FAILED';
+  errorCode?: string | null;
 }
 
 /** 单条消息。历史拉取与实时推送都用这一个结构 */
@@ -74,6 +84,8 @@ export interface ChatMessage {
   seq: number;
   content: string;
   createdAt: string;
+  /** 只有用户消息可能带附件 */
+  attachments?: ChatMessageAttachment[];
 }
 
 /**

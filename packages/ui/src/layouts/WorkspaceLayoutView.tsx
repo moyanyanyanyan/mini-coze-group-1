@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Icon } from '../components/Icon';
+import { BrandMark } from '../components/BrandMark';
+import { BRAND_NAME } from '../brand';
 import type { IconName } from '../components/types';
 import { useOverlayFocus } from '../hooks/useOverlayFocus';
 import type { LinkComponentType } from './types';
@@ -58,9 +60,9 @@ export function WorkspaceLayoutView({ pathname, children, navigation, user: me, 
           sessionStorage.setItem('workspace-nav-collapsed', String(!collapsed));
           setMobileNavOpen(false);
         }}><Icon name="panel" /></button>
-        <LinkComponent className="workspace-brand" to="/" aria-label="返回 MiniCoze 首页">
-          <span className="workspace-brand-mark" aria-hidden="true">M</span>
-          <span>MiniCoze</span>
+        <LinkComponent className="workspace-brand" to="/" aria-label={`返回${BRAND_NAME}首页`}>
+          <BrandMark className="workspace-brand-mark" />
+          <span>{BRAND_NAME}</span>
         </LinkComponent>
 
         <nav className="workspace-nav">

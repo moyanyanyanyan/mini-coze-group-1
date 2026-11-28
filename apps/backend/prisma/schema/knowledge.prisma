@@ -13,6 +13,7 @@ model KnowledgeBase {
   updatedAt   DateTime            @updatedAt
   documents   KnowledgeDocument[]
   chunks      KnowledgeChunk[]
+  agentBindings KnowledgeBaseAgentBinding[]
 
   @@index([workspaceId, createdAt])
 }
@@ -21,6 +22,12 @@ enum KnowledgeDocumentSourceType {
   TEXT
   TXT
   JSON
+  PDF
+  IMAGE
+  DOCX
+  PPTX
+  MARKDOWN
+  HTML
 }
 
 enum KnowledgeDocumentStatus {
@@ -71,6 +78,7 @@ model KnowledgeChunk {
   startOffset     Int
   endOffset       Int
   enabled         Boolean               @default(true)
+  sourceRanges    Json?
   vector          KnowledgeChunkVector?
 
   @@unique([documentId, position])
