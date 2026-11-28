@@ -27,6 +27,7 @@ const nodeTypes = {
 
 
 export interface WorkflowEditorCanvasProps {
+  theme?: 'light' | 'dark';
   propertyPanel: React.ReactNode;
   loading: boolean;
   error: string | null;
@@ -64,6 +65,7 @@ export interface WorkflowEditorCanvasProps {
 }
 
 export function WorkflowEditorCanvas({
+  theme = 'light',
   propertyPanel,
   loading,
   error,
@@ -180,6 +182,7 @@ export function WorkflowEditorCanvas({
           </button>
 
           <ReactFlow
+            colorMode={theme}
             nodes={displayNodes}
             edges={edges}
             onNodesChange={onNodesChange}
@@ -192,7 +195,7 @@ export function WorkflowEditorCanvas({
             onPaneClick={() => setSelectedId(null)}
             nodeTypes={nodeTypes}
           >
-            <Background gap={22} size={1} color="#dcdee5" />
+            <Background gap={22} size={1} color={theme === 'dark' ? '#3a3d4d' : '#dcdee5'} />
             <Controls />
             <MiniMap
               className="wf-minimap"

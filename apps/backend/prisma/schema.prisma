@@ -15,7 +15,11 @@ model User {
   passwordHash String?                    // ← 可空：Google 用户没有密码
   googleId     String?  @unique           // ← Google 账号的 sub，一个 Google 账号最多绑一个用户
   displayName  String
+  /// 个人资料简介，最多 120 字，可空
+  bio          String?  @db.VarChar(120)
   avatarUrl    String?
+  /// 用户级长期交互偏好，作为独立 user 消息参与运行时上下文
+  globalPrompt String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   conversations  Conversation[]

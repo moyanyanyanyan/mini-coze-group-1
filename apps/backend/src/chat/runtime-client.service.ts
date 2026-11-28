@@ -41,6 +41,8 @@ export interface RuntimeRequestBody {
   history: RuntimeHistoryMessage[];
   historySummary?: string;
   message: string;
+  /** 用户级全局 Prompt 的本轮快照；空值不传 */
+  globalPrompt?: string;
   /** 原始问题；没有文字时使用截取的附件内容，与发给模型的消息分开传递。 */
   retrievalQuery?: string;
 }

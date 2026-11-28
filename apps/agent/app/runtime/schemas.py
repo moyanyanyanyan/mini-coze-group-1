@@ -8,6 +8,7 @@ class DTO(BaseModel):
 
 
 Identifier = Annotated[str, Field(min_length=1, max_length=200)]
+GlobalPrompt = Annotated[str, Field(strict=True, max_length=4000)]
 
 
 class ModelConnection(DTO):
@@ -25,7 +26,7 @@ class ChatMessage(DTO):
 
 class ModelInput(DTO):
     model: str = Field(min_length=1, max_length=100)
-    messages: list[ChatMessage] = Field(min_length=1, max_length=204)
+    messages: list[ChatMessage] = Field(min_length=1, max_length=205)
     temperature: float = Field(default=0.7, ge=0, le=2, allow_inf_nan=False)
     max_tokens: int = Field(default=1024, ge=1, le=8192)
 
@@ -92,6 +93,7 @@ class ContextCompressionRequest(DTO):
 class RuntimeRequest(DTO):
     runId: Identifier
     actor: Actor
+    globalPrompt: GlobalPrompt = ""
     conversationId: Identifier
     userMessageId: Identifier
     assistantMessageId: Identifier

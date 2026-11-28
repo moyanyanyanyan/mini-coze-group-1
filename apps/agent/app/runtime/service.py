@@ -12,6 +12,7 @@ from app.runtime.deepseek import check_budget, estimate_input, stream_model, val
 from app.runtime.tool_loop import check_tool_budget, stream_tool_loop
 from app.runtime.errors import ModelError
 from app.runtime.observations import StageRecorder
+from app.runtime.prompts import prompt_prefix
 from app.runtime.providers import KnowledgeContextProvider, PluginToolProvider, UnconfiguredKnowledgeProvider, UnconfiguredPluginProvider
 from app.runtime.schemas import ChatMessage, ContextCompressionRequest, ContextPreviewRequest, KnowledgeRequest, KnowledgeResult, ModelInput, ModelResult, RuntimeRequest, RuntimeResult
 
@@ -32,7 +33,7 @@ class RuntimeService:
                        request.agentConfig.connection)
 
     def context(self, request: RuntimeRequest, knowledge: KnowledgeResult) -> list[ChatMessage]:
-        prefix = [ChatMessage(role="system", content=request.agentConfig.systemPrompt)] if request.agentConfig.systemPrompt else []
+        prefix = prompt_prefix(request.agentConfig.systemPrompt, request.globalPrompt)
         prefix += self.summary_context(request.historySummary)
         # RAG 是参考数据而非系统指令；权限仍由 Provider/业务服务校验。
         if knowledge.chunks:

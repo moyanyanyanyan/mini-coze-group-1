@@ -16,7 +16,7 @@
   background:
     radial-gradient(1100px 480px at -12% -8%, rgba(111, 86, 217, 0.55), transparent 62%),
     radial-gradient(720px 420px at 112% 108%, rgba(111, 86, 217, 0.38), transparent 58%),
-    var(--violet-950);
+    var(--inverse-surface);
 }
 
 /* 细网格：给深底一点「图纸」质感 */
@@ -307,8 +307,8 @@
   margin-top: 4px;
   border: 0;
   border-radius: var(--radius-md);
-  color: #fff;
-  background: linear-gradient(135deg, var(--block-violet), #5940b6);
+  color: var(--accent-button-fg);
+  background: var(--accent-button-bg);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -317,7 +317,7 @@
 }
 
 .submit:hover:not(:disabled) {
-  background: linear-gradient(135deg, #654bc7, #49319f);
+  background: var(--accent-button-bg-hover);
   box-shadow: var(--shadow-sm);
 }
 

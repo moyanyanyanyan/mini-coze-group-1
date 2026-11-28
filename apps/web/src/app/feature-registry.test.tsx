@@ -32,6 +32,11 @@ describe('feature registry', () => {
     expect(getWorkspaceFeature('/workspace/publish/docs')?.id).toBe('publish-sdk');
   });
 
+  it('resolves the profile route without adding it to workspace navigation', () => {
+    expect(getWorkspaceFeature('/workspace/profile')?.id).toBe('profile');
+    expect(workspaceNavigation.some((feature) => feature.id === 'profile')).toBe(false);
+  });
+
   it('preserves workflow list and detail routes without matching similar prefixes', () => {
     expect(getWorkspaceFeature('/workspace')?.id).toBe('workspace');
     expect(getWorkspaceFeature('/workspace/workflows')?.id).toBe('workflow');
