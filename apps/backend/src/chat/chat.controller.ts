@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Get,
   Logger,
   HttpException,
   Param,
@@ -81,6 +82,11 @@ export class ChatController {
     private readonly conversations: ConversationsService,
     private readonly agents: AgentsService,
   ) {}
+
+  @Get(':id/memory')
+  memory(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload) {
+    return this.chat.memory(id, user.id);
+  }
 
   /**
    * SSE 流式聊天。B3 的 POST /:id/messages 保持非流式不动，两者并存。

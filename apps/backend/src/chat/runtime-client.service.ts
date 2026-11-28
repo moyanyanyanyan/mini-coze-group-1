@@ -1,4 +1,5 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import type { ConversationMemory } from '@minicoze/shared';
 
 // 智能体配置
 export interface RuntimeModelConnection {
@@ -321,6 +322,26 @@ export class RuntimeClientService {
   async assertReady(): Promise<void> {
     if ((await this.readiness()).status !== 'ready') {
       throw new ServiceUnavailableException({ code: 'SERVICE_NOT_READY', message: '对话服务尚未就绪，请稍后重试' });
+    }
+  }
+
+  async previewContext(input: { systemPrompt: string; maxTokens: number; history: RuntimeHistoryMessage[] }): Promise<Pick<ConversationMemory, 'tokenLimit' | 'estimatedInputTokens' | 'reservedOutputTokens' | 'remainingTokens' | 'droppedTurns' | 'history'>> {
+    try {
+      if (!this.token) throw new Error('unconfigured');
+      const response = await fetch(`${this.baseUrl}/internal/runtime/context/preview`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.token}` },
+        body: JSON.stringify(input), signal: AbortSignal.timeout(5000),
+      });
+      if (!response.ok) throw new Error('unavailable');
+      const body = await response.json();
+      if (!isRecord(body) || !['tokenLimit', 'estimatedInputTokens', 'reservedOutputTokens', 'remainingTokens', 'droppedTurns'].every(key => Number.isSafeInteger(body[key]) && Number(body[key]) >= 0)
+        || !Array.isArray(body.history) || body.history.length % 2 || body.history.length > input.history.length
+        || !body.history.every((item: unknown, index: number) => isRecord(item) && typeof item.id === 'string' && item.role === (index % 2 ? 'assistant' : 'user') && typeof item.content === 'string')) {
+        throw new Error('invalid response');
+      }
+      return body as unknown as Awaited<ReturnType<RuntimeClientService['previewContext']>>;
+    } catch {
+      throw new ServiceUnavailableException('暂时无法读取上下文预算，请稍后刷新');
     }
   }
 

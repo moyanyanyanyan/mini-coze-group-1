@@ -9,12 +9,26 @@ import { OperationsAgentsQuery, OperationsDocumentsQuery, OperationsPageQuery } 
 const now = new Date('2026-11-14T00:00:00Z');
 function setup() {
   const model = () => ({ findFirst: jest.fn(), findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0), groupBy: jest.fn().mockResolvedValue([]) });
-  const tx = { $queryRaw: jest.fn().mockResolvedValue([]), agent: model(), conversation: model(), message: model(), knowledgeBase: model(), knowledgeDocument: model(), knowledgeChunk: model() };
+  const tx = { $queryRaw: jest.fn().mockResolvedValue([]), agent: model(), conversation: model(), message: model(), knowledgeBase: model(), knowledgeDocument: model(), knowledgeChunk: model(), agentPluginBinding: model(), plugin: model(), workflow: model(), workflowRun: model(), apiKey: model(), modelConfig: model() };
   const prisma = { knowledgeDocument: tx.knowledgeDocument, $transaction: jest.fn(async (fn: (client: typeof tx) => unknown) => fn(tx)) };
   return { tx, prisma, service: new OperationsService(prisma as never) };
 }
 
 describe('Operations 当前用户查询', () => {
+  it('集成概览仅统计本人资源及绑定的插件，密钥只读取最后使用时间', async () => {
+    const { tx, service } = setup();
+    tx.agentPluginBinding.findMany.mockResolvedValue([{ pluginId: 'bound' }, { pluginId: 'bound' }]);
+    tx.apiKey.findFirst.mockResolvedValue({ lastUsedAt: now });
+    const result = await service.resources('owner');
+    expect(tx.agentPluginBinding.findMany.mock.calls[0][0].where).toEqual({ agent: { ownerId: 'owner' } });
+    expect(tx.plugin.count.mock.calls[0][0].where).toEqual({ pluginId: { in: ['bound'] } });
+    expect(tx.workflow.count.mock.calls[0][0].where).toMatchObject({ creatorId: 'owner', workspaceId: 'owner' });
+    expect(tx.workflowRun.count.mock.calls[0][0].where).toMatchObject({ userId: 'owner', workflow: { creatorId: 'owner' } });
+    expect(tx.apiKey.findFirst.mock.calls[0][0].select).toEqual({ lastUsedAt: true });
+    expect(tx.apiKey.count.mock.calls[0][0].where).toMatchObject({ createdById: 'owner', agent: { ownerId: 'owner' } });
+    expect(tx.modelConfig.count.mock.calls[0][0].where).toEqual({ ownerId: 'owner' });
+    expect(result.apiKeys.lastUsedAt).toBe(now.toISOString());
+  });
   it('列表只返回原文件字节长度，保留零字节和未知并限制本人及父知识库', async () => {
     const { tx, service } = setup();
     tx.knowledgeBase.findFirst.mockResolvedValue({ id: 'kb', name: '资料', status: 'ACTIVE' });

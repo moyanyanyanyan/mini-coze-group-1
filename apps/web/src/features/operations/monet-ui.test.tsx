@@ -10,7 +10,7 @@ const items = [{ id: 'one', name: '文件一', value: 1 }, { id: 'two', name: '�
 
 describe('容量环图的视觉交互边界', () => {
   it('环段保留完整比例，六色高光不改变容量', () => {
-    const html = renderToStaticMarkup(<StorageRing items={items} label="容量" LinkComponent={Link} sample={false} />);
+    const html = renderToStaticMarkup(<StorageRing items={items} label="容量" LinkComponent={Link} incomplete={false} />);
     const arcs = [...html.matchAll(/stroke-dasharray="([\d.]+) ([\d.]+)"/g)];
     expect(arcs).toHaveLength(2);
     expect(arcs.reduce((sum, arc) => sum + Number(arc[1]), 0)).toBeCloseTo(100);
@@ -27,12 +27,12 @@ describe('容量环图的视觉交互边界', () => {
     expect(html).not.toContain('aria-label="筛选其他');
     expect(html).toContain('其他 3 项');
   });
-  it('空容量不生成无效环段，紧凑模式仍标识示例', () => {
+  it('空容量不生成无效环段，紧凑模式显示实际文件大小', () => {
     const empty = renderToStaticMarkup(<StorageRing items={[{ id: 'zero', name: '空文件', value: 0 }]} label="容量" LinkComponent={Link} />);
     expect(empty).not.toContain('NaN');
     expect(empty).not.toContain('stroke-dasharray');
     expect(empty).toContain('暂无可统计的文件');
     const compact = renderToStaticMarkup(<StorageRing items={items} compact label="容量" LinkComponent={Link} />);
-    expect(compact).toContain('示例容量');
+    expect(compact).toContain('文件大小');
   });
 });

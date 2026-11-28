@@ -66,6 +66,21 @@ class HistoryMessage(DTO):
     content: str = Field(min_length=1, max_length=8000)
 
 
+class ContextPreviewRequest(DTO):
+    systemPrompt: str = Field(max_length=16000)
+    maxTokens: int = Field(ge=1, le=8192)
+    history: list[HistoryMessage] = Field(max_length=20)
+
+    @model_validator(mode="after")
+    def validate_pairs(self) -> Self:
+        if len(self.history) % 2 or any(
+            item.role != ("user" if i % 2 == 0 else "assistant")
+            for i, item in enumerate(self.history)
+        ):
+            raise ValueError("history 必须由完整问答对组成")
+        return self
+
+
 class RuntimeRequest(DTO):
     runId: Identifier
     actor: Actor

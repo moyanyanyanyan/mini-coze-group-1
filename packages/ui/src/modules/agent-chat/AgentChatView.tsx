@@ -37,6 +37,7 @@ export interface AgentChatViewProps {
   pendingAttachments: ComposerAttachment[];
   attaching: boolean;
   attachmentError: string;
+  memoryPanel?: ReactNode;
   onSelectFiles: (files: File[]) => void;
   onRemoveAttachment: (id: string) => void;
 }
@@ -47,6 +48,7 @@ export function AgentChatView({
   confirmation, LinkComponent, createAgentRoute, handleNewConversation, handleConversationChange,
   handleDeleteConversation, handleAgentChange, handleSend, handleStop, onRetry, readiness = 'ready', onReadinessRetry,
   pendingAttachments, attaching, attachmentError, onSelectFiles, onRemoveAttachment,
+  memoryPanel,
 }: AgentChatViewProps) {
   const selectedAgent = agents.find(agent => agent.id === selectedAgentId);
   const { conversationsOpen, setConversationsOpen, conversationPanelRef, conversationDrawer,
@@ -157,6 +159,7 @@ export function AgentChatView({
         </div>
 
         <div className={styles.footer}>
+        {memoryPanel}
         {readiness !== 'ready' && <div className={styles.alert} role="status">
           {readiness === 'starting' ? '对话服务正在准备，准备完成后即可发送' : readiness === 'failed' ? '对话服务准备失败，请联系维护者检查并重启服务' : '暂时无法连接对话服务，正在尝试重新连接'}
           {readiness !== 'starting' && <button type="button" onClick={onReadinessRetry}>重新检查</button>}

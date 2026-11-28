@@ -1,0 +1,11 @@
+ALTER TYPE "KnowledgeDocumentSourceType" ADD VALUE IF NOT EXISTS 'PDF';
+ALTER TYPE "KnowledgeDocumentSourceType" ADD VALUE IF NOT EXISTS 'DOCX';
+ALTER TYPE "KnowledgeDocumentSourceType" ADD VALUE IF NOT EXISTS 'MD';
+ALTER TYPE "KnowledgeDocumentSourceType" ADD VALUE IF NOT EXISTS 'XLSX';
+ALTER TYPE "KnowledgeDocumentSourceType" ADD VALUE IF NOT EXISTS 'CSV';
+ALTER TYPE "KnowledgeDocumentSourceType" ADD VALUE IF NOT EXISTS 'PNG';
+ALTER TYPE "KnowledgeDocumentSourceType" ADD VALUE IF NOT EXISTS 'JPG';
+ALTER TYPE "KnowledgeDocumentSourceType" ADD VALUE IF NOT EXISTS 'JPEG';
+ALTER TYPE "KnowledgeDocumentSourceType" ADD VALUE IF NOT EXISTS 'WEBP';
+ALTER TYPE "KnowledgeDocumentSourceType" ADD VALUE IF NOT EXISTS 'PPTX';
+ALTER TYPE "KnowledgeDocumentSourceType" ADD VALUE IF NOT EXISTS 'HTML';

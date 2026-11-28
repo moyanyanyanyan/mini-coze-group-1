@@ -22,6 +22,7 @@ vi.mock('react', async importOriginal => ({
 vi.mock('@minicoze/ui/hooks', () => ({ useConfirm: () => ({ confirm: vi.fn(), confirmation: null }) }));
 vi.mock('@minicoze/ui/agent-chat', () => ({
   AgentChatView: () => null,
+  ConversationMemory: () => null,
   useChatViewport: () => ({ following: { current: true }, setAwayFromBottom: vi.fn() }),
 }));
 vi.mock('./use-chat-readiness', () => ({

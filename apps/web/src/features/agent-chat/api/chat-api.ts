@@ -4,6 +4,11 @@ import type {
   SendMessageResult,
 } from '@minicoze/shared';
 import { ApiError, API_BASE, del, get, post } from '../../../shared/api/http';
+import type { ConversationMemory } from '@minicoze/shared';
+
+export function getConversationMemory(conversationId: string) {
+  return get<ConversationMemory>(`/api/conversations/${encodeURIComponent(conversationId)}/memory`);
+}
 
 export function listConversations() {
   return get<ConversationSummary[]>('/api/conversations');

@@ -10,7 +10,7 @@ export interface KnowledgeBaseItem {
 export interface KnowledgeDocumentItem {
   id: string;
   title: string;
-  sourceType: 'TEXT' | 'TXT' | 'JSON';
+  sourceType: 'TEXT' | 'TXT' | 'JSON' | 'PDF' | 'DOCX' | 'MD' | 'XLSX' | 'CSV' | 'PNG' | 'JPG' | 'JPEG' | 'WEBP' | 'PPTX' | 'HTML';
   status: 'PROCESSING' | 'READY' | 'FAILED';
   stage: string;
   chunkCount: number;

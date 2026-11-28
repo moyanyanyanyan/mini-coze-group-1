@@ -141,6 +141,7 @@ export function Records({
   rows,
   statusOptions = [],
   sourceOptions = [],
+  sourceLabel = '来源',
   initialStatus = '',
   compact = false,
 }: {
@@ -150,6 +151,7 @@ export function Records({
   rows: TableRow[];
   statusOptions?: [string, string][];
   sourceOptions?: string[];
+  sourceLabel?: string;
   initialStatus?: string;
   compact?: boolean;
 }) {
@@ -190,8 +192,8 @@ export function Records({
           />
           <div>
             {sourceOptions.length > 0 && (
-              <MenuFilter label="来源筛选" value={filters.source} onChange={source => change({ source })}
-                items={[{ id: '', label: '全部来源' }, ...sourceOptions.map(source => ({ id: source, label: source }))]} />
+              <MenuFilter label={`${sourceLabel}筛选`} value={filters.source} onChange={source => change({ source })}
+                items={[{ id: '', label: `全部${sourceLabel}` }, ...sourceOptions.map(source => ({ id: source, label: source }))]} />
             )}
             {statusOptions.length > 0 && (
               <MenuFilter label="状态筛选" value={filters.status} onChange={status => change({ status })}
@@ -263,8 +265,7 @@ export function Breadcrumbs({
 
 export function RunMetrics({ runs }: { runs: OperationRun[] }) {
   const s = runSummary(runs);
-  const example = runs.length > 0 && !runs.some(run => run.observed);
-  const suffix = example ? '（示例）' : '';
+  const suffix = '';
   return (
     <Stats
       items={[
@@ -287,7 +288,7 @@ export function Stages({
   stages: OperationStage[];
   onNode?: (name: string) => ReactNode;
 }) {
-  const total = stages.reduce((n, s) => n + s.durationMs, 0);
+  const total = stages.reduce((n, s) => n + (s.durationMs ?? 0), 0);
   return (
     <ol className="om-stages">
       {stages.map((s) => (
@@ -311,7 +312,7 @@ export function Stages({
               </span>
             </div>
             <p>{s.description}</p>
-            {onNode && s.durationMs > 0 && (
+            {onNode && s.durationMs !== null && s.durationMs > 0 && (
               <div className={`om-bar ${s.status === 'failed' ? 'is-failed' : ''}`}>
                 <span style={{ width: `${total ? (s.durationMs / total) * 100 : 0}%` }} />
               </div>

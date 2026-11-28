@@ -1,5 +1,6 @@
 import {
   Controller,
+  Logger,
   Get,
   Post,
   Body,
@@ -9,6 +10,9 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { PluginsService } from './plugins.service';
+import { PrismaService } from '../../prisma/prisma.service';
+import { OperationTelemetryService } from '../operations/collection/telemetry.service';
+import { sanitizeObservation } from '../operations/collection/runtime-collector.service';
 import type {
   ApiResponse,
   PluginToolDefinition,
@@ -24,7 +28,8 @@ import type {
  */
 @Controller('tools')
 export class ToolsController {
-  constructor(private readonly pluginsService: PluginsService) {}
+  private readonly logger = new Logger(ToolsController.name);
+  constructor(private readonly pluginsService: PluginsService, private readonly prisma: PrismaService, private readonly telemetry: OperationTelemetryService) {}
 
   @Get()
   listTools(
@@ -44,8 +49,20 @@ export class ToolsController {
     @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
+    const startedAt = new Date();
     const serviceToken = (req.headers['x-plugin-service-token'] as string | undefined) ?? null;
     const result = await this.pluginsService.executeTool(body, serviceToken ?? undefined);
+    try {
+      if (result.code === 200 && body && typeof body === 'object') {
+        const input = body as Record<string, unknown>;
+        if (typeof input.actorId === 'string' && typeof input.agentId === 'string') {
+          const agent = await this.prisma.agent.findFirst({ where: { id: input.agentId, ownerId: input.actorId }, select: { id: true } });
+          if (agent) await this.telemetry.record({ ownerId: input.actorId, kind: 'tool', status: result.data.status, startedAt,
+            agentId: agent.id, runId: typeof input.runId === 'string' ? input.runId : null, durationMs: Date.now() - startedAt.getTime(),
+            data: { toolCallId: String(input.toolCallId), toolName: String(input.toolName), input: sanitizeObservation(input.arguments), result: sanitizeObservation(result.data) } });
+        }
+      }
+    } catch { this.logger.error('工具运行记录采集失败，工具实际返回不变'); }
     res.status(result.code).json(result);
   }
 

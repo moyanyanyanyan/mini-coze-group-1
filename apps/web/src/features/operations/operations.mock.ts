@@ -338,7 +338,7 @@ export function createOperationsMock(now = Date.now()): OperationsData {
               : c === 6
                 ? '知识库中没有找到相关内容，建议联系人工客服确认开票信息。'
                 : '签收后 7 天内，符合条件的商品可以申请无理由退货。商品需保持完好，部分特殊商品除外。可从订单详情页提交申请。',
-          durationMs: stages.reduce((n, s) => n + s.durationMs, 0),
+          durationMs: stages.reduce((n, s) => n + (s.durationMs ?? 0), 0),
           firstTokenMs: failed ? null : plugin ? 1320 : 580,
           inputTokens: failed ? 0 : 1122,
           outputTokens: failed ? 0 : 126,

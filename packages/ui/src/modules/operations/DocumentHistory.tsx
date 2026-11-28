@@ -1,5 +1,5 @@
 import type { OperationDocument } from './model';
-import { dateTime, taskPath } from './model';
+import { dateTime, duration, taskPath } from './model';
 import { stageNames } from './knowledge-display';
 import { Panel, Empty, Pagination } from './components';
 import type { LinkComponentType } from '../../layouts/types';
@@ -22,7 +22,7 @@ export function DocumentHistory({ document, baseId, LinkComponent: L }: { docume
           {attempt.source === 'OBSERVED' && <p className="om-note">历史阶段未采集</p>}
           {attempt.errorCode && <p className="om-error-description">{attempt.errorCode}{attempt.errorMessage ? ` · ${attempt.errorMessage}` : ''}</p>}
           <ol>{attempt.events.map((event, eventIndex) => <li key={eventIndex}><span>{stageNames[event.stage] ?? event.stage}{event.status === 'FAILED' ? ' · 失败' : event.status === 'PROCESSING' && !event.snapshot ? ' · 进入阶段' : ''}{event.snapshot ? '（状态快照）' : ''}</span><time>{dateTime(Date.parse(event.at))}</time></li>)}</ol>
-          {attempt.finishedAt && <p className="om-note">结束于 {dateTime(Date.parse(attempt.finishedAt))}</p>}
+          {attempt.finishedAt && <p className="om-note">结束于 {dateTime(Date.parse(attempt.finishedAt))}{attempt.startedAt ? ` · 总耗时 ${duration(Date.parse(attempt.finishedAt) - Date.parse(attempt.startedAt))}` : ''}</p>}
         </div>
       </details>)}
       <p className="om-note">预览与切片为当前版本</p>

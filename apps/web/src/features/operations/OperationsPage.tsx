@@ -6,6 +6,8 @@ import { AppLink } from '../../shared/routing/AppLink';
 import { navigate, useRouteLocation } from '../../shared/routing/navigation';
 import { ApiError } from '../../shared/api/http';
 import { loadOperations } from './operations.api';
+import { useConfirm } from '@minicoze/ui/hooks';
+import { deleteKnowledgeDocument, retryKnowledgeDocument } from '../knowledge/knowledge.api';
 
 const scrollPositions = new Map<string, number>();
 function OperationsLink({ to, onClick, ...props }: ComponentProps<typeof AppLink>) {
@@ -25,12 +27,15 @@ export function OperationsPage() {
 }
 
 function OperationsController({ pathname, search }: { pathname: string; search: string }) {
+  const { confirm, confirmation } = useConfirm();
+  const [documentActionId, setDocumentActionId] = useState('');
+  const [actionMessage, setActionMessage] = useState('');
+  const actionPending = useRef(false);
   const [profile, setProfile] = useState<AuthUser>();
   const [data, setData] = useState<OperationsData>();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [attempt, setAttempt] = useState(0);
-  const [runPages, setRunPages] = useState(1);
   const restored = useRef(false);
   useEffect(() => {
     let active = true;
@@ -42,7 +47,7 @@ function OperationsController({ pathname, search }: { pathname: string; search: 
       pending = true; setLoading(true);
       try {
         const user = await getMe();
-        const next = await loadOperations(pathname, search, user.id, runPages);
+        const next = await loadOperations(pathname, search, user.id);
         if (!active) return;
         setProfile(user); setData(next); setError('');
         polling = next.runs.some(run => run.observed && (run.observed.status === 'running' || (run.status === 'running' && run.observed.finishedAt !== null && Date.now() - Date.parse(run.observed.finishedAt) < 30_000))) || next.tasks.some(task => task.observed && task.status === 'processing');
@@ -66,7 +71,7 @@ function OperationsController({ pathname, search }: { pathname: string; search: 
     document.addEventListener('visibilitychange', visibility);
     window.addEventListener('focus', visibility);
     return () => { active = false; clearTimeout(timer); document.removeEventListener('visibilitychange', visibility); window.removeEventListener('focus', visibility); };
-  }, [pathname, search, attempt, runPages]);
+  }, [pathname, search, attempt]);
   useLayoutEffect(() => {
     if (!data || restored.current) return;
     const scroller = document.querySelector<HTMLElement>('.workspace-content');
@@ -83,6 +88,22 @@ function OperationsController({ pathname, search }: { pathname: string; search: 
     ? <div className="om-empty" role="alert">{error}<button onClick={() => setAttempt(n => n + 1)}>重试</button></div>
     : <div className="om-loading" role="status"><OperationsLoader /><span>正在加载运行数据…</span></div>}
   </div>;
-  return <OperationsView data={data} profile={profile} pathname={pathname} search={search} LinkComponent={OperationsLink}
-    loading={loading} error={error} onRefresh={() => setAttempt(n => n + 1)} onMoreRuns={() => setRunPages(n => n + 1)} />;
+  async function documentAction(id: string, action: 'retry' | 'delete') {
+    if (!profile || !data || actionPending.current) return;
+    const document = data.documents.find(item => item.id === id && item.observed);
+    if (!document) return;
+    actionPending.current = true;
+    try {
+      if (action === 'delete' && !await confirm(`删除「${document.name}」及其切片和处理历史？删除后不可恢复。`)) return;
+      setDocumentActionId(id); setActionMessage('');
+      if (action === 'retry') await retryKnowledgeDocument(id, profile.id);
+      else await deleteKnowledgeDocument(id, profile.id);
+      setActionMessage(action === 'retry' ? '已提交重新处理' : '文件已删除');
+      setAttempt(n => n + 1);
+    } catch (failure) { setActionMessage(failure instanceof Error ? failure.message : '操作失败，请重试'); }
+    finally { actionPending.current = false; setDocumentActionId(''); }
+  }
+  return <>{confirmation}<OperationsView data={data} profile={profile} pathname={pathname} search={search} LinkComponent={OperationsLink}
+    documentActionId={documentActionId} actionMessage={actionMessage} onDocumentAction={(id, action) => void documentAction(id, action)}
+    loading={loading} error={error} onRefresh={() => setAttempt(n => n + 1)} /></>;
 }

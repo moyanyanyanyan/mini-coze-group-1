@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { OperationsRuntimeRun, OperationsRuntimeStats } from '@minicoze/shared';
+import { parseRuntimeStages } from '../../../../../packages/shared/src/runtime-stages';
 import { OperationsView, runSummary, conversationPath } from '@minicoze/ui/operations';
 import { get } from '../../shared/api/http';
 import { loadOperations, replaceRuntime } from './operations.api';
 import { createOperationsMock } from './operations.mock';
+import { getConversationMemory } from '../agent-chat/api/chat-api';
+vi.mock('../agent-chat/api/chat-api', () => ({ getConversationMemory: vi.fn() }));
 
 vi.mock('../../shared/api/http', async importOriginal => ({ ...await importOriginal<object>(), get: vi.fn() }));
 const now = new Date().toISOString();
@@ -29,8 +32,36 @@ function responses(rows = [run], summary = stats) {
   });
 }
 const Link = ({ to, children }: { to: string; children?: React.ReactNode }) => <a href={to}>{children}</a>;
-beforeEach(() => vi.resetAllMocks());
+beforeEach(() => {
+  vi.resetAllMocks();
+  vi.mocked(getConversationMemory).mockRejectedValue(new Error('记忆暂不可用'));
+});
 describe('原运行页面内接入采集数据', () => {
+  it('统计完整分页并按 ID 去重，超过首批 100 条的记录不会遗漏', async () => {
+    responses();
+    const fallback = vi.mocked(get).getMockImplementation()!;
+    vi.mocked(get).mockImplementation(async path => {
+      if (path.includes('/runtime/runs?')) {
+        const second = new URL('http://local' + path).searchParams.get('page') === '2';
+        return { code: 200, data: { items: second ? [{ ...run, id: 'run-101' }, { ...run, id: 'run-100' }] : Array.from({ length: 100 }, (_, i) => ({ ...run, id: `run-${i+1}` })), total: 101, pageSize: 100, page: second ? 2 : 1 } } as never;
+      }
+      return fallback(path);
+    });
+    const data = await loadOperations('/workspace/operations', '', 'owner');
+    expect(data.runs).toHaveLength(101);
+    expect(data.runs.some(row => row.id === 'run-101')).toBe(true);
+    expect(vi.mocked(get).mock.calls.some(([path]) => path.includes('page=2'))).toBe(true);
+  });
+  it('记忆接口失败不影响真实对话与执行链路，也不伪造额度', async () => {
+    responses();
+    const path = conversationPath(run.agentId, run.conversationId);
+    const data = await loadOperations(path, '', 'owner');
+    const html = renderToStaticMarkup(<OperationsView data={data} pathname={path} search="" LinkComponent={Link} />);
+    expect(getConversationMemory).toHaveBeenCalledWith(run.conversationId);
+    expect(html).toContain('记忆暂不可用');
+    expect(html).toContain('实际提问');
+    expect(html).not.toContain('约剩');
+  });
   it('已完成的新聊天进入最新运行，并点亮当天 Token 格子', async () => {
     responses([{ ...run, question: '累累', totalTokens: 2793, inputTokens: 2000, outputTokens: 793 }]);
     const data = await loadOperations('/workspace/operations', '', 'owner');
@@ -51,6 +82,7 @@ describe('原运行页面内接入采集数据', () => {
         chunkCount: kind === 'retrieval' || kind === 'context' ? 0 : undefined,
         usage: kind === 'model' ? { promptTokens: 0, completionTokens: 0, totalTokens: 0 } : undefined },
     }));
+    data.runs[0].observed!.stages = parseRuntimeStages(data.runs[0].observed!.events!.map(event => event.data));
     const html = renderToStaticMarkup(<OperationsView data={data} pathname={path} search={`run=${run.id}`} LinkComponent={Link} />);
     expect(html).toContain('内部阶段（实际采集');
     expect(html).toContain('模型调用 · 第 2 轮');
@@ -68,7 +100,8 @@ describe('原运行页面内接入采集数据', () => {
     const path = conversationPath(run.agentId, run.conversationId);
     const data = await loadOperations(path, `run=${run.id}`, 'owner');
     expect(data.runs).toHaveLength(1);
-    expect(data.runs[0]).toMatchObject({ question: '实际提问', answer: '实际回复', inputTokens: 0, outputTokens: 0, retrievals: [], plugin: undefined });
+    expect(data.runs[0]).toMatchObject({ question: '实际提问', answer: '实际回复', inputTokens: 0, outputTokens: 0, retrievals: [] });
+    expect(data.runs[0].plugin).toBeUndefined();
     const html = renderToStaticMarkup(<OperationsView data={data} pathname={path} search={`run=${run.id}`} LinkComponent={Link} />);
     expect(html).toContain('实际提问');
     expect(html).toContain('actual-tool');
@@ -83,12 +116,13 @@ describe('原运行页面内接入采集数据', () => {
     const data = await loadOperations(path, `run=${run.id}`, 'owner');
     const observed = { ...run, status: 'failed', messageStatus: 'failed', durationMs: null, firstTokenMs: null,
       inputTokens: null, outputTokens: null, totalTokens: null, errorCode: 'KNOWLEDGE_TIMEOUT' };
-    const row = replaceRuntime(createOperationsMock().runs[0], observed);
+    const row = replaceRuntime(observed);
     row.observed = { ...observed, events: [
       { type: 'runtime.stage', observedAt: now, data: { stageId: 'retrieval', kind: 'retrieval', startedAt: now,
         durationMs: 10020, status: 'failed', errorCode: 'KNOWLEDGE_TIMEOUT' } },
       { type: 'run.failed', observedAt: now, data: { code: 'KNOWLEDGE_TIMEOUT' } },
     ] };
+    row.observed.stages = parseRuntimeStages(row.observed.events?.filter(event => event.type === 'runtime.stage').map(event => event.data));
     data.runs = [row];
     const html = renderToStaticMarkup(<OperationsView data={data} pathname={path} search={`run=${run.id}`} LinkComponent={Link} />);
     expect(html).toContain('知识库检索（已采集）');
@@ -103,19 +137,20 @@ describe('原运行页面内接入采集数据', () => {
     expect(html).not.toContain('模型调用');
     expect(html).not.toContain('工具执行');
   });
-  it('缺失指标仍保留原示例，但不进入实际耗时及成功率统计', () => {
-    const row = replaceRuntime(createOperationsMock().runs[0], { ...run, durationMs: null, totalTokens: null, inputTokens: null, outputTokens: null, status: 'running', messageStatus: 'pending' });
-    expect(row.durationMs).toBeGreaterThan(0);
+  it('缺失指标保留为空，不生成示例数值或影响统计', () => {
+    const row = replaceRuntime({ ...run, durationMs: null, totalTokens: null, inputTokens: null, outputTokens: null, status: 'running', messageStatus: 'pending' });
+    expect(row.durationMs).toBeNull();
     expect(runSummary([row])).toMatchObject({ rate: '—', average: '—' });
   });
-  it('无采集记录时在原页保留已标注示例，真实 Agent 不被赋予示例会话', async () => {
+  it('无采集记录时显示真实空态，不向目录或图表注入示例', async () => {
     responses([], { ...stats, total: 0, reported: 0, totalTokens: null });
     const data = await loadOperations('/workspace/operations', '', 'owner');
-    expect(data.runs.length).toBeGreaterThan(0);
-    expect(data.runs.every(row => !row.observed)).toBe(true);
+    expect(data.runs).toEqual([]);
+    expect(data.bases).toEqual([]);
     expect(data.conversations.some(c => c.agentId === run.agentId)).toBe(false);
     const html = renderToStaticMarkup(<OperationsView data={data} pathname="/workspace/operations" search="" LinkComponent={Link} />);
-    expect(html).toContain('累计 Token（示例）');
+    expect(html).toContain('累计已报告 Token');
+    expect(html).not.toContain('示例');
     expect(html).toContain('om-overview-top');
   });
   it('读取失败明确抛出，不退回示例成功结果', async () => {
@@ -146,7 +181,7 @@ describe('原运行页面内接入采集数据', () => {
     expect(html).toContain('12 B');
     expect(html).toContain('实际解析正文');
     expect(html).not.toContain('模拟预览 · 非真实原文件');
-    expect(html).toContain('阶段耗时：未采集');
+    expect(html).toContain('历史未记录完整阶段');
     expect(html).not.toContain('文件接收成功');
     const chunksHtml = renderToStaticMarkup(<OperationsView data={data} pathname={path} search="tab=chunks" LinkComponent={Link} />);
     expect(chunksHtml).toContain('实际切片正文');

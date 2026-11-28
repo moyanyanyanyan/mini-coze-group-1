@@ -14,7 +14,8 @@ import {
 } from './api/chat-api';
 import { AppLink } from '../../shared/routing/AppLink';
 import { useConfirm } from '@minicoze/ui/hooks';
-import { AgentChatView, useChatViewport } from '@minicoze/ui/agent-chat';
+import { AgentChatView, ConversationMemory, useChatViewport } from '@minicoze/ui/agent-chat';
+import { useConversationMemory } from './use-conversation-memory';
 
 import { useChatReadiness } from './use-chat-readiness';
 
@@ -53,6 +54,7 @@ export function AgentChatPage() {
   const { following, setAwayFromBottom, jumpToLatest, closeConversationDrawer } = viewport;
   const requestId = useRef(0);
   const [switching, setSwitching] = useState(false);
+  const memory = useConversationMemory(conversationId, switching || streamingId !== null);
 
   /** 切换会话后自增，用于丢弃旧会话的在途上传结果 */
   const uploadEpoch = useRef(0);
@@ -408,6 +410,7 @@ export function AgentChatPage() {
   return (
     <AgentChatView
       conversationId={conversationId}
+      memoryPanel={conversationId ? <ConversationMemory memory={memory.memory} error={memory.error} loading={memory.loading} onRefresh={memory.refresh} /> : undefined}
       conversations={conversations}
       agents={agents}
       selectedAgentId={selectedAgentId}

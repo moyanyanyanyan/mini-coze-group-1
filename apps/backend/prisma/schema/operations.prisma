@@ -6,6 +6,8 @@ model OperationRuntimeRun {
   conversationId     String   @db.Uuid
   assistantMessageId String   @db.Uuid
   mode               String
+  source             String   @default("unknown")
+  apiKeyId           String?
   model              String
   status             String   @default("running")
   startedAt          DateTime @default(now())
@@ -22,6 +24,27 @@ model OperationRuntimeRun {
 
   @@index([userId, startedAt, id])
   @@index([userId, conversationId, startedAt])
+}
+
+model OperationTelemetry {
+  id              String   @id @default(uuid()) @db.Uuid
+  ownerId         String?
+  kind            String
+  status          String
+  knowledgeBaseId String?
+  documentId      String?
+  agentId         String?
+  runId           String?
+  apiKeyId        String?
+  startedAt       DateTime @default(now())
+  durationMs      Int
+  inputTokens     Int?
+  itemCount       Int     @default(0)
+  data            Json    @default("{}")
+
+  @@index([ownerId, kind, startedAt])
+  @@index([ownerId, knowledgeBaseId, startedAt])
+  @@index([ownerId, runId])
 }
 
 /// 由 Operations 数据库触发器记录，不在知识库业务服务中重复写入。

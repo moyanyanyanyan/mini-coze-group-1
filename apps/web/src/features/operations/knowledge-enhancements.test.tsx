@@ -21,16 +21,16 @@ function fixture() {
   return { data, document, task, render: (path: string) => renderToStaticMarkup(<OperationsView data={data} pathname={path} search="" LinkComponent={Link} />) };
 }
 describe('知识库用量与重试展示', () => {
-  it('容量和 Token 分别标识来源，示例曲线可通过键盘访问', () => {
+  it('容量和 Token 使用真实来源，空用量不补示例曲线', () => {
     const { document, render } = fixture();
     const html = render(basePath(document.baseId));
-    expect(html).toContain('检索 Token');
-    expect(html).toContain('示例数据');
-    expect(html).toContain('检索用量未采集');
+    expect(html).toContain('向量化输入 Token');
+    expect(html).not.toContain('示例数据');
+    expect(html).toContain('尚无采集记录');
     expect(html).toContain('重试后完成 · 已记录 2 次处理');
     expect(html).toContain('原文件总大小：0 B');
     expect(html).not.toContain('原文件总大小：0 B，含模拟数据');
-    expect((html.match(/aria-label="[^"]*示例 [\d,]+ Token"/g) ?? []).length).toBe(7);
+    expect((html.match(/aria-label="[^"]*实际 [\d,]+ Token"/g) ?? []).length).toBe(7);
   });
   it('成功后仍展示以前的失败与阶段，不把历史切片冒充当前版本', () => {
     const { document, task, render } = fixture();

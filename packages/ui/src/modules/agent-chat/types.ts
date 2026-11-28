@@ -31,3 +31,19 @@ export interface ChatConversationItem {
   title: string;
   updatedAt: string;
 }
+
+export interface ConversationMemoryData {
+  conversationId: string;
+  systemPrompt: string;
+  configuredTurns: number;
+  effectiveTurns: number;
+  retainedTurns: number;
+  availableTurns: number;
+  tokenLimit: number;
+  estimatedInputTokens: number;
+  reservedOutputTokens: number;
+  remainingTokens: number;
+  droppedTurns: number;
+  history: { id: string; role: 'user' | 'assistant'; content: string }[];
+  asOf: string;
+}

@@ -12,7 +12,7 @@ export interface KnowledgeDocument {
   id: string;
   knowledgeBaseId: string;
   title: string;
-  sourceType: 'TEXT' | 'TXT' | 'JSON';
+  sourceType: 'TEXT' | 'TXT' | 'JSON' | 'PDF' | 'DOCX' | 'MD' | 'XLSX' | 'CSV' | 'PNG' | 'JPG' | 'JPEG' | 'WEBP' | 'PPTX' | 'HTML';
   originalFileName: string | null;
   status: 'PROCESSING' | 'READY' | 'FAILED';
   stage: 'VALIDATING' | 'EXTRACTING' | 'CHUNKING' | 'EMBEDDING' | 'PERSISTING' | 'COMPLETED' | 'FAILED';
@@ -59,6 +59,10 @@ interface ApiEnvelope<T> {
 }
 
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? '/api';
+
+export function knowledgeDocumentDownloadUrl(id: string, workspaceId: string) {
+  return `${apiBase}/documents/${encodeURIComponent(id)}/file?${new URLSearchParams({ workspaceId })}`;
+}
 
 export async function getKnowledgeWorkspaceId(): Promise<string> {
   const response = await fetch(`${apiBase}/auth/me`, { credentials: 'include' });

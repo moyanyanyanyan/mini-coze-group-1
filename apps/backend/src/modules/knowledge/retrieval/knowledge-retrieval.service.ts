@@ -2,6 +2,9 @@ import { BadRequestException, ForbiddenException, Injectable, ServiceUnavailable
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
 import { EmbeddingClient, EmbeddingUnavailableError } from '../../../integrations/embedding.client';
+import { OperationTelemetryService } from '../../operations/collection/telemetry.service';
+
+interface RetrievalScope { ownerId: string; agentId?: string; runId?: string; source: 'chat' | 'preview'; }
 
 export interface KnowledgeHit {
   chunkId: string;
@@ -14,22 +17,30 @@ export interface KnowledgeHit {
 
 @Injectable()
 export class KnowledgeRetrievalService {
-  constructor(private readonly prisma: PrismaService, private readonly embedding: EmbeddingClient) {}
+  constructor(private readonly prisma: PrismaService, private readonly embedding: EmbeddingClient, private readonly telemetry: OperationTelemetryService) {}
 
   // The caller must first verify actor, agent, workspace and binding permissions.
-  async searchAuthorized(knowledgeBaseIds: string[], query: string, topK = 5): Promise<{ status: 'HIT' | 'NO_HIT'; hits: KnowledgeHit[] }> {
+  async searchAuthorized(knowledgeBaseIds: string[], query: string, topK = 5, scope?: RetrievalScope): Promise<{ status: 'HIT' | 'NO_HIT'; hits: KnowledgeHit[] }> {
     if (typeof query !== 'string' || !query.trim() || Array.from(query).length > 8000) {
       throw new BadRequestException('问题长度必须为 1～8000 字符');
     }
+    const startedAt = new Date();
+    let result: { status: 'HIT' | 'NO_HIT'; hits: KnowledgeHit[] } | undefined;
     try {
-      return await this.performSearch(knowledgeBaseIds, query.trim(), topK);
+      result = await this.performSearch(knowledgeBaseIds, query.trim(), topK, scope);
+      return result;
     } catch (error) {
       if (error instanceof ForbiddenException || error instanceof ServiceUnavailableException) {throw error;}
       throw new ServiceUnavailableException('知识库检索服务不可用');
+    } finally {
+      if (scope) await this.telemetry.record({ ownerId: scope.ownerId, kind: 'retrieval', status: result?.status ?? 'FAILED',
+        startedAt, durationMs: Date.now() - startedAt.getTime(), knowledgeBaseId: knowledgeBaseIds.length === 1 ? knowledgeBaseIds[0] : null,
+        agentId: scope.agentId, runId: scope.runId, itemCount: result?.hits.length ?? 0,
+        data: { query: query.trim(), baseIds: knowledgeBaseIds, source: scope.source, hits: result?.hits.map(hit => ({ ...hit })) ?? [] } });
     }
   }
 
-  private async performSearch(knowledgeBaseIds: string[], query: string, topK: number): Promise<{ status: 'HIT' | 'NO_HIT'; hits: KnowledgeHit[] }> {
+  private async performSearch(knowledgeBaseIds: string[], query: string, topK: number, scope?: RetrievalScope): Promise<{ status: 'HIT' | 'NO_HIT'; hits: KnowledgeHit[] }> {
     const ids = [...new Set(knowledgeBaseIds)];
     if (ids.length !== knowledgeBaseIds.length || ids.length === 0 || topK !== 5) {
       throw new ForbiddenException('知识库检索范围无效');
@@ -53,7 +64,7 @@ export class KnowledgeRetrievalService {
     try {
       // 每段最多 600 个 Unicode 字符，保留问题末尾；纯空白段没有检索内容。
       const parts = query.match(/.{1,600}/gsu)!.filter((part) => part.trim());
-      const embedded = await this.embedding.embed(parts);
+      const embedded = await this.embedding.embed(parts, scope ? { ...scope, source: 'retrieval', knowledgeBaseIds: ids } : undefined);
       model = embedded.model;
       const distances = embedded.vectors.map((vector) => Prisma.sql`v.embedding <=> ${'[' + vector.join(',') + ']'}::vector`);
       // 每个片段取与整道问题各段最接近的距离，单段时保留原查询。

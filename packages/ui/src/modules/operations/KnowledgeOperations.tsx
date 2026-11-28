@@ -1,155 +1,38 @@
-import { basePath, conversationPath, duration, time } from "./model";
-import { PageHeader, Stats, Records, Cell, Badge, Notice } from "./components";
-import type { ContentProps } from "./view-types";
+import { basePath, taskPath, conversationPath, duration, dateTime } from './model';
+import { PageHeader, Stats, Records, Cell, Badge, Empty } from './components';
+import type { ContentProps } from './view-types';
+import { BaseFiles } from './KnowledgeWorkspace';
+export { Knowledge, Document } from './KnowledgeWorkspace';
 
-import { BaseFiles } from "./KnowledgeWorkspace";
-export { Knowledge, Document } from "./KnowledgeWorkspace";
 export function Base(p: ContentProps & { baseId: string }) {
-  return new URLSearchParams(p.search).get("tab") === "retrieval" ? (
-    <RetrievalRecords {...p} />
-  ) : (
-    <BaseFiles {...p} />
-  );
+  return new URLSearchParams(p.search).get('tab') === 'retrieval' ? <RetrievalRecords {...p} /> : <BaseFiles {...p} />;
 }
 
 function RetrievalRecords(p: ContentProps & { baseId: string }) {
-  const { data, baseId, runs, LinkComponent: L } = p;
-  const base = data.bases.find((b) => b.id === baseId)!;
-  const actualRetrievals = runs.flatMap((run) =>
-    run.retrievals
-      .filter((r) => r.baseId === baseId)
-      .map((retrieval) => ({ run, retrieval })),
-  );
-  const retrievalSample = Boolean(
-    base.observed && !actualRetrievals.length && data.examples,
-  );
-  const retrievalData = retrievalSample ? data.examples! : data;
-  const retrievals = retrievalSample
-    ? retrievalData.runs
-        .slice(0, 3)
-        .flatMap((run) =>
-          run.retrievals.map((retrieval) => ({ run, retrieval })),
-        )
-    : actualRetrievals;
-  const hits = retrievals.filter((r) => r.retrieval.status === "hit");
-  return (
-    <div className="om-knowledge">
-      <PageHeader title={base.name} />
-      {retrievalSample && (
-        <Notice title="检索过程示例" tone="neutral">
-          以下为示例查询和指标，不属于当前知识库的真实检索；已采集的引用请在对应会话执行链路查看。
-        </Notice>
-      )}
-      <Stats
-        items={[
-          {
-            label: "检索次数",
-            value: retrievals.length,
-            note: "当前时间范围内",
-          },
-          {
-            label: "命中率",
-            value: retrievals.length
-              ? `${((hits.length / retrievals.length) * 100).toFixed(1)}%`
-              : "—",
-            note: `${hits.length} 次命中 · ${retrievals.length - hits.length} 次未命中或失败`,
-          },
-          {
-            label: "平均检索耗时",
-            value: retrievals.length
-              ? duration(
-                  Math.round(
-                    retrievals.reduce((n, r) => n + r.retrieval.durationMs, 0) /
-                      retrievals.length,
-                  ),
-                )
-              : "—",
-            note: "仅统计本知识库检索",
-          },
-          {
-            label: "返回切片总数",
-            value: retrievals.reduce((n, r) => n + r.retrieval.hits.length, 0),
-            note: "按每次检索累加，不去重",
-          },
-        ]}
-      />
-      <nav className="om-tabs" aria-label="知识库运行内容">
-        <L className="" to={basePath(baseId)}>
-          文件处理
-        </L>
-        <L className="is-active" to={`${basePath(baseId)}?tab=retrieval`}>
-          检索记录
-        </L>
-      </nav>
-
-      <Records
-        key="retrievals"
-        id={`retrievals-${baseId}`}
-        title="检索记录"
-        headers={[
-          "检索内容 / 来源",
-          "命中文档",
-          "返回切片",
-          "耗时",
-          "结果",
-          "时间",
-          "操作",
-        ]}
-        sourceOptions={data.agents.map((a) => a.name)}
-        statusOptions={[
-          ["hit", "命中"],
-          ["no_hit", "未命中"],
-          ["failed", "失败"],
-        ]}
-        rows={retrievals.map(({ run, retrieval: r }) => {
-          const conversation = retrievalData.conversations.find(
-            (c) => c.id === run.conversationId,
-          )!;
-          const agent = retrievalData.agents.find(
-            (a) => a.id === conversation.agentId,
-          )!;
-          const href = `${conversationPath(agent.id, conversation.id)}?run=${run.id}&node=knowledge`;
-          return {
-            id: run.id,
-            text: `${r.query} ${run.id} ${agent.name}`,
-            status: r.status,
-            source: agent.name,
-            cells: [
-              <Cell
-                title={
-                  retrievalSample ? (
-                    `${r.query}（示例）`
-                  ) : (
-                    <L to={href}>{r.query}</L>
-                  )
-                }
-                subtitle={`${agent.name} · ${run.id}`}
-              />,
-              new Set(r.hits.map((h) => h.documentId)).size,
-              r.hits.length,
-              duration(r.durationMs),
-              <Badge
-                tone={
-                  r.status === "hit"
-                    ? "success"
-                    : r.status === "failed"
-                      ? "failed"
-                      : "neutral"
-                }
-              >
-                {r.status === "hit"
-                  ? "命中"
-                  : r.status === "failed"
-                    ? "失败"
-                    : "未命中"}
-              </Badge>,
-              time(run.startedAt),
-              retrievalSample ? <span>示例</span> : <L to={href}>查看链路</L>,
-            ],
-          };
-        })}
-      />
-      <p className="om-note">未命中表示检索正常执行，但未返回相关切片。</p>
-    </div>
-  );
+  const { data, baseId, LinkComponent: L } = p;
+  const base = data.bases.find(row => row.id === baseId)!;
+  const records = data.knowledgeActivity?.retrievals;
+  const rows = records?.items ?? [];
+  return <div className="om-knowledge">
+    <PageHeader title={base.name} description="知识库模块实际执行的检索，包含聊天调用和检索测试。" />
+    <nav className="om-tabs" aria-label="知识库运行内容"><L to={basePath(baseId)}>文件处理</L><L className="is-active" to={`${basePath(baseId)}?tab=retrieval`}>检索记录</L></nav>
+    <Stats items={[
+      { label: '检索记录总数', value: records?.total ?? 0, note: '从启用采集开始，包含失败与未命中' },
+      { label: '本页返回切片', value: rows.reduce((sum, row) => sum + row.hits.length, 0), note: '仅本知识库返回的候选' },
+      { label: '本页采用切片', value: rows.reduce((sum, row) => sum + row.hits.filter(hit => hit.used === true).length, 0), note: '按 Runtime 实际公告的引用计算' },
+      { label: '本页平均耗时', value: rows.length ? duration(rows.reduce((sum, row) => sum + row.durationMs, 0) / rows.length) : '—', note: '整次检索耗时，含多库共用向量化' },
+    ]} />
+    {!rows.length && <Empty>当前没有检索记录；执行聊天检索或知识库检索测试后会自动出现。</Empty>}
+    {rows.map(row => <details className="om-panel om-padding" key={row.id}>
+      <summary><strong>{row.query}</strong> · {row.source === 'preview' ? '检索测试' : '聊天检索'} · <Badge tone={row.status === 'HIT' ? 'success' : row.status === 'FAILED' ? 'failed' : 'neutral'}>{row.status === 'HIT' ? '命中' : row.status === 'FAILED' ? '失败' : '未命中'}</Badge> · {duration(row.durationMs)}</summary>
+      <p className="om-note">{dateTime(Date.parse(row.startedAt))} · {row.id}</p>
+      {row.hits.map(hit => <details className="om-snippet" key={hit.chunkId}><summary>{hit.documentTitle} · 相似度 {hit.score.toFixed(3)} · {hit.used === true ? '送入模型' : hit.used === false ? '未采用' : row.source === 'preview' ? '测试检索，未调用模型' : '采用情况未记录'}</summary><p>{hit.content}</p><small>{hit.documentId} · {hit.chunkId}</small><p><L to={taskPath(baseId, hit.documentId)}>查看来源文件与切片 →</L></p></details>)}
+      {row.runId && row.conversationId && row.agentId && <L to={`${conversationPath(row.agentId, row.conversationId)}?run=${row.runId}&node=knowledge`}>查看实际执行链路 →</L>}
+    </details>)}
+    {records && records.total > records.pageSize && <nav className="om-tabs" aria-label="检索记录分页">
+      {records.page > 1 && <L to={`${basePath(baseId)}?tab=retrieval&page=${records.page - 1}`}>上一页</L>}
+      <span>第 {records.page} / {Math.ceil(records.total / records.pageSize)} 页</span>
+      {records.page * records.pageSize < records.total && <L to={`${basePath(baseId)}?tab=retrieval&page=${records.page + 1}`}>下一页</L>}
+    </nav>}
+  </div>;
 }

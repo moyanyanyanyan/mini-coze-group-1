@@ -1,6 +1,14 @@
 import { extname } from 'node:path';
+import { AttachmentError, type AttachmentSourceType } from '../../attachments/attachment.types';
+import { resolveSourceType, maxBytesFor } from '../../attachments/parsers/file-type';
 
 export const MAX_DOCUMENT_BYTES = 1024 * 1024;
+export const MAX_KNOWLEDGE_UPLOAD_BYTES = 20 * 1024 * 1024;
+export type KnowledgeSourceType = 'TEXT' | 'TXT' | 'JSON' | AttachmentSourceType;
+
+export function documentMaxBytes(type: KnowledgeSourceType) {
+  return type === 'TEXT' || type === 'TXT' || type === 'JSON' ? MAX_DOCUMENT_BYTES : maxBytesFor(type);
+}
 
 export class DocumentContentError extends Error {
   constructor(public readonly code: string, message: string) {
@@ -19,11 +27,15 @@ export function decodeUploadFilename(filename: string): string {
   }
 }
 
-export function sourceTypeFromFilename(filename: string): 'TXT' | 'JSON' {
+export function sourceTypeFromFilename(filename: string): Exclude<KnowledgeSourceType, 'TEXT'> {
   const extension = extname(filename).toLowerCase();
   if (extension === '.txt') return 'TXT';
   if (extension === '.json') return 'JSON';
-  throw new DocumentContentError('UNSUPPORTED_FILE', '只支持 .txt 和 .json 文件');
+  try { return resolveSourceType(filename); }
+  catch (error) {
+    if (error instanceof AttachmentError) throw new DocumentContentError(error.code, error.message);
+    throw error;
+  }
 }
 
 export function extractDocumentText(sourceType: 'TEXT' | 'TXT' | 'JSON', bytes: Uint8Array): string {

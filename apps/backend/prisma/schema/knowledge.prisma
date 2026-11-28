@@ -22,6 +22,17 @@ enum KnowledgeDocumentSourceType {
   TEXT
   TXT
   JSON
+  PDF
+  DOCX
+  MD
+  XLSX
+  CSV
+  PNG
+  JPG
+  JPEG
+  WEBP
+  PPTX
+  HTML
 }
 
 enum KnowledgeDocumentStatus {

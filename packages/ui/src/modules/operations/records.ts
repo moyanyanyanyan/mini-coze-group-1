@@ -1,0 +1,141 @@
+// 运行管理的展示契约；接口读取、校验和映射由应用层负责。
+export interface OperationsPageResult<T> {
+  items: T[];
+  page: number;
+  pageSize: number;
+  total: number;
+  asOf: string;
+}
+
+export interface OperationsResources {
+  plugins: { bound: number; enabled: number; connectionErrors: number };
+  workflows: { total: number; runs: number; failedRuns: number };
+  apiKeys: { active: number; revoked: number; lastUsedAt: string | null };
+  models: { total: number; enabled: number };
+  asOf: string;
+}
+
+export interface OperationsRuntimeRun {
+  hasWarnings?: boolean;
+  source?: string;
+  apiKeyId?: string | null;
+  question?: string;
+  answer?: string;
+  conversationTitle?: string;
+  id: string;
+  agentId: string;
+  conversationId: string;
+  assistantMessageId: string;
+  mode: string;
+  model: string;
+  status: string;
+  messageStatus: string | null;
+  startedAt: string;
+  finishedAt: string | null;
+  durationMs: number | null;
+  firstTokenMs: number | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  totalTokens: number | null;
+  errorCode: string | null;
+  truncated: boolean;
+}
+
+export interface OperationsRuntimeDetail extends OperationsRuntimeRun {
+  events: { type: string; observedAt: string; data: unknown }[];
+  asOf: string;
+}
+
+export interface OperationsRuntimeStats {
+  total: number;
+  running: number;
+  reported: number;
+  missingUsage: number;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  totalTokens: number | null;
+  peakTokens: number | null;
+  averageDurationMs: number | null;
+  asOf: string;
+}
+
+export interface OperationsBase {
+  createdAt?: string;
+  id: string;
+  name: string;
+  description: string;
+  status: 'ACTIVE' | 'DISABLED';
+  updatedAt: string;
+  documentCount: number;
+  availableChunkCount: number;
+  processingDocuments: number;
+  failedDocuments: number;
+}
+
+export interface OperationsDocument {
+  latestAttempt?: OperationsDocumentAttempt | null;
+  attempts?: { recordedCount: number; latestSource: string; latestStatus: string };
+  sourceSize?: number | null;
+  id: string;
+  knowledgeBaseId: string;
+  title: string;
+  sourceType: string;
+  originalFileName: string | null;
+  status: 'PROCESSING' | 'READY' | 'FAILED';
+  stage: string;
+  chunkCount: number;
+  error: { code: string; message: string | null } | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OperationsDocumentAttempt {
+  id: string;
+  ordinal: number;
+  source: string;
+  status: string;
+  stage: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  capturedAt: string;
+  errorCode: string | null;
+  errorMessage: string | null;
+  events: { stage: string; status: string; at: string; snapshot?: boolean }[];
+}
+
+export interface OperationsKnowledgeActivity {
+  daily: { date: string; inputTokens: number; indexingTokens: number; retrievalTokens: number; requests: number; missingUsage: number }[];
+  retrievals: OperationsPageResult<OperationsRetrievalRecord>;
+  asOf: string;
+}
+
+export interface OperationsRetrievalRecord {
+  id: string; runId: string | null; conversationId: string | null; agentId: string | null; source: string;
+  query: string; startedAt: string; durationMs: number; status: 'HIT' | 'NO_HIT' | 'FAILED';
+  hits: { chunkId: string; documentId: string; documentTitle: string; content: string; score: number; used: boolean | null }[];
+}
+
+export interface OperationsIntegrationActivity {
+  api: { total: number; failed: number; cancelled: number; averageDurationMs: number | null; byKey: { apiKeyId: string | null; name: string; total: number; failed: number; averageDurationMs: number | null }[] };
+  requests: OperationsPageResult<{ id: string; apiKeyId: string | null; agentId: string | null; conversationId: string | null; runId: string | null; startedAt: string; durationMs: number; status: string; httpStatus: number | null; path: string }>;
+  tools: OperationsPageResult<{ id: string; runId: string | null; conversationId: string | null; agentId: string | null; toolName: string; status: string; durationMs: number | null; startedAt: string; input: unknown; output: unknown; error: unknown }>;
+  workflows: OperationsPageResult<{ id: string; workflowId: string; name: string; status: string; startedAt: string; durationMs: number | null; input: unknown; output: unknown; nodeResults: unknown; error: unknown }>;
+  asOf: string;
+}
+
+export interface RuntimeStageView {
+  stageId: string;
+  kind: 'retrieval' | 'context' | 'model' | 'tool';
+  startedAt: string;
+  durationMs: number;
+  status: 'completed' | 'failed' | 'interrupted';
+  errorCode?: string;
+  round?: number;
+  model?: string;
+  outcome?: 'answer' | 'tool_calls';
+  chunkCount?: number;
+  toolCallId?: string;
+  toolName?: string;
+  usage?: { promptTokens: number; completionTokens: number; totalTokens: number };
+}
+

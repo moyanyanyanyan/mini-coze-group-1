@@ -93,7 +93,7 @@ export function KnowledgeView({
                     {sourceMode === 'text' ? (
                       <><label htmlFor="document-text">正文</label><textarea id="document-text" value={documentText} onChange={(event) => onDocumentTextChange(event.target.value)} rows={8} required placeholder="在此粘贴资料正文" /></>
                     ) : (
-                      <><label htmlFor="document-file">TXT / JSON 文件，最多 1 MB</label><input id="document-file" ref={fileInputRef} type="file" accept=".txt,.json" onChange={(event) => onDocumentFileChange(event.target.files?.[0] ?? null)} required /></>
+                      <><label htmlFor="document-file">TXT / JSON（1 MB），Markdown / CSV / HTML（2 MB），图片（5 MB），PDF / Word / Excel / PPT（20 MB）</label><input id="document-file" ref={fileInputRef} type="file" accept=".txt,.json,.md,.markdown,.csv,.html,.htm,.pdf,.docx,.xlsx,.pptx,.png,.jpg,.jpeg,.webp" onChange={(event) => onDocumentFileChange(event.target.files?.[0] ?? null)} required /><p>图片提取复用 OCR 与已配置的视觉服务；扫描 PDF 暂不支持 OCR。</p></>
                     )}
                     <button type="submit" disabled={documentSaving}>{documentSaving ? '提交中…' : '提交资料'}</button>
                   </form>

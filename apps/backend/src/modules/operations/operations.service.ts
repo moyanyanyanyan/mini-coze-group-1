@@ -3,8 +3,10 @@ import { Prisma } from '@prisma/client';
 import type {
   OperationsAgent, OperationsBase, OperationsConversations, OperationsDocuments,
   OperationsMessages, OperationsOverview, OperationsPageResult,
+  OperationsResources,
 } from '@minicoze/shared';
 import { PrismaService } from '../../prisma/prisma.service';
+import { serializeDocumentAttempt } from './collection/document-history.service';
 import { OperationsAgentsQuery, OperationsDocumentsQuery, OperationsPageQuery, OperationsSearchQuery } from './operations.dto';
 
 const order = [{ updatedAt: 'desc' }, { id: 'desc' }] as const;
@@ -13,7 +15,7 @@ const baseSelect = { createdAt: true, id: true, name: true, description: true, s
 const conversationSelect = { id: true, agentId: true, title: true, createdAt: true, updatedAt: true } as const;
 const documentSelect = {
   _count: { select: { operationAttempts: true } },
-  operationAttempts: { orderBy: { ordinal: 'desc' }, take: 1, select: { source: true, status: true } },
+  operationAttempts: { orderBy: { ordinal: 'desc' }, take: 1 },
   id: true, knowledgeBaseId: true, title: true, sourceType: true, originalFileName: true,
   status: true, stage: true, chunkCount: true, errorCode: true, errorMessage: true,
   createdAt: true, updatedAt: true,
@@ -32,6 +34,28 @@ function dates<T extends { createdAt: Date; updatedAt: Date }>(row: T) {
 @Injectable()
 export class OperationsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  resources(userId: string): Promise<OperationsResources> {
+    return this.read(async tx => {
+      const bindings = await tx.agentPluginBinding.findMany({ where: { agent: { ownerId: userId } }, select: { pluginId: true } });
+      const pluginScope = { pluginId: { in: [...new Set(bindings.map(item => item.pluginId))] } };
+      const workflowScope = { creatorId: userId, workspaceId: userId, status: { not: 'ARCHIVED' } };
+      const runScope = { userId, workflow: { creatorId: userId, workspaceId: userId } };
+      const keyScope = { createdById: userId, agent: { ownerId: userId } };
+      const [bound, enabledPlugins, connectionErrors, workflows, runs, failedRuns, activeKeys, revokedKeys, lastKey, models, enabledModels] = await Promise.all([
+        tx.plugin.count({ where: pluginScope }), tx.plugin.count({ where: { ...pluginScope, enabled: true } }),
+        tx.plugin.count({ where: { ...pluginScope, connectionStatus: 'error' } }),
+        tx.workflow.count({ where: workflowScope }), tx.workflowRun.count({ where: runScope }),
+        tx.workflowRun.count({ where: { ...runScope, status: 'FAILED' } }),
+        tx.apiKey.count({ where: { ...keyScope, revokedAt: null } }), tx.apiKey.count({ where: { ...keyScope, revokedAt: { not: null } } }),
+        tx.apiKey.findFirst({ where: { ...keyScope, lastUsedAt: { not: null } }, orderBy: { lastUsedAt: 'desc' }, select: { lastUsedAt: true } }),
+        tx.modelConfig.count({ where: { ownerId: userId } }), tx.modelConfig.count({ where: { ownerId: userId, enabled: true } }),
+      ]);
+      return { plugins: { bound, enabled: enabledPlugins, connectionErrors }, workflows: { total: workflows, runs, failedRuns },
+        apiKeys: { active: activeKeys, revoked: revokedKeys, lastUsedAt: lastKey?.lastUsedAt?.toISOString() ?? null },
+        models: { total: models, enabled: enabledModels }, asOf: new Date().toISOString() };
+    });
+  }
 
   // 同页列表、总数和汇总使用同一数据库快照，避免并发更新导致口径不一致。
   private read<T>(query: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
@@ -153,7 +177,8 @@ export class OperationsService {
       `) : [];
       const byId = new Map(sizes.map(row => [row.id, row.sourceSize]));
       return {
-        ...page(rows.map(({ errorCode, errorMessage, _count, operationAttempts, ...row }) => ({ ...dates(row), attempts: { recordedCount: _count?.operationAttempts ?? 0, latestSource: operationAttempts?.[0]?.source ?? '', latestStatus: operationAttempts?.[0]?.status ?? '' }, sourceSize: byId.get(row.id) ?? null, error: errorCode ? { code: errorCode, message: errorMessage } : null })), total, query), base,
+        ...page(rows.map(({ errorCode, errorMessage, _count, operationAttempts, ...row }) => ({ ...dates(row), latestAttempt: operationAttempts?.[0] ? serializeDocumentAttempt(operationAttempts[0]) : null,
+          attempts: { recordedCount: _count?.operationAttempts ?? 0, latestSource: operationAttempts?.[0]?.source ?? '', latestStatus: operationAttempts?.[0]?.status ?? '' }, sourceSize: byId.get(row.id) ?? null, error: errorCode ? { code: errorCode, message: errorMessage } : null })), total, query), base,
       };
     });
   }

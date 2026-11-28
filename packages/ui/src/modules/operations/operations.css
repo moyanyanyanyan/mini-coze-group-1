@@ -294,3 +294,6 @@
   .om :is(button, a):is(:hover, :active), .om :is(.om-attention, .om-k-errors article):has(a:active), .om tbody tr:hover td, .om :is(.om-attention, .om-k-errors article):hover { transform: none; }
   ::view-transition-group(operations-region), ::view-transition-old(operations-region), ::view-transition-new(operations-region) { animation: none; }
 }
+.om-resource-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.om-resource-grid > * > p, .om-resource-grid > * > a { margin: 16px; line-height: 1.7; }
+@media (max-width: 800px) { .om-resource-grid { grid-template-columns: 1fr; } }

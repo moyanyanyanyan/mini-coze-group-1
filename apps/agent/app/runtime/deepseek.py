@@ -50,9 +50,13 @@ def validate_model(value: ModelInput, settings: Settings, connection: ModelConne
         raise ModelError("MODEL_NOT_CONFIGURED", "模型服务未配置", 503)
 
 
-def check_budget(messages: list[ChatMessage], max_tokens: int, settings: Settings) -> None:
+def estimate_input(messages: list[ChatMessage]) -> int:
     # 以 UTF-8 字节数保守估计输入上界；不是供应商的精确 token 计数。
-    upper_bound = sum(len(m.content.encode("utf-8")) + 16 for m in messages) + 32
+    return sum(len(m.content.encode("utf-8")) + 16 for m in messages) + 32
+
+
+def check_budget(messages: list[ChatMessage], max_tokens: int, settings: Settings) -> None:
+    upper_bound = estimate_input(messages)
     if upper_bound + max_tokens > settings.context_token_limit:
         raise ModelError("INVALID_REQUEST", "上下文超出本服务预算，请缩短输入", 400)
 
@@ -103,7 +107,7 @@ def payload(value: ModelInput, stream: bool, settings: Settings, provider: str |
         body["enable_thinking"] = False
     elif active_provider == "deepseek":
         body["thinking"] = {"type": "disabled"}
-    if stream and active_provider == "deepseek":
+    if stream:
         body["stream_options"] = {"include_usage": True}
     return body
 

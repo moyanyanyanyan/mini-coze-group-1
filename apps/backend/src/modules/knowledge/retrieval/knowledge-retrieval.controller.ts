@@ -16,7 +16,7 @@ export class KnowledgeRetrievalController {
 
     const allowedIds = await this.access.allowedIds(input.actorId, input.agentId, input.knowledgeBaseIds);
     const data = allowedIds.length
-      ? await this.retrieval.searchAuthorized(allowedIds, input.query, input.topK)
+      ? await this.retrieval.searchAuthorized(allowedIds, input.query, input.topK, { ownerId: input.actorId, agentId: input.agentId, runId: input.runId, source: 'chat' })
       : { status: 'NO_HIT' as const, hits: [] };
     return { code: 200, message: 'ok', data };
   }

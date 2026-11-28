@@ -7,12 +7,12 @@ from datetime import datetime, timezone
 import httpx
 
 from app.config import Settings
-from app.runtime.deepseek import check_budget, stream_model, validate_model
+from app.runtime.deepseek import check_budget, estimate_input, stream_model, validate_model
 from app.runtime.tool_loop import check_tool_budget, stream_tool_loop
 from app.runtime.errors import ModelError
 from app.runtime.observations import StageRecorder
 from app.runtime.providers import KnowledgeContextProvider, PluginToolProvider, UnconfiguredKnowledgeProvider, UnconfiguredPluginProvider
-from app.runtime.schemas import ChatMessage, KnowledgeRequest, KnowledgeResult, ModelInput, RuntimeRequest, RuntimeResult
+from app.runtime.schemas import ChatMessage, ContextPreviewRequest, KnowledgeRequest, KnowledgeResult, ModelInput, RuntimeRequest, RuntimeResult
 
 logger = logging.getLogger(__name__)
 
@@ -42,16 +42,36 @@ class RuntimeService:
             prefix.append(ChatMessage(role="user", content=reference))
         history = [ChatMessage(role=m.role, content=m.content) for m in request.history]
         current = [ChatMessage(role="user", content=request.message)]
+        return self.fit_context(prefix, history, current, request.agentConfig.maxTokens)
+
+    def fit_context(self, prefix: list[ChatMessage], history: list[ChatMessage],
+                    current: list[ChatMessage], max_tokens: int) -> list[ChatMessage]:
         while True:
             messages = prefix + history + current
             try:
-                check_budget(messages, request.agentConfig.maxTokens, self.settings)
+                check_budget(messages, max_tokens, self.settings)
                 return messages
             except ModelError:
                 if not history:
                     raise
                 # 只能成对删除最旧历史，不丢失当前问题或系统约束。
                 history = history[2:]
+
+    def preview_context(self, request: ContextPreviewRequest) -> dict:
+        prefix = [ChatMessage(role="system", content=request.systemPrompt)] if request.systemPrompt else []
+        history = [ChatMessage(role=m.role, content=m.content) for m in request.history]
+        # 为尚未输入的当前消息预留协议开销；正文、检索和工具在实际发送时另计。
+        fitted = self.fit_context(prefix, history, [], request.maxTokens + 16)
+        retained = len(fitted) - len(prefix)
+        used = estimate_input(fitted) + 16
+        return {
+            "tokenLimit": self.settings.context_token_limit,
+            "estimatedInputTokens": used,
+            "reservedOutputTokens": request.maxTokens,
+            "remainingTokens": max(0, self.settings.context_token_limit - used - request.maxTokens),
+            "droppedTurns": (len(history) - retained) // 2,
+            "history": [m.model_dump() for m in request.history[len(history) - retained:]],
+        }
 
     async def events(self, request: RuntimeRequest) -> AsyncIterator[dict]:
         seq = 0

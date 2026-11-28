@@ -130,3 +130,7 @@
   .om-k-token { padding: 14px; }
   .om-k-error-bottom { flex-wrap: wrap; }
 }
+.om-file-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.om-file-actions button { min-height: 36px; cursor: pointer; }
+.om-file-actions button:disabled { cursor: default; opacity: .5; }
+.om img.om-k-image { display: block; max-height: 600px; object-fit: contain; cursor: default; }

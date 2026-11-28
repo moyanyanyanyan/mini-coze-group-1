@@ -77,14 +77,19 @@ export class PublicApiService {
     const { agent, conversationId } = await this.resolveInvocation(dto, principal);
 
     try {
-      return await this.chat.runOnce({
+      const result = await this.chat.runOnce({
         conversationId,
         userId: principal.userId,
         agentId: agent.agentId,
         message: dto.message,
         agentConfig: agent.config,
       });
+      const context = operationRequestContext.getStore();
+      if (context) context.businessStatus = 'completed';
+      return result;
     } catch (error) {
+      const context = operationRequestContext.getStore();
+      if (context) context.businessStatus = 'failed';
       throw this.toHttpError(error);
     }
   }
@@ -117,9 +122,13 @@ export class PublicApiService {
         agentId: plan.agentId,
         agentConfig: plan.agentConfig,
       })) {
+        const context = operationRequestContext.getStore();
+        if (context && (event.type === 'run.completed' || event.type === 'run.failed')) context.businessStatus = event.type === 'run.completed' ? 'completed' : 'failed';
         yield this.projectPublicEvent(event);
       }
     } catch (error) {
+      const context = operationRequestContext.getStore();
+      if (context) context.businessStatus = signal.aborted ? 'cancelled' : 'failed';
       throw this.toHttpError(error);
     }
   }
@@ -229,3 +238,4 @@ export class PublicApiService {
     return new HttpException('运行服务异常', HttpStatus.INTERNAL_SERVER_ERROR);
   }
 }
+import { operationRequestContext } from '../operations/collection/request-context';

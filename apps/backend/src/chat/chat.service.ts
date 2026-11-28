@@ -6,6 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import type { ConversationMemory } from '@minicoze/shared';
 import type { Prisma } from '@prisma/client';
 import { ErrorCode } from '../common/errors/error-codes';
 import { PrismaService } from '../prisma/prisma.service';
@@ -110,6 +111,19 @@ export class ChatService {
 
   async assertReady(): Promise<void> {
     await this.runtime.assertReady();
+  }
+
+  async memory(conversationId: string, userId: string): Promise<ConversationMemory> {
+    const conversation = await this.conversations.assertOwned(conversationId, userId);
+    if (!conversation.agentId) throw new HttpException('请先选择智能体', HttpStatus.BAD_REQUEST);
+    const config = await this.agents.getAgentConfig(conversation.agentId, userId);
+    const configuredTurns = config.contextLimit ?? MAX_HISTORY_TURNS;
+    const effectiveTurns = Math.min(configuredTurns, MAX_HISTORY_TURNS);
+    const history = await this.buildHistory(conversationId, effectiveTurns, []);
+    const preview = await this.runtime.previewContext({ systemPrompt: config.systemPrompt, maxTokens: config.maxTokens, history });
+    const retainedTurns = preview.history.length / 2;
+    return { ...preview, conversationId, systemPrompt: config.systemPrompt, configuredTurns, effectiveTurns,
+      retainedTurns, availableTurns: Math.max(0, effectiveTurns - retainedTurns), asOf: new Date().toISOString() };
   }
 
   release(conversationId: string): void {

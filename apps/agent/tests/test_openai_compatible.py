@@ -37,7 +37,7 @@ def test_generic_gateway_stream_uses_standard_fields():
             body = json.loads(request.content)
             assert body["stream"] is True
             assert "thinking" not in body and "enable_thinking" not in body
-            assert "stream_options" not in body
+            assert body["stream_options"] == {"include_usage": True}
             events = [
                 {"choices": [{"delta": {"content": "测试成功"}, "finish_reason": None}]},
                 {"choices": [{"delta": {}, "finish_reason": "stop"}]},

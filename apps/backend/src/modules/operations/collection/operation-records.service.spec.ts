@@ -2,7 +2,7 @@ import { NotFoundException } from '@nestjs/common';
 import { OperationRecordsService } from './operation-records.service';
 
 function setup() {
-  const tx = { operationRuntimeRun: { findMany: jest.fn().mockResolvedValue([]), findFirst: jest.fn().mockResolvedValue(null), count: jest.fn().mockResolvedValue(0), updateMany: jest.fn().mockResolvedValue({ count: 0 }) }, conversation: { findFirst: jest.fn().mockResolvedValue(null) }, message: { findMany: jest.fn().mockResolvedValue([]), findFirst: jest.fn().mockResolvedValue(null) } };
+  const tx = { operationTelemetry: { findMany: jest.fn().mockResolvedValue([]) }, operationRuntimeRun: { findMany: jest.fn().mockResolvedValue([]), findFirst: jest.fn().mockResolvedValue(null), count: jest.fn().mockResolvedValue(0), updateMany: jest.fn().mockResolvedValue({ count: 0 }) }, conversation: { findFirst: jest.fn().mockResolvedValue(null) }, message: { findMany: jest.fn().mockResolvedValue([]), findFirst: jest.fn().mockResolvedValue(null) } };
   const prisma = { ...tx, $transaction: jest.fn(async (fn: (value: typeof tx) => unknown) => fn(tx)) };
   return { tx, service: new OperationRecordsService(prisma as never) };
 }
@@ -20,7 +20,7 @@ describe('Runtime 记录权限和状态', () => {
   it('列表仅本人记录，详情越权返回 404', async () => {
     const { tx, service } = setup();
     await service.list('owner', { page: 1, pageSize: 20 });
-    expect(tx.operationRuntimeRun.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: 'owner', conversation: { userId: 'owner' }, conversationId: undefined }, omit: { events: true } }));
+    expect(tx.operationRuntimeRun.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: 'owner', conversation: { userId: 'owner' }, conversationId: undefined }, include: { conversation: { select: { title: true } } } }));
     await expect(service.detail('owner', 'other-run')).rejects.toBeInstanceOf(NotFoundException);
     expect(tx.operationRuntimeRun.findFirst).toHaveBeenCalledWith({ where: { id: 'other-run', userId: 'owner', conversation: { userId: 'owner' } } });
   });

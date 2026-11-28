@@ -78,6 +78,14 @@ def test_tool_roundtrip_and_usage(settings,body):
     assert events[-1]['data']['toolResults'][0]['status']=='succeeded'
 
 
+def test_partial_round_usage_is_not_reported_as_the_full_run(settings, body):
+    missing_usage_answer = wire([{'choices': [{'delta': {'content': '回答'}, 'finish_reason': 'stop'}]}])
+    events, _, _ = run(settings, body, [tool_stream(), missing_usage_answer])
+    assert events[-1]['type'] == 'run.completed'
+    assert events[-1]['data']['usage'] is None
+    assert next(stage for stage in events[-1]['data']['stages'] if stage['kind'] == 'model')['usage']['totalTokens'] == 15
+
+
 @pytest.mark.parametrize('calls,code',[
     ([('c','unbound_tool','{}')],'TOOL_FORBIDDEN'),
     ([('c','echo_text','{bad')],'TOOL_INVALID_ARGUMENTS'),

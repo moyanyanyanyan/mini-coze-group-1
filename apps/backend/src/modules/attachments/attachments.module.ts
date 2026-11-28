@@ -2,13 +2,11 @@ import { Module } from '@nestjs/common';
 import { ConversationsModule } from '../conversations/conversations.module';
 import { AttachmentsController } from './attachments.controller';
 import { AttachmentsService } from './attachments.service';
-import { OcrClient } from './ocr.client';
-import { VisionClient } from './vision.client';
-import { AttachmentParserRegistry } from './parsers/parser.registry';
+import { AttachmentParsingModule } from './attachment-parsing.module';
 
 @Module({
-  imports: [ConversationsModule],
+  imports: [ConversationsModule, AttachmentParsingModule],
   controllers: [AttachmentsController],
-  providers: [AttachmentsService, AttachmentParserRegistry, OcrClient, VisionClient],
+  providers: [AttachmentsService],
 })
 export class AttachmentsModule {}

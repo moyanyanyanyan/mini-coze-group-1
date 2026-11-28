@@ -14,6 +14,7 @@ import { Breadcrumbs, PageHeader, OperationsLoader } from './components';
 import { Overview } from './Overview';
 import { Agents, Conversations, Conversation } from './AgentOperations';
 import { Knowledge, Base, Document } from './KnowledgeOperations';
+import { ResourceOperations } from './ResourceOperations';
 import type { OperationsViewProps, ContentProps } from './view-types';
 import './operations.css';
 import './source-ui.css';
@@ -30,7 +31,7 @@ export function OperationsView(props: OperationsViewProps) {
   const items: [string, string][] =
     route.page === 'overview'
       ? [['首页', '']]
-      : [
+      : route.page === 'resources' ? [['集成与调用', '']] : [
           [
             isKnowledge ? '知识库' : 'Agent 聊天',
             `${operationsRoot}/${isKnowledge ? 'knowledge' : 'agents'}`,
@@ -44,6 +45,7 @@ export function OperationsView(props: OperationsViewProps) {
   };
   let content: ReactNode;
   if (route.page === 'overview') content = <Overview {...p} />;
+  else if (route.page === 'resources') content = <ResourceOperations {...p} />;
   else if (route.page === 'agents') content = <Agents {...p} />;
   else if (route.page === 'knowledge') content = <Knowledge {...p} />;
   else if (route.page === 'conversations' || route.page === 'conversation') {
@@ -93,10 +95,10 @@ export function OperationsView(props: OperationsViewProps) {
   const activeSection =
     route.page === 'overview'
       ? operationsRoot
-      : isKnowledge
+      : route.page === 'resources' ? operationsRoot + '/resources' : isKnowledge
         ? operationsRoot + '/knowledge'
         : operationsRoot + '/agents';
-  const timed = ['agents', 'conversations'].includes(route.page) || (route.page === 'base' && new URLSearchParams(props.search).get('tab') === 'retrieval');
+  const timed = ['agents', 'conversations'].includes(route.page);
   return (
     <div className={route.page === 'overview' ? 'om om-overview' : 'om'} aria-busy={props.loading || undefined}>
       <header className="om-navigation">
@@ -107,6 +109,7 @@ export function OperationsView(props: OperationsViewProps) {
               ['首页', operationsRoot, 'home'],
               ['Agent 聊天', operationsRoot + '/agents', 'chat'],
               ['知识库', operationsRoot + '/knowledge', 'book'],
+              ['集成与调用', operationsRoot + '/resources', 'plug'],
             ] as const
           ).map(([label, href, icon]) => {
             const selected = href === activeSection;
@@ -130,7 +133,7 @@ export function OperationsView(props: OperationsViewProps) {
       <section className="om-content" aria-label="运行管理内容">
         <div className="om-topline">
           <Breadcrumbs items={items} LinkComponent={L} />
-          {!data.connected && <span className="om-demo">示例数据</span>}
+          {!data.connected && <span className="om-demo">数据未连接</span>}
         </div>
         <div className="om-top-actions">
           {timed && (
@@ -146,8 +149,7 @@ export function OperationsView(props: OperationsViewProps) {
           <span role="status">{data.connected ? '更新于' : '查看于'} {time(data.connected ? data.snapshotAt : refreshedAt)}</span>
         </div>
         {props.error && <p role="alert">{props.error} <button className="om-primary" onClick={props.onRefresh} disabled={props.loading}>重试</button></p>}
-        {data.connected && !isKnowledge && (data.loadedRuns ?? 0) < (data.totalRuns ?? 0) &&
-          <button className="om-primary" disabled={props.loading} onClick={props.onMoreRuns}>加载更多记录</button>}
+        {props.actionMessage && <p role="status">{props.actionMessage}</p>}
         {content ?? (
           <>
             <PageHeader title="记录不存在" description="请检查链接，或返回运行管理查看已有记录。" />

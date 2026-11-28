@@ -205,6 +205,7 @@ async def run_node(node, run, outputs, previous, parent, iteration):
     if parent:
         record.update(parentId=parent, iteration=iteration)
     started = time.monotonic()
+    deadline_guard = None
     try:
         run.steps += 1
         if run.steps > MAX_STEPS:
@@ -232,10 +233,9 @@ async def run_node(node, run, outputs, previous, parent, iteration):
                 record["input"] = {"count": data["count"]}
             output = await run_loop(node, run, outputs, items)
         else:
-            output = await asyncio.wait_for(
-                EXECUTORS[kind].execute(data, run.values, outputs, run.runtime),
-                run.deadline - started,
-            )
+            deadline_guard = asyncio.timeout(run.deadline - started)
+            async with deadline_guard:
+                output = await EXECUTORS[kind].execute(data, run.values, outputs, run.runtime)
     except Stop:
         # 循环体内节点已记录自身错误，循环节点只标记为失败。
         record["error"] = dict(code="NODE_EXECUTION_FAILED", message="循环体执行失败")
@@ -246,7 +246,8 @@ async def run_node(node, run, outputs, previous, parent, iteration):
             code = "WORKFLOW_STEP_LIMIT_EXCEEDED"
         elif isinstance(exc, (TimeoutError, asyncio.TimeoutError)):
             code = (
-                "WORKFLOW_TIMEOUT" if time.monotonic() >= run.deadline else "LLM_TIMEOUT"
+                # 用超时上下文本身判断来源，避免 Windows 定时器提前唤醒时误归为模型超时。
+                "WORKFLOW_TIMEOUT" if (deadline_guard is not None and deadline_guard.expired()) or time.monotonic() >= run.deadline else "LLM_TIMEOUT"
             )
         elif kind == "llm":
             code = "LLM_UNAVAILABLE"

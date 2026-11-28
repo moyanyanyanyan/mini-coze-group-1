@@ -9,7 +9,7 @@ export class KnowledgePreviewService {
   constructor(private readonly prisma: PrismaService, private readonly retrieval: KnowledgeRetrievalService) {}
 
   async listChunks(knowledgeBaseId: string, documentId: string, workspaceId: string, page: number) {
-    await this.assertBase(knowledgeBaseId, workspaceId);
+    await this.assertBase(knowledgeBaseId, workspaceId, false);
     const document = await this.prisma.knowledgeDocument.findFirst({
       where: { id: documentId, knowledgeBaseId }, select: { id: true },
     });
@@ -27,11 +27,11 @@ export class KnowledgePreviewService {
 
   async search(knowledgeBaseId: string, workspaceId: string, query: string) {
     await this.assertBase(knowledgeBaseId, workspaceId);
-    return this.retrieval.searchAuthorized([knowledgeBaseId], query, 5);
+    return this.retrieval.searchAuthorized([knowledgeBaseId], query, 5, { ownerId: workspaceId, source: 'preview' });
   }
 
-  private async assertBase(id: string, workspaceId: string) {
+  private async assertBase(id: string, workspaceId: string, requireActive = true) {
     const base = await this.prisma.knowledgeBase.findUnique({ where: { id }, select: { workspaceId: true, status: true } });
-    if (!base || base.workspaceId !== workspaceId || base.status !== 'ACTIVE') {throw new NotFoundException('知识库不存在或不可用');}
+    if (!base || base.workspaceId !== workspaceId || (requireActive && base.status !== 'ACTIVE')) {throw new NotFoundException('知识库不存在或不可用');}
   }
 }

@@ -9,7 +9,7 @@ function createService() {
     $queryRaw: jest.fn(),
   };
   const embedding = { embed: jest.fn() };
-  return { service: new KnowledgeRetrievalService(prisma as never, embedding as never), prisma, embedding };
+  return { service: new KnowledgeRetrievalService(prisma as never, embedding as never, { record: jest.fn() } as never), prisma, embedding };
 }
 
 describe('KnowledgeRetrievalService', () => {

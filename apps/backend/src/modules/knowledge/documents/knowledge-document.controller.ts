@@ -1,16 +1,25 @@
-import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, Post, Query, Req, StreamableFile, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request } from 'express';
 import { CreateTextDocumentDto } from '../dto/create-text-document.dto';
 import { resolveKnowledgeWorkspace } from '../knowledge-local-access';
 import { KnowledgeWorkspaceGuard } from '../knowledge-workspace.guard';
-import { MAX_DOCUMENT_BYTES } from './document-content';
+import { MAX_KNOWLEDGE_UPLOAD_BYTES } from './document-content';
 import { KnowledgeDocumentService } from './knowledge-document.service';
+import { isImageType, mimeTypeFor } from '../../attachments/parsers/file-type';
+import type { AttachmentSourceType } from '../../attachments/attachment.types';
 
 @Controller()
 @UseGuards(KnowledgeWorkspaceGuard)
 export class KnowledgeDocumentController {
   constructor(private readonly documents: KnowledgeDocumentService) {}
+
+  @Get('documents/:id/file')
+  async original(@Req() request: Request, @Param('id') id: string, @Query('workspaceId') workspaceId: string, @Query('inline') inline?: string) {
+    const file = await this.documents.original(id, resolveKnowledgeWorkspace(request, workspaceId));
+    const canPreview = inline === '1' && (file.sourceType === 'PDF' || isImageType(file.sourceType as AttachmentSourceType));
+    return new StreamableFile(file.bytes, { type: canPreview ? mimeTypeFor(file.sourceType as AttachmentSourceType) : 'application/octet-stream', disposition: `${canPreview ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(file.filename).replace(/'/g, '%27')}`, length: file.bytes.length });
+  }
 
   @Get('knowledge-bases/:id/documents')
   async list(@Req() request: Request, @Param('id') id: string, @Query('workspaceId') workspaceId: string) {
@@ -42,7 +51,7 @@ export class KnowledgeDocumentController {
 
   @Post('knowledge-bases/:id/documents/files')
   @HttpCode(202)
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_DOCUMENT_BYTES } }))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_KNOWLEDGE_UPLOAD_BYTES } }))
   async createFile(@Req() request: Request, @Param('id') id: string, @Body() body: { workspaceId?: string; title?: string }, @UploadedFile() file?: { originalname: string; buffer: Buffer; size: number }) {
     if (typeof body.workspaceId !== 'string' || (body.title !== undefined && typeof body.title !== 'string')) {
       throw new BadRequestException('上传字段格式无效');

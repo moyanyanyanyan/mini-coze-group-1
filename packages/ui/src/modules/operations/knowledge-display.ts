@@ -4,6 +4,18 @@ import {
   type OperationTask,
   type OperationsData,
 } from "./model";
+import type { OperationsDocumentAttempt } from './records';
+
+export function documentStages(attempt?: OperationsDocumentAttempt) {
+  if (!attempt) return [];
+  return attempt.events.flatMap((event, index) => {
+    if (event.snapshot || event.status !== 'PROCESSING' || event.stage === 'COMPLETED') return [];
+    const next = attempt.events.slice(index + 1).find(item => item.stage !== event.stage || item.status !== 'PROCESSING');
+    const durationMs = next ? Math.max(0, Date.parse(next.at) - Date.parse(event.at)) : null;
+    const status = next ? next.status === 'FAILED' && next.stage === event.stage ? 'failed' as const : 'success' as const : attempt.status === 'PROCESSING' ? 'running' as const : 'interrupted' as const;
+    return [{ name: stageNames[event.stage] ?? event.stage, status, durationMs, description: `进入于 ${new Date(event.at).toLocaleString('zh-CN')}` }];
+  });
+}
 
 export function fileType(document: OperationDocument) {
   const name = document.observed?.originalFileName || document.name;
@@ -21,6 +33,12 @@ export function fileType(document: OperationDocument) {
         json: "JSON",
         doc: "Word",
         docx: "Word",
+        xlsx: "Excel",
+        csv: "CSV",
+        pptx: "PowerPoint",
+        html: "HTML",
+        htm: "HTML",
+        markdown: "Markdown",
         mp3: "音频",
         wav: "音频",
       } as Record<string, string>
@@ -90,9 +108,9 @@ export function taskState(task?: OperationTask) {
   return `${stage ?? "处理"}中`;
 }
 
-// 旧接口没有字节数时保留示例；零字节是有效的实际值。
+// 实际文件缺少原始字节时不以演示容量补位；零字节是有效值。
 export function displaySize(document: OperationDocument) {
-  return document.observed?.sourceSize ?? document.sourceBytes;
+  return document.observed ? document.observed.sourceSize ?? 0 : document.sourceBytes;
 }
 
 export function baseFiles(data: OperationsData, id: string) {
@@ -103,15 +121,14 @@ export function baseFiles(data: OperationsData, id: string) {
 
 export function originalText(document: OperationDocument) {
   if (document.parsedText != null) return document.parsedText;
-  if (document.observed)
-    return "模拟解析文本 · 非当前文件内容\n\n这里展示文件解析／OCR 后的文本样式。当前文档尚无可读取的解析文本，以下内容仅为示例。";
-  // 模拟切片存在重叠，按原始字符位置还原，避免重复拼接。
+  if (document.observed) return '';
+  // 切片存在重叠，按原始字符位置还原，避免重复拼接。
   let text = "";
   for (const chunk of [...document.chunks].sort((a, b) => a.start - b.start)) {
     if (chunk.start > text.length) break;
     text += chunk.content.slice(Math.max(0, text.length - chunk.start));
   }
-  return text || "模拟文件预览\n\n这是一份用于演示原文件预览的资料。";
+  return text;
 }
 
 export function groupShares(

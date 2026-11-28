@@ -10,6 +10,7 @@ vi.mock('react', async importOriginal => ({
 }));
 vi.mock('../auth/api/auth-api', () => ({ getMe: vi.fn() }));
 vi.mock('./operations.api', () => ({ loadOperations: vi.fn() }));
+vi.mock('@minicoze/ui/hooks', () => ({ useConfirm: () => ({ confirm: vi.fn(), confirmation: null }) }));
 vi.mock('../../shared/routing/navigation', () => ({
   navigate: vi.fn(), useRouteLocation: () => '/workspace/operations',
 }));

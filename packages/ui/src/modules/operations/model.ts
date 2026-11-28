@@ -1,5 +1,7 @@
-import type { OperationsDocumentAttempt, OperationsPageResult } from '../../../../shared/src/operations';
-import type { OperationsRuntimeRun, OperationsRuntimeDetail, OperationsRuntimeStats, OperationsBase, OperationsDocument } from '../../../../shared/src/operations';
+import type { OperationsResources, OperationsDocumentAttempt, OperationsPageResult, OperationsKnowledgeActivity, OperationsIntegrationActivity } from './records';
+import type { OperationsRuntimeRun, OperationsRuntimeDetail, OperationsRuntimeStats, OperationsBase, OperationsDocument } from './records';
+import type { ConversationMemoryData as ConversationMemory } from '../agent-chat/types';
+import type { RuntimeStageView } from './records';
 export type RunStatus = 'success' | 'warning' | 'failed' | 'running' | 'cancelled' | 'interrupted';
 export type TaskStatus = 'ready' | 'processing' | 'failed';
 export interface OperationAgent {
@@ -24,6 +26,7 @@ export interface OperationChunk {
   end: number;
 }
 export interface OperationDocument {
+  downloadUrl?: string;
   history?: OperationsPageResult<OperationsDocumentAttempt>;
   parsedText?: string | null;
   observed?: OperationsDocument;
@@ -37,7 +40,7 @@ export interface OperationStage {
   id?: string;
   name: string;
   status: 'success' | 'failed' | 'pending' | 'running' | 'interrupted';
-  durationMs: number;
+  durationMs: number | null;
   description: string;
 }
 export interface OperationTask {
@@ -74,17 +77,17 @@ export interface OperationPlugin {
   output: Record<string, string>;
 }
 export interface OperationRun {
-  observed?: OperationsRuntimeRun & { events?: OperationsRuntimeDetail['events'] };
+  observed?: OperationsRuntimeRun & { events?: OperationsRuntimeDetail['events']; stages?: RuntimeStageView[] };
   id: string;
   conversationId: string;
   startedAt: number;
   status: RunStatus;
   question: string;
   answer: string;
-  durationMs: number;
+  durationMs: number | null;
   firstTokenMs: number | null;
-  inputTokens: number;
-  outputTokens: number;
+  inputTokens: number | null;
+  outputTokens: number | null;
   retrievals: OperationRetrieval[];
   plugin?: OperationPlugin;
   stages: OperationStage[];
@@ -93,16 +96,20 @@ export interface OperationConversation {
   id: string;
   agentId: string;
   title: string;
-  source: '平台聊天' | 'SDK/API' | '未采集';
+  source: '平台聊天' | 'SDK/API' | '历史未记录' | '混合来源';
   actor: string;
 }
 export interface OperationsData {
-  examples?: OperationsData;
+  knowledgeActivity?: OperationsKnowledgeActivity;
+  integrationActivity?: OperationsIntegrationActivity;
+  resources?: OperationsResources;
+  memory?: ConversationMemory;
+  memoryError?: string;
   connected?: boolean;
   runtimeStats?: OperationsRuntimeStats;
   loadedRuns?: number;
   totalRuns?: number;
-  messages?: { id: string; role: string; content: string; status: string }[];
+  messages?: { id: string; role: string; content: string; status: string; seq?: number }[];
   agents: OperationAgent[];
   bases: OperationBase[];
   documents: OperationDocument[];
@@ -112,7 +119,7 @@ export interface OperationsData {
   snapshotAt: number;
 }
 export type OperationsRoute =
-  | { page: 'overview' | 'agents' | 'knowledge' }
+  | { page: 'overview' | 'agents' | 'knowledge' | 'resources' }
   | { page: 'conversations'; agentId: string }
   | { page: 'conversation'; agentId: string; conversationId: string }
   | { page: 'base'; baseId: string }
@@ -130,6 +137,7 @@ export function parseOperationsRoute(pathname: string): OperationsRoute {
   const parts = pathname.slice(operationsRoot.length).split('/').filter(Boolean);
   if (!pathname.startsWith(operationsRoot)) return { page: 'not-found' };
   if (!parts.length) return { page: 'overview' };
+  if (parts.length === 1 && parts[0] === 'resources') return { page: 'resources' };
   if (parts[0] === 'agents') {
     if (parts.length === 1) return { page: 'agents' };
     if (parts.length === 2) return { page: 'conversations', agentId: parts[1] };
@@ -148,7 +156,7 @@ export function parseOperationsRoute(pathname: string): OperationsRoute {
 export const byteLength = (text: string) => new TextEncoder().encode(text).length;
 export const chunkBytes = (chunks: OperationChunk[]) =>
   chunks.reduce((n, c) => n + byteLength(c.content), 0);
-export const duration = (ms: number) => (ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(2)} s`);
+export const duration = (ms: number | null) => ms === null ? '历史未记录' : (ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(2)} s`);
 export const bytes = (n: number) =>
   n < 1000
     ? `${n} B`
@@ -169,7 +177,7 @@ export function runSummary(runs: OperationRun[]) {
     warnings: runs.filter((r) => r.status === 'warning').length,
     rate: finished.length ? `${(((finished.length - failed) / finished.length) * 100).toFixed(1)}%` : '—',
     average: timed.length
-      ? duration(Math.round(timed.reduce((n, r) => n + r.durationMs, 0) / timed.length))
+      ? duration(Math.round(timed.reduce((n, r) => n + (r.durationMs ?? 0), 0) / timed.length))
       : '—',
   };
 }

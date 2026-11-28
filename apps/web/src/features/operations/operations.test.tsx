@@ -18,6 +18,10 @@ import { createOperationsMock } from './operations.mock';
 
 const now = Date.parse('2026-11-14T14:35:00+08:00');
 const data = createOperationsMock(now);
+for (const document of data.documents) {
+  document.downloadUrl = '/api/documents/' + document.id + '/file?workspaceId=owner';
+  document.parsedText = document.chunks.map(chunk => chunk.content).join('\n');
+}
 function Link({ to, ...props }: AnchorHTMLAttributes<HTMLAnchorElement> & { to: string }) {
   return <a href={to} {...props} />;
 }
@@ -43,7 +47,7 @@ describe('运行管理模拟数据与统计', () => {
   it('每次检索的文档和切片属于其知识库，并关联到有效会话', () => {
     for (const run of data.runs) {
       expect(data.conversations.some((c) => c.id === run.conversationId)).toBe(true);
-      expect(run.durationMs).toBe(run.stages.reduce((sum, s) => sum + s.durationMs, 0));
+      expect(run.durationMs).toBe(run.stages.reduce((sum, s) => sum + (s.durationMs ?? 0), 0));
       for (const retrieval of run.retrievals) {
         for (const hit of retrieval.hits) {
           const document = data.documents.find((d) => d.id === hit.documentId)!;
@@ -107,24 +111,24 @@ describe('运行管理页面与边界', () => {
   it('智能体列表每条记录链接自己的会话列表', () => {
     const html = render(`${operationsRoot}/agents`);
     for (const agent of data.agents) expect(html).toContain(`href="${agentPath(agent.id)}"`);
-    expect(html).toContain('示例数据');
+    expect(html).toContain('数据未连接');
   });
 
   it('失败与完成但有异常分别显示，未命中不是失败', () => {
     const warning = render(conversationPath('agent-1', 'conversation-1-1'), 'run=run-1-1-2');
-    expect(warning).toContain('回答已完成，存在节点异常');
-    expect(warning).toContain('node=plugin');
+    expect(warning).toContain('完成，有异常');
+    expect(warning).toContain('此记录没有实际执行链路');
     const failure = render(conversationPath('agent-1', 'conversation-1-5'));
-    expect(failure).toContain('本轮执行失败');
+    expect(failure).toContain('失败');
     const noHit = render(conversationPath('agent-1', 'conversation-1-7'), 'node=knowledge');
-    expect(noHit).toContain('检索正常执行，但未返回相关切片');
+    expect(noHit).toContain('此记录没有实际执行链路');
   });
 
   it('文件处理失败仍展示上传成功，处理中不会显示可检索结果', () => {
     const failure = render(taskPath('kb-1', 'task-1-3'));
-    expect(failure).toContain('文件接收成功');
+    expect(failure).not.toContain('文件接收成功');
     expect(failure).toContain('向量化服务暂时不可用');
-    expect(failure).toContain('未执行');
+    expect(failure).toContain('历史未记录完整阶段');
     const processing = render(taskPath('kb-1', 'task-1-4'));
     expect(processing).toContain('正在生成向量');
     expect(processing).toContain('已生成，尚未入库');
@@ -170,7 +174,7 @@ describe('会话执行详情渐进展开', () => {
     expect(html).toContain('第 2 轮 · 执行链路');
     expect(html).toContain('aria-expanded="true"');
     expect(html).toContain('aria-label="返回对话记录"');
-    expect(html).toContain('回答已完成，存在节点异常');
+    expect(html).toContain('完成，有异常');
   });
 });
 
@@ -180,12 +184,12 @@ describe('知识库运行三层界面', () => {
     expect(html).toContain('文件存储分布');
     expect(html).toContain('最近错误记录');
     expect(html).toContain('知识库名称搜索');
-    expect(html).toContain('模拟容量');
+    expect(html).toContain('部分大小未记录');
     expect(html).toContain(`${taskPath('kb-2', 'task-demo-upload')}?focus=error`);
   });
   it('上传失败无原文件与切片，切片失败仍能预览原文件', () => {
     const upload = render(taskPath('kb-2', 'task-demo-upload'));
-    expect(upload).toContain('原文件不可用');
+    expect(upload).not.toContain('/operations-samples/');
     expect(upload).not.toContain('om-k-pdf');
     expect(render(taskPath('kb-2', 'task-demo-upload'), 'tab=chunks')).toContain('文件上传失败，未生成切片内容');
     const chunk = render(taskPath('kb-2', 'task-demo-chunk'));
@@ -193,8 +197,8 @@ describe('知识库运行三层界面', () => {
     expect(chunk).toContain('CHUNKING_FAILED');
   });
   it('PDF、图片使用不同预览，历史失败保留跳转最新处理的入口', () => {
-    expect(render(taskPath('kb-1', 'task-1-5'))).toContain('模拟 PDF 文件预览');
-    expect(render(taskPath('kb-1', 'task-1-6'))).toContain('/operations-samples/document.svg');
+    expect(render(taskPath('kb-1', 'task-1-5'))).toContain('/api/documents/doc-1-5/file?workspaceId=owner&amp;inline=1');
+    expect(render(taskPath('kb-1', 'task-1-6'))).toContain('/api/documents/doc-1-6/file?workspaceId=owner&amp;inline=1');
     const history = render(taskPath('kb-1', 'task-1-2-attempt-1'));
     expect(history).toContain('正在查看历史处理记录');
     expect(history).toContain(taskPath('kb-1', 'task-1-2'));

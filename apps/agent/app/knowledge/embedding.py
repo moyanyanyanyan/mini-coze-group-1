@@ -31,8 +31,11 @@ def load_model():
 def embed_texts(texts: list[str]) -> dict:
     model = load_model()
     vectors = model.encode(texts, normalize_embeddings=True, convert_to_numpy=True)
+    # 与 encode 共用实际 tokenizer 和截断配置，统计本地模型处理的输入 Token。
+    input_tokens = int(model.tokenize(texts)["attention_mask"].sum().item())
     return {
         "model": f"{get_settings().embedding_model}@{get_settings().embedding_model_revision}",
         "dimension": EMBEDDING_DIMENSION,
         "vectors": vectors.tolist(),
+        "usage": {"inputTokens": input_tokens},
     }

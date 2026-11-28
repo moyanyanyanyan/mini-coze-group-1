@@ -1,4 +1,7 @@
 import { Injectable } from '@nestjs/common';
+import { OperationTelemetryService } from '../modules/operations/collection/telemetry.service';
+
+export interface EmbeddingScope { ownerId: string; source: 'indexing' | 'retrieval'; knowledgeBaseIds: string[]; documentId?: string; agentId?: string; runId?: string; }
 
 export const EMBEDDING_DIMENSION = 512;
 const BATCH_SIZE = 16;
@@ -9,7 +12,9 @@ export class EmbeddingUnavailableError extends Error {
 
 @Injectable()
 export class EmbeddingClient {
-  async embed(texts: string[]): Promise<{ model: string; vectors: number[][] }> {
+  constructor(private readonly telemetry: OperationTelemetryService) {}
+
+  async embed(texts: string[], scope?: EmbeddingScope): Promise<{ model: string; vectors: number[][] }> {
     const serviceUrl = process.env.AGENT_SERVICE_URL;
     const token = process.env.INTERNAL_SERVICE_TOKEN;
     const expectedModel = process.env.EMBEDDING_MODEL ?? 'BAAI/bge-small-zh-v1.5';
@@ -18,6 +23,7 @@ export class EmbeddingClient {
 
     const vectors: number[][] = [];
     for (let start = 0; start < texts.length; start += BATCH_SIZE) {
+      const startedAt = new Date();
       let response: Response;
       try {
         response = await fetch(new URL('/internal/knowledge/embeddings', serviceUrl), {
@@ -37,14 +43,19 @@ export class EmbeddingClient {
         throw new EmbeddingUnavailableError();
       }
       vectors.push(...body.vectors);
+      if (scope) await this.telemetry.record({ ownerId: scope.ownerId, kind: 'embedding', status: 'completed', startedAt,
+        durationMs: Date.now() - startedAt.getTime(), knowledgeBaseId: scope.knowledgeBaseIds.length === 1 ? scope.knowledgeBaseIds[0] : null,
+        documentId: scope.documentId, runId: scope.runId, agentId: scope.agentId, itemCount: body.vectors.length,
+        inputTokens: body.usage?.inputTokens ?? null, data: { baseIds: scope.knowledgeBaseIds, source: scope.source, model: body.model } });
     }
     return { model: `${expectedModel}@${expectedRevision}`, vectors };
   }
 }
 
-function isEmbeddingResponse(value: unknown, model: string, count: number): value is { model: string; dimension: number; vectors: number[][] } {
+function isEmbeddingResponse(value: unknown, model: string, count: number): value is { model: string; dimension: number; vectors: number[][]; usage?: { inputTokens: number } } {
   if (typeof value !== 'object' || value === null) {return false;}
   const result = value as Record<string, unknown>;
+  if (result.usage !== undefined && (typeof result.usage !== 'object' || result.usage === null || !Number.isSafeInteger((result.usage as Record<string, unknown>).inputTokens) || Number((result.usage as Record<string, unknown>).inputTokens) < 0)) return false;
   return result.model === model && result.dimension === EMBEDDING_DIMENSION &&
     Array.isArray(result.vectors) && result.vectors.length === count &&
     result.vectors.every((vector: unknown) => Array.isArray(vector) && vector.length === EMBEDDING_DIMENSION &&

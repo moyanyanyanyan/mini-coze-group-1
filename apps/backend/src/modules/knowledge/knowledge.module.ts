@@ -10,8 +10,11 @@ import { KnowledgeRetrievalAccess } from './retrieval/knowledge-retrieval-access
 import { KnowledgePreviewController } from './preview/knowledge-preview.controller';
 import { KnowledgePreviewService } from './preview/knowledge-preview.service';
 import { KnowledgeWorkspaceGuard } from './knowledge-workspace.guard';
+import { AttachmentParsingModule } from '../attachments/attachment-parsing.module';
+import { OperationTelemetryModule } from '../operations/collection/telemetry.module';
 
 @Module({
+  imports: [AttachmentParsingModule, OperationTelemetryModule],
   controllers: [KnowledgeController, KnowledgeDocumentController, KnowledgeRetrievalController, KnowledgePreviewController],
   providers: [KnowledgeService, KnowledgeDocumentService, KnowledgeRetrievalService, KnowledgeRetrievalAccess, KnowledgePreviewService, KnowledgeWorkspaceGuard, EmbeddingClient],
   exports: [KnowledgeService],

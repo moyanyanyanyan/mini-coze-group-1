@@ -1,6 +1,5 @@
 import { InfoTooltip } from '../../components/uiverse/InfoTooltip';
 import { Icon } from '../../components/Icon';
-import { parseRuntimeStages } from '../../../../shared/src/runtime-stages';
 import { animateOperationsChange } from './motion';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -80,7 +79,7 @@ export function Conversations(p: ContentProps & { agentId: string }) {
       <Records
         id={`conversations-${agentId}`}
         title="会话记录"
-        sourceOptions={['平台聊天', 'SDK/API']}
+        sourceOptions={['平台聊天', 'SDK/API', '混合来源', '历史未记录']}
         statusOptions={[
           ['failed', '有失败'],
           ['warning', '有节点异常'],
@@ -126,139 +125,9 @@ export function Conversations(p: ContentProps & { agentId: string }) {
   );
 }
 
-export function RetrievalDetail({ data, run }: { data: OperationsData; run: OperationRun }) {
-  if (!run.observed && data.examples) data = data.examples;
-  const hits = run.retrievals.flatMap((r) => r.hits);
-  return (
-    <>
-      <div className="om-query">
-        <small>检索问题</small>
-        {run.question}
-      </div>
-      <div className="om-mini-stats">
-        <div>
-          <strong>{new Set(hits.map((h) => h.documentId)).size}</strong>命中文档
-        </div>
-        <div>
-          <strong>{hits.length}</strong>返回切片
-        </div>
-        <div>
-          <strong>{hits.filter((h) => h.used).length}</strong>送入模型
-        </div>
-      </div>
-      {run.retrievals.map((r) => (
-        <section className="om-kb-group" key={r.baseId}>
-          <header>
-            <strong>{data.bases.find((b) => b.id === r.baseId)?.name}</strong>
-            <span>
-              {duration(r.durationMs)} · {r.hits.length} 个切片
-            </span>
-          </header>
-          <div className="om-padding">
-            {r.status === 'no_hit' ? (
-              <Notice title="未命中" tone="neutral">
-                检索正常执行，但未返回相关切片。
-              </Notice>
-            ) : r.status === 'failed' ? (
-              <Notice title="检索失败" tone="failed">
-                知识库检索服务暂时不可用。
-              </Notice>
-            ) : (
-              [...new Set(r.hits.map((h) => h.documentId))].map((id) => {
-                const document = data.documents.find((d) => d.id === id)!;
-                const documentHits = r.hits.filter((h) => h.documentId === id);
-                return (
-                  <div key={id}>
-                    <div className="om-stage-title">
-                      <strong>{document.name}</strong>
-                      <span>{documentHits.length} 个切片</span>
-                    </div>
-                    {documentHits.map((h, i) => (
-                      <details className="om-snippet" key={h.chunkId} open={i === 0}>
-                        <summary onClick={event => {
-                          event.preventDefault();
-                          const details = event.currentTarget.closest('details');
-                          if (details) animateOperationsChange(() => { details.open = !details.open; });
-                        }}>
-                          切片 #{document.chunks.find((c) => c.id === h.chunkId)?.position} · 相似度{' '}
-                          {h.score.toFixed(2)} · {h.used ? '送入模型' : '未采用'}
-                        </summary>
-                        <p>{document.chunks.find((c) => c.id === h.chunkId)?.content}</p>
-                      </details>
-                    ))}
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </section>
-      ))}
-      <p className="om-note">
-        相似度用于检索排序，不代表回答准确率。返回与送入模型的切片分别统计。
-      </p>
-    </>
-  );
-}
-
-export function PluginDetail({ run }: { run: OperationRun }) {
-  const plugin = run.plugin!;
-  const [feedback, setFeedback] = useState('');
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(
-        JSON.stringify({ input: plugin.input, output: plugin.output }, null, 2),
-      );
-      setFeedback('已复制脱敏内容');
-    } catch {
-      setFeedback('复制失败，请手动选择下方文本复制');
-    }
-  }
-  return (
-    <>
-      {plugin.failed && (
-        <Notice title="上游服务请求超时" tone="failed">
-          UPSTREAM_TIMEOUT · 在 {duration(plugin.durationMs)} 内未收到订单服务响应。
-        </Notice>
-      )}
-      <div className="om-key-value">
-        <span>工具</span>
-        <strong>{plugin.tool}</strong>
-      </div>
-      <div className="om-key-value">
-        <span>耗时</span>
-        <strong>{duration(plugin.durationMs)}</strong>
-      </div>
-      <div className="om-key-value">
-        <span>来源执行</span>
-        <strong>{run.id}</strong>
-      </div>
-      <div className="om-section-heading">
-        <h3>输入参数</h3>
-        <InfoTooltip label="脱敏说明" title="调用信息">敏感字段已脱敏，复制内容与下方展示一致。</InfoTooltip>
-      </div>
-      <pre>{JSON.stringify(plugin.input, null, 2)}</pre>
-      <h3>返回结果</h3>
-      <pre>{JSON.stringify(plugin.output, null, 2)}</pre>
-      <button type="button" className="om-source-copy" data-copied={feedback === '已复制脱敏内容'} onClick={copy} aria-label="复制调用信息">
-        <span className="om-source-copy-tooltip" data-text-initial="复制调用信息" data-text-end="已复制" aria-hidden="true" />
-        <span aria-hidden="true"><svg className="om-source-clipboard" viewBox="0 0 6.35 6.35"><path fill="currentColor" d="M2.43.265c-.3 0-.548.236-.573.53h-.328a.74.74 0 0 0-.735.734v3.822a.74.74 0 0 0 .735.734H4.82a.74.74 0 0 0 .735-.734V1.529a.74.74 0 0 0-.735-.735h-.328a.58.58 0 0 0-.573-.53zm0 .529h1.49c.032 0 .049.017.049.049v.431c0 .032-.017.049-.049.049H2.43c-.032 0-.05-.017-.05-.049V.843c0-.032.018-.05.05-.05zm-.901.53h.328c.026.292.274.528.573.528h1.49a.58.58 0 0 0 .573-.529h.328a.2.2 0 0 1 .206.206v3.822a.2.2 0 0 1-.206.205H1.53a.2.2 0 0 1-.206-.205V1.529a.2.2 0 0 1 .206-.206z" /></svg>
-        <svg className="om-source-checkmark" viewBox="0 0 24 24"><path fill="currentColor" d="M9.707 19.121a.997.997 0 0 1-1.414 0l-5.646-5.647a1.5 1.5 0 0 1 0-2.121l.707-.707a1.5 1.5 0 0 1 2.121 0L9 14.171l9.525-9.525a1.5 1.5 0 0 1 2.121 0l.707.707a1.5 1.5 0 0 1 0 2.121z" /></svg></span>
-      </button>
-      <span className="om-note" role="status">
-        {feedback}
-      </span>
-      <Notice title={run.status === 'failed' ? '整轮执行失败' : '整轮执行已完成'} tone="neutral">
-        {run.status === 'failed'
-          ? '后续模型调用失败，没有生成最终回复。'
-          : '后续模型生成了最终回答，并保存回复。'}
-      </Notice>
-    </>
-  );
-}
-
 function CollectedTrace({ run }: { run: OperationRun }) {
   const actual = run.observed!;
-  const stages = parseRuntimeStages(actual.events?.filter(event => event.type === 'runtime.stage').map(event => event.data));
+  const stages = actual.stages ?? [];
   const measured = stages.map(stage => ({
     id: stage.stageId,
     name: `${({ retrieval: '知识库检索', context: '上下文组装', model: '模型调用', tool: '工具执行' })[stage.kind]}${stage.round ? ` · 第 ${stage.round} 轮` : ''}${stage.toolName ? ` · ${stage.toolName}` : ''}（已采集）`,
@@ -282,7 +151,7 @@ function CollectedTrace({ run }: { run: OperationRun }) {
     {actual.errorCode && <Notice title="实际调用异常" tone="failed">{actual.errorCode}</Notice>}
     <h3>已采集执行链路</h3>
     {!actual.events ? <p>正在读取本轮采集事件…</p> : !actual.events.length ? <p>尚无过程事件，事件在本轮调用结束后保存。</p> : actual.events.filter(event => event.type !== 'runtime.stage').map((event, index) => <details className="om-snippet" key={index}>
-      <summary>{({ 'tool.started': '工具调用开始', 'tool.completed': '工具调用结果', 'knowledge.result': '知识库引用', 'runtime.result': 'Runtime 返回结果', 'run.failed': '调用失败' } as Record<string, string>)[event.type] ?? event.type}</summary>
+      <summary>{({ 'tool.started': '工具调用开始', 'tool.completed': '工具调用结果', 'knowledge.result': '知识库引用', 'knowledge.retrieval': '实际检索候选与相似度', 'tool.request': '实际工具参数与结果', 'runtime.result': 'Runtime 返回结果', 'run.failed': '调用失败' } as Record<string, string>)[event.type] ?? event.type}</summary>
       <pre>{JSON.stringify(event.data, null, 2)}</pre>
     </details>)}
     {actual.truncated && <p className="om-note">部分事件已按大小上限截断或省略。</p>}
@@ -325,6 +194,7 @@ export function Conversation(p: ContentProps & { agentId: string; conversationId
   if (!run)
     return (
       <><PageHeader title={conversation.title} description="当前会话尚无对应的采集记录，以下为已有消息。" />
+      <ConversationMemory memory={data.memory} error={data.memoryError} loading={p.loading} onRefresh={p.onRefresh} />
       {data.messages?.map(message => <Panel key={message.id} title={message.role === 'user' ? '用户' : '助手'}><p className="om-answer">{message.content}</p></Panel>)}
       <Empty>
         执行记录不存在，或不属于当前会话。
@@ -334,7 +204,11 @@ export function Conversation(p: ContentProps & { agentId: string; conversationId
   const node = detailParams.get('node');
   const path = `${conversationPath(agentId, conversationId)}?run=${run.id}`;
   const detail =
-    node === 'knowledge' ? 'knowledge' : node === 'plugin' && run.plugin ? 'plugin' : 'trace';
+    node === 'knowledge' ? 'knowledge' : 'trace';
+  const retrievalEvent = run.observed?.events?.find(event => event.type === 'knowledge.result');
+  const retrievalData = retrievalEvent?.data as { status?: string } | undefined;
+  const failedRetrieval = (run.observed?.stages ?? []).some(stage => stage.kind === 'retrieval' && stage.status === 'failed');
+  const retrievalLabel = failedRetrieval ? '检索失败' : retrievalData?.status === 'matched' ? '命中' : retrievalData?.status === 'no_match' ? '未命中' : '结果未记录';
   return (
     <>
       <L className="om-conversation-back" to={agentPath(agentId)}>
@@ -344,13 +218,24 @@ export function Conversation(p: ContentProps & { agentId: string; conversationId
         title={conversation.title}
         description={`${data.agents.find((a) => a.id === agentId)!.name} · ${conversation.id}`}
       />
+      <ConversationMemory memory={data.memory} error={data.memoryError} loading={p.loading} onRefresh={p.onRefresh} />
       <div className={`om-chat-layout om-conversation-layout${expanded ? ' is-expanded' : closing ? ' is-closing' : ''}`}>
         <Panel
           title="对话记录"
-          action={<span className="om-note">{runs.length} 次执行 · {run.observed ? '已载入采集记录' : '示例记录'}</span>}
+          action={<span className="om-note">{runs.length} 次执行 · 已载入采集记录</span>}
         >
           <div className="om-thread">
-            {runs.map((r, i) => (
+            {data.messages?.length ? data.messages.map(message => {
+              const associated = runs.find(item => item.observed?.assistantMessageId === message.id);
+              return <article className="om-turn" key={message.id}>
+                <div className={`om-replay-message ${message.role === 'user' ? 'is-user' : 'is-assistant'}`}>
+                  <span className="om-replay-avatar" aria-hidden="true">{message.role === 'user' ? '用' : '助'}</span>
+                  <div className="om-replay-body"><div className="om-speaker">{message.role === 'user' ? '用户' : '助手'} · {({ completed: '已完成', failed: '失败', cancelled: '已取消', running: '生成中', pending: '等待生成' } as Record<string,string>)[message.status] ?? message.status}</div><p className="om-answer">{message.content || '没有已保存的正文'}</p></div>
+                </div>
+                {associated ? <L className="om-run-link" to={`${conversationPath(agentId, conversationId)}?run=${associated.id}`} aria-expanded={expanded && run.id === associated.id}><Badge tone={associated.status}>{runLabels[associated.status]}</Badge><span>{duration(associated.durationMs)}</span><span>查看第 {runs.indexOf(associated) + 1} 轮执行链路</span></L>
+                  : message.role === 'assistant' ? <p className="om-note">这条历史消息没有采集执行链路。</p> : null}
+              </article>;
+            }) : runs.map((r, i) => (
               <article className={`om-turn${expanded && r.id === run.id ? ' is-selected' : ''}`} key={r.id}>
                 <div className="om-replay-time">第 {i + 1} 轮 · <time>{time(r.startedAt)}</time></div>
                 <div className="om-replay-message is-user">
@@ -396,38 +281,10 @@ export function Conversation(p: ContentProps & { agentId: string; conversationId
               </L>
               <span>{detail === 'trace'
                 ? `第 ${runs.indexOf(run) + 1} 轮 · 执行链路`
-                : detail === 'knowledge' ? '知识库检索' : run.plugin!.name}</span>
+                : '知识库检索'}</span>
             </span>
           }
-          action={
-            <Badge
-              tone={
-                detail === 'knowledge'
-                  ? run.retrievals.some((r) => r.status === 'failed')
-                    ? 'failed'
-                    : run.retrievals.some((r) => r.status === 'hit')
-                      ? 'success'
-                      : 'neutral'
-                  : detail === 'plugin'
-                    ? run.plugin!.failed
-                      ? 'failed'
-                      : 'success'
-                    : run.status
-              }
-            >
-              {detail === 'knowledge'
-                ? run.retrievals.some((r) => r.status === 'failed')
-                  ? '检索失败'
-                  : run.retrievals.some((r) => r.status === 'hit')
-                    ? '命中'
-                    : '未命中'
-                : detail === 'plugin'
-                  ? run.plugin!.failed
-                    ? '调用失败'
-                    : '调用成功'
-                  : runLabels[run.status]}
-            </Badge>
-          }
+          action={<Badge tone={detail === 'knowledge' ? failedRetrieval ? 'failed' : retrievalData?.status === 'matched' ? 'success' : 'neutral' : run.status}>{detail === 'knowledge' ? retrievalLabel : runLabels[run.status]}</Badge>}
         >
           <div className="om-padding">
             {detail !== 'trace' && (
@@ -435,48 +292,7 @@ export function Conversation(p: ContentProps & { agentId: string; conversationId
                 ← 返回执行链路
               </L>
             )}
-            {run.observed ? <CollectedTrace run={run} /> : detail === 'knowledge' ? (
-              <RetrievalDetail key={run.id} data={data} run={run} />
-            ) : detail === 'plugin' ? (
-              <PluginDetail key={run.id} run={run} />
-            ) : (
-              <>
-                <div className="om-trace-metrics">
-                  <span>
-                    总耗时 <b>{duration(run.durationMs)}</b>
-                  </span>
-                  <span>
-                    首字响应 <b>{run.firstTokenMs === null ? '—' : duration(run.firstTokenMs)}</b>
-                  </span>
-                  <span>
-                    Token <b>{run.inputTokens + run.outputTokens}</b>
-                  </span>
-                </div>
-                {run.status !== 'success' && (
-                  <Notice
-                    title={run.status === 'warning' ? '回答已完成，存在节点异常' : '本轮执行失败'}
-                    tone={run.status}
-                  >
-                    {run.status === 'warning'
-                      ? '插件调用失败，智能体已告知用户暂时无法查询。'
-                      : '模型服务不可用，未生成最终回复。'}
-                  </Notice>
-                )}
-                <Stages
-                  stages={run.stages}
-                  onNode={(name) =>
-                    name === '知识库检索' ? (
-                      <L to={`${path}&node=knowledge`}>查看检索详情 →</L>
-                    ) : name === '订单查询插件' ? (
-                      <L to={`${path}&node=plugin`}>查看调用详情 →</L>
-                    ) : null
-                  }
-                />
-                <p className="om-note">
-                  {run.id} · 输入 {run.inputTokens} / 输出 {run.outputTokens} Token
-                </p>
-              </>
-            )}
+            {run.observed ? <CollectedTrace run={run} /> : <Empty>此记录没有实际执行链路。</Empty>}
           </div>
         </Panel>
         </section>}
@@ -484,3 +300,4 @@ export function Conversation(p: ContentProps & { agentId: string; conversationId
     </>
   );
 }
+import { ConversationMemory } from '../agent-chat/ConversationMemory';

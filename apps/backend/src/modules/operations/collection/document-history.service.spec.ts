@@ -19,7 +19,7 @@ describe('文档历史查询', () => {
     tx.operationDocumentAttempt.count.mockResolvedValue(4);
     const result = await service.list('owner', 'kb', 'doc', { page: 4, pageSize: 1 });
     expect(result).toMatchObject({ total: 4, page: 4, items: [{ startedAt: null, finishedAt: null, source: 'OBSERVED' }] });
-    expect(result.items[0].events).toEqual([{ stage: 'FAILED', at: '2026-11-19T00:00:00Z' }]);
+    expect(result.items[0].events).toEqual([{ stage: 'FAILED', status: 'UNKNOWN', at: '2026-11-19T00:00:00Z' }]);
     expect(tx.operationDocumentAttempt.findMany).toHaveBeenCalledWith({ where: { documentId: 'doc', document: { knowledgeBaseId: 'kb', knowledgeBase: { workspaceId: 'owner' } } }, orderBy: { ordinal: 'desc' }, skip: 3, take: 1 });
   });
 });

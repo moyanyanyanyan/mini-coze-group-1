@@ -20,7 +20,10 @@ describe('document content extraction', () => {
 
   it('accepts supported extensions without trusting unrelated file types', () => {
     expect(sourceTypeFromFilename('rules.JSON')).toBe('JSON');
-    expect(() => sourceTypeFromFilename('rules.pdf')).toThrow(DocumentContentError);
+    expect(sourceTypeFromFilename('rules.pdf')).toBe('PDF');
+    expect(sourceTypeFromFilename('table.xlsx')).toBe('XLSX');
+    expect(sourceTypeFromFilename('image.PNG')).toBe('PNG');
+    expect(() => sourceTypeFromFilename('rules.exe')).toThrow(DocumentContentError);
   });
 
   it('recovers a UTF-8 Chinese upload filename read as Latin-1', () => {

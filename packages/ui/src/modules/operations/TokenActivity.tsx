@@ -13,6 +13,7 @@ export function tokenActivity(runs: OperationRun[], snapshotAt: number) {
     if (run.observed && run.observed.totalTokens === null) continue;
     if (run.startedAt < start.getTime() || run.startedAt > snapshotAt) continue;
     const key = dayKey(new Date(run.startedAt));
+    if (run.inputTokens === null || run.outputTokens === null) continue;
     totals.set(key, (totals.get(key) ?? 0) + (run.observed ? run.observed.totalTokens! : run.inputTokens + run.outputTokens));
   }
   return Array.from({ length: 84 }, (_, index) => {

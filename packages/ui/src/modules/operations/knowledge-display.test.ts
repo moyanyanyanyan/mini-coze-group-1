@@ -87,6 +87,6 @@ describe("知识库展示的统计与失败边界", () => {
     const observed = { id: "d", knowledgeBaseId: "b", title: "test.txt", sourceType: "TEXT", originalFileName: null, status: "READY", stage: "COMPLETED", chunkCount: 0, error: null, createdAt: "", updatedAt: "" } as const;
     expect(displaySize({ ...document, sourceBytes: 999, observed: { ...observed, sourceSize: 0 } })).toBe(0);
     expect(displaySize({ ...document, sourceBytes: 999, observed: { ...observed, sourceSize: 6 } })).toBe(6);
-    expect(displaySize({ ...document, sourceBytes: 999, observed: { ...observed, sourceSize: null } })).toBe(999);
+    expect(displaySize({ ...document, sourceBytes: 999, observed: { ...observed, sourceSize: null } })).toBe(0);
   });
 });

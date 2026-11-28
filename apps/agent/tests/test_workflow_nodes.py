@@ -345,6 +345,15 @@ def test_workflow_timeout():
     assert result["nodeResults"][1]["error"]["code"] == "WORKFLOW_TIMEOUT"
 
 
+def test_model_timeout_before_workflow_deadline_keeps_its_own_source():
+    async def timed_out(**kwargs):
+        raise asyncio.TimeoutError()
+
+    result = run(chain(), {"query": "hi"}, timed_out, timeout=1)
+    assert result["status"] == "FAILED"
+    assert result["nodeResults"][1]["error"]["code"] == "LLM_TIMEOUT"
+
+
 def test_array_input_validation():
     definition = looping()
     assert not validate_input(definition, {"questions": ["a"]})

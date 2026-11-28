@@ -32,6 +32,7 @@ async def stream_tool_loop(value, tools, request, settings, plugins, client, con
     content = []
     total = {"promptTokens": 0, "completionTokens": 0, "totalTokens": 0}
     has_usage = False
+    complete_usage = True
     for round_index in range(MAX_TOOL_ROUNDS + 1):
         check_tool_budget(value, tools, messages, settings)
         turn = None
@@ -50,9 +51,11 @@ async def stream_tool_loop(value, tools, request, settings, plugins, client, con
             has_usage = True
             for key, count in turn.usage.model_dump().items():
                 total[key] += count
+        else:
+            complete_usage = False
         if isinstance(turn, ModelResult):
             yield ToolLoopResult(content="".join(content), finishReason=turn.finishReason,
-                                 usage=Usage(**total) if has_usage else None, toolResults=results)
+                                 usage=Usage(**total) if has_usage and complete_usage else None, toolResults=results)
             return
         if not isinstance(turn, ToolCallBatch):
             raise ModelError("MODEL_PROTOCOL_ERROR", "模型回合格式错误", 502)

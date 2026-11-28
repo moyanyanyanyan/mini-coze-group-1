@@ -6,7 +6,34 @@ export interface OperationsPageResult<T> {
   asOf: string;
 }
 
+export interface ConversationMemory {
+  conversationId: string;
+  systemPrompt: string;
+  configuredTurns: number;
+  effectiveTurns: number;
+  retainedTurns: number;
+  availableTurns: number;
+  tokenLimit: number;
+  estimatedInputTokens: number;
+  reservedOutputTokens: number;
+  remainingTokens: number;
+  droppedTurns: number;
+  history: { id: string; role: 'user' | 'assistant'; content: string }[];
+  asOf: string;
+}
+
+export interface OperationsResources {
+  plugins: { bound: number; enabled: number; connectionErrors: number };
+  workflows: { total: number; runs: number; failedRuns: number };
+  apiKeys: { active: number; revoked: number; lastUsedAt: string | null };
+  models: { total: number; enabled: number };
+  asOf: string;
+}
+
 export interface OperationsRuntimeRun {
+  hasWarnings?: boolean;
+  source?: string;
+  apiKeyId?: string | null;
   question?: string;
   answer?: string;
   conversationTitle?: string;
@@ -97,6 +124,7 @@ export interface OperationsBase {
 }
 
 export interface OperationsDocument {
+  latestAttempt?: OperationsDocumentAttempt | null;
   attempts?: { recordedCount: number; latestSource: string; latestStatus: string };
   sourceSize?: number | null;
   id: string;
@@ -145,4 +173,24 @@ export interface OperationsDocumentAttempt {
   errorCode: string | null;
   errorMessage: string | null;
   events: { stage: string; status: string; at: string; snapshot?: boolean }[];
+}
+
+export interface OperationsKnowledgeActivity {
+  daily: { date: string; inputTokens: number; indexingTokens: number; retrievalTokens: number; requests: number; missingUsage: number }[];
+  retrievals: OperationsPageResult<OperationsRetrievalRecord>;
+  asOf: string;
+}
+
+export interface OperationsRetrievalRecord {
+  id: string; runId: string | null; conversationId: string | null; agentId: string | null; source: string;
+  query: string; startedAt: string; durationMs: number; status: 'HIT' | 'NO_HIT' | 'FAILED';
+  hits: { chunkId: string; documentId: string; documentTitle: string; content: string; score: number; used: boolean | null }[];
+}
+
+export interface OperationsIntegrationActivity {
+  api: { total: number; failed: number; cancelled: number; averageDurationMs: number | null; byKey: { apiKeyId: string | null; name: string; total: number; failed: number; averageDurationMs: number | null }[] };
+  requests: OperationsPageResult<{ id: string; apiKeyId: string | null; agentId: string | null; conversationId: string | null; runId: string | null; startedAt: string; durationMs: number; status: string; httpStatus: number | null; path: string }>;
+  tools: OperationsPageResult<{ id: string; runId: string | null; conversationId: string | null; agentId: string | null; toolName: string; status: string; durationMs: number | null; startedAt: string; input: unknown; output: unknown; error: unknown }>;
+  workflows: OperationsPageResult<{ id: string; workflowId: string; name: string; status: string; startedAt: string; durationMs: number | null; input: unknown; output: unknown; nodeResults: unknown; error: unknown }>;
+  asOf: string;
 }

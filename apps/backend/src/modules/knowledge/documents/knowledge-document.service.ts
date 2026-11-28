@@ -4,7 +4,10 @@ import { randomUUID } from 'node:crypto';
 import { basename, extname } from 'node:path';
 import { PrismaService } from '../../../database/prisma.service';
 import { EmbeddingClient, EMBEDDING_DIMENSION, EmbeddingUnavailableError } from '../../../integrations/embedding.client';
-import { decodeUploadFilename, DocumentContentError, extractDocumentText, MAX_DOCUMENT_BYTES, sourceTypeFromFilename } from './document-content';
+import { decodeUploadFilename, DocumentContentError, extractDocumentText, MAX_DOCUMENT_BYTES, sourceTypeFromFilename, documentMaxBytes, type KnowledgeSourceType } from './document-content';
+import { AttachmentParserRegistry } from '../../attachments/parsers/parser.registry';
+import { AttachmentError } from '../../attachments/attachment.types';
+import { assertMagicBytes, mimeTypeFor } from '../../attachments/parsers/file-type';
 import { chunkDocument } from './chunk-document';
 import { CreateTextDocumentDto } from '../dto/create-text-document.dto';
 
@@ -19,7 +22,7 @@ export class KnowledgeDocumentService implements OnModuleInit {
   private readonly logger = new Logger(KnowledgeDocumentService.name);
   private readonly running = new Set<string>();
 
-  constructor(private readonly prisma: PrismaService, private readonly embedding: EmbeddingClient) {}
+  constructor(private readonly prisma: PrismaService, private readonly embedding: EmbeddingClient, private readonly parsers: AttachmentParserRegistry) {}
 
   onModuleInit() {
     void this.prisma.knowledgeDocument.findMany({ where: { status: 'PROCESSING' }, select: { id: true } })
@@ -43,15 +46,16 @@ export class KnowledgeDocumentService implements OnModuleInit {
 
   async createFile(knowledgeBaseId: string, workspaceId: string, title: string | undefined, file: UploadedDocumentFile | undefined) {
     await this.assertKnowledgeBase(knowledgeBaseId, workspaceId);
-    if (!file) {throw new BadRequestException('请选择 TXT 或 JSON 文件');}
+    if (!file) {throw new BadRequestException('请选择文件');}
     const filename = decodeUploadFilename(file.originalname);
-    let sourceType: 'TXT' | 'JSON';
+    let sourceType: Exclude<KnowledgeSourceType, 'TEXT'>;
     try {
       sourceType = sourceTypeFromFilename(filename);
     } catch (error) {
       throw new BadRequestException(error instanceof Error ? error.message : '文件类型不支持');
     }
-    if (file.size > MAX_DOCUMENT_BYTES) {throw new BadRequestException('文件不能超过 1 MB');}
+    const limit = documentMaxBytes(sourceType);
+    if (file.size > limit || file.buffer.byteLength > limit) {throw new BadRequestException(`此类型文件不能超过 ${limit / 1024 / 1024} MB`);}
     const documentTitle = (title?.trim() || basename(filename, extname(filename))).trim();
     if (!documentTitle || documentTitle.length > 100) {throw new BadRequestException('文档标题长度必须为 1～100 字符');}
 
@@ -72,6 +76,16 @@ export class KnowledgeDocumentService implements OnModuleInit {
     const document = await this.prisma.knowledgeDocument.findUnique({ where: { id }, include: { knowledgeBase: true } });
     if (!document || document.knowledgeBase.workspaceId !== workspaceId?.trim()) {throw new NotFoundException('文档不存在');}
     return this.publicDocument(document);
+  }
+
+  async original(id: string, workspaceId: string) {
+    const document = await this.prisma.knowledgeDocument.findFirst({
+      where: { id, knowledgeBase: { workspaceId } },
+      select: { sourceBytes: true, originalFileName: true, title: true, sourceType: true },
+    });
+    if (!document?.sourceBytes) throw new NotFoundException('原文件不存在或不可访问');
+    const filename = document.originalFileName || `${document.title}.txt`;
+    return { bytes: Buffer.from(document.sourceBytes), filename, sourceType: document.sourceType };
   }
 
   async retry(id: string, workspaceId: string) {
@@ -117,12 +131,21 @@ export class KnowledgeDocumentService implements OnModuleInit {
     try {
       const document = await this.prisma.knowledgeDocument.findUniqueOrThrow({ where: { id } });
       await this.prisma.knowledgeDocument.update({ where: { id }, data: { stage: 'EXTRACTING' } });
-      const text = extractDocumentText(document.sourceType, document.sourceBytes ?? new Uint8Array());
+      const source = document.sourceBytes ?? new Uint8Array();
+      const type = document.sourceType;
+      let text: string;
+      if (type === 'TEXT' || type === 'TXT' || type === 'JSON') {
+        text = extractDocumentText(type, source);
+      } else {
+        assertMagicBytes(type, source);
+        text = await this.parsers.parse({ fileName: document.originalFileName || document.title, mimeType: mimeTypeFor(type), sourceType: type, bytes: source });
+      }
       await this.prisma.knowledgeDocument.update({ where: { id }, data: { rawText: text, stage: 'CHUNKING' } });
       const chunks = chunkDocument(text);
       if (chunks.length === 0) {throw new DocumentContentError('EMPTY_CONTENT', '资料无法生成可检索片段');}
       await this.prisma.knowledgeDocument.update({ where: { id }, data: { stage: 'EMBEDDING' } });
-      const { model, vectors } = await this.embedding.embed(chunks.map((chunk) => chunk.content));
+      const base = await this.prisma.knowledgeBase.findUniqueOrThrow({ where: { id: document.knowledgeBaseId }, select: { workspaceId: true } });
+      const { model, vectors } = await this.embedding.embed(chunks.map((chunk) => chunk.content), { ownerId: base.workspaceId, source: 'indexing', knowledgeBaseIds: [document.knowledgeBaseId], documentId: id });
       await this.prisma.knowledgeDocument.update({ where: { id }, data: { stage: 'PERSISTING' } });
 
       const rows = chunks.map((chunk, index) => ({
@@ -145,12 +168,13 @@ export class KnowledgeDocumentService implements OnModuleInit {
         });
       }, { timeout: 120_000 });
     } catch (error) {
-      const code = error instanceof DocumentContentError ? error.code
+      const code = error instanceof DocumentContentError || error instanceof AttachmentError ? error.code
         : error instanceof EmbeddingUnavailableError ? 'EMBEDDING_UNAVAILABLE' : 'PROCESSING_FAILED';
-      const message = error instanceof DocumentContentError ? error.message
+      const message = error instanceof DocumentContentError || error instanceof AttachmentError ? error.message
         : error instanceof EmbeddingUnavailableError ? error.message : '文档处理失败，请稍后重试';
       this.logger.error(`文档 ${id} 处理失败：${code}`, error);
-      await this.prisma.knowledgeDocument.update({ where: { id }, data: { status: 'FAILED', stage: 'FAILED', errorCode: code, errorMessage: message } });
+      // 保留实际失败的处理阶段，运行管理才能区分解析、切片和向量化错误。
+      await this.prisma.knowledgeDocument.update({ where: { id }, data: { status: 'FAILED', errorCode: code, errorMessage: message } });
     }
   }
 

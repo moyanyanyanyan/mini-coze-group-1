@@ -4,6 +4,7 @@ import type { RuntimeRequestBody } from '../../../chat/runtime-client.service';
 import type { OperationsRuntimeRun, OperationsRuntimeStats } from '@minicoze/shared';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { OperationsRunsQuery } from '../operations.dto';
+import { operationRequestContext } from './request-context';
 
 export interface CollectedResult {
   status: string;
@@ -41,13 +42,15 @@ export class OperationRecordsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async start(request: RuntimeRequestBody, mode: 'stream' | 'run'): Promise<boolean> {
+    const context = operationRequestContext.getStore();
+    if (context) context.runId = request.runId;
     try {
       const conversation = await this.prisma.conversation.findFirst({ where: { id: request.conversationId, userId: request.actor.id, agentId: request.agentConfig.id }, select: { id: true } });
       if (!conversation) throw new Error('ownership');
       await this.prisma.operationRuntimeRun.create({ data: {
         id: request.runId, userId: request.actor.id, agentId: request.agentConfig.id,
         conversationId: request.conversationId, assistantMessageId: request.assistantMessageId,
-        model: request.agentConfig.model, mode,
+        model: request.agentConfig.model, mode, source: context?.request.apiKeyPrincipal ? 'api' : 'web', apiKeyId: context?.request.apiKeyPrincipal?.apiKeyId,
       } });
       return true;
     } catch {
@@ -57,6 +60,8 @@ export class OperationRecordsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async finish(id: string, result: CollectedResult) {
+    const context = operationRequestContext.getStore();
+    if (context) context.runtimeStatus = result.status;
     try {
       await this.prisma.operationRuntimeRun.updateMany({ where: { id, status: 'running' }, data: { ...result, finishedAt: new Date() } });
     } catch { this.logger.error(`运行采集保存失败 runId=${id}；不改变聊天响应`); }
@@ -67,16 +72,21 @@ export class OperationRecordsService implements OnModuleInit, OnModuleDestroy {
       if (query.conversationId && !await tx.conversation.findFirst({ where: { id: query.conversationId, userId }, select: { id: true } })) throw new NotFoundException('会话不存在或不可访问');
       const where = { userId, conversation: { userId }, conversationId: query.conversationId };
       const [rows, total] = await Promise.all([
-        tx.operationRuntimeRun.findMany({ where, omit: { events: true }, include: { conversation: { select: { title: true } } }, orderBy: [{ startedAt: 'desc' }, { id: 'desc' }], skip: (query.page - 1) * query.pageSize, take: query.pageSize }),
+        tx.operationRuntimeRun.findMany({ where, include: { conversation: { select: { title: true } } }, orderBy: [{ startedAt: 'desc' }, { id: 'desc' }], skip: (query.page - 1) * query.pageSize, take: query.pageSize }),
         tx.operationRuntimeRun.count({ where }),
       ]);
       const messages = await tx.message.findMany({ where: { id: { in: rows.map(r => r.assistantMessageId) }, conversation: { userId } }, select: { id: true, status: true, seq: true, content: true, conversationId: true } });
       // prepareRun 在同一事务中创建相邻的问答消息，不把其他轮次的问题配给本次运行。
       const questions = messages.length ? await tx.message.findMany({ where: { conversation: { userId }, role: 'user', OR: messages.map(message => ({ conversationId: message.conversationId, seq: message.seq - 1 })) }, select: { conversationId: true, seq: true, content: true } }) : [];
-      const items: OperationsRuntimeRun[] = rows.map(({ conversation, ...row }) => {
+      const items: OperationsRuntimeRun[] = rows.map(({ conversation, events, ...row }) => {
         const message = messages.find(message => message.id === row.assistantMessageId);
         return {
           ...row, startedAt: row.startedAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null,
+          hasWarnings: Array.isArray(events) && events.some(event => {
+            if (!event || typeof event !== 'object' || Array.isArray(event) || event.type !== 'tool.completed') return false;
+            const data = event.data;
+            return data && typeof data === 'object' && !Array.isArray(data) && data.status === 'failed';
+          }),
           messageStatus: message?.status ?? null, answer: message?.content ?? '', conversationTitle: conversation.title,
           question: questions.find(question => question.conversationId === row.conversationId && question.seq === (message?.seq ?? 0) - 1)?.content ?? '',
         };
@@ -90,7 +100,9 @@ export class OperationRecordsService implements OnModuleInit, OnModuleDestroy {
       const row = await tx.operationRuntimeRun.findFirst({ where: { id, userId, conversation: { userId } } });
       if (!row) throw new NotFoundException('运行记录不存在或不可访问');
       const message = await tx.message.findFirst({ where: { id: row.assistantMessageId, conversationId: row.conversationId, conversation: { userId } }, select: { status: true } });
-      return { ...row, startedAt: row.startedAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null, messageStatus: message?.status ?? null, asOf: new Date().toISOString() };
+      const telemetry = await tx.operationTelemetry.findMany({ where: { ownerId: userId, runId: id, kind: { in: ['retrieval', 'tool'] } }, orderBy: { startedAt: 'asc' } });
+      const events = [...(Array.isArray(row.events) ? row.events : []), ...telemetry.map(item => ({ type: item.kind === 'retrieval' ? 'knowledge.retrieval' : 'tool.request', observedAt: item.startedAt.toISOString(), data: item.data }))];
+      return { ...row, events, startedAt: row.startedAt.toISOString(), finishedAt: row.finishedAt?.toISOString() ?? null, messageStatus: message?.status ?? null, asOf: new Date().toISOString() };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }
 

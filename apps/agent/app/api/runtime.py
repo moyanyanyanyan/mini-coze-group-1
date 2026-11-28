@@ -12,7 +12,7 @@ from app.config import get_settings
 from app.readiness import require_ready
 from app.runtime.errors import ModelError
 from app.runtime.deepseek import test_model_connection
-from app.runtime.schemas import ModelTestRequest, RuntimeRequest
+from app.runtime.schemas import ContextPreviewRequest, ModelTestRequest, RuntimeRequest
 from app.runtime.service import RuntimeService
 from app.runtime.providers import HttpKnowledgeProvider
 from app.runtime.http_providers import HttpPluginProvider
@@ -45,6 +45,11 @@ async def run(body: RuntimeRequest, runtime: RuntimeService = Depends(get_runtim
 async def test_model(body: ModelTestRequest):
     """内部排查接口：真实发起最小请求，返回结果、耗时与错误类型，不回显 Key。"""
     return await test_model_connection(body.connection, body.type, settings=get_settings())
+
+
+@router.post("/context/preview")
+async def preview_context(body: ContextPreviewRequest, runtime: RuntimeService = Depends(get_runtime)):
+    return runtime.preview_context(body)
 
 
 async def sse_events(runtime: RuntimeService, body: RuntimeRequest):
