@@ -1,13 +1,13 @@
 import { plainToInstance, Type } from 'class-transformer';
 import { MAX_IMAGE_DOCUMENT_BYTES, MAX_OFFICE_DOCUMENT_BYTES, MAX_PDF_DOCUMENT_BYTES } from './upload-limits';
-import { 
-  IsInt, 
+import {
+  IsInt,
   IsIn,
   IsOptional,
-  IsString, 
-  IsUrl, 
-  Max, 
-  Min, 
+  IsString,
+  IsUrl,
+  Max,
+  Min,
   validateSync,
   MinLength,
   ValidateIf

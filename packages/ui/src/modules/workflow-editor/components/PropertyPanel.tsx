@@ -24,7 +24,7 @@ interface Props {
   conditionPanel: React.ReactNode;
   onChange: (nodeId: string, data: NodeData) => void;
   onDelete: (nodeId: string) => void;
-  onEditLoopBody?: (loopId: string) => void; 
+  onEditLoopBody?: (loopId: string) => void;
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -96,7 +96,7 @@ export function PropertyPanel({
             nodeId={node.id}
             bodyCandidates={bodyCandidates}
             onChange={handleChange}
-            onEditBody={onEditLoopBody} 
+            onEditBody={onEditLoopBody}
           />
         )}
         <div className="wf-danger-zone"><button className="wf-btn wf-btn-outline wf-btn-danger" onClick={() => onDelete(node.id)}>删除节点</button></div>

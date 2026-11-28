@@ -26,10 +26,12 @@ export interface RegisterViewProps {
   LinkComponent: LinkComponentType;
   footerRoute: string;
   fieldErrors: RegistrationFieldErrors;
+  /** 左上角「返回首页」的地址，例如首屏路由 */
+  homeRoute?: string;
 }
 
 export function RegisterView({
-  displayName, onDisplayNameChange, email, onEmailChange, password, onPasswordChange, confirmPassword, onConfirmPasswordChange, formError, submitting, handleSubmit, LinkComponent, footerRoute, fieldErrors
+  displayName, onDisplayNameChange, email, onEmailChange, password, onPasswordChange, confirmPassword, onConfirmPasswordChange, formError, submitting, handleSubmit, LinkComponent, footerRoute, fieldErrors, homeRoute
 }: RegisterViewProps) {
   return (
     <AuthLayout
@@ -37,6 +39,7 @@ export function RegisterView({
       title="创建账号"
       description="注册后即可搭建属于你的智能体。"
       footer={{ text: '已经有账号了？', label: '去登录', to: footerRoute }}
+      homeRoute={homeRoute}
     >
       <form className={styles.form} onSubmit={handleSubmit} noValidate>
         <AuthField

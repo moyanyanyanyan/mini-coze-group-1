@@ -15,10 +15,12 @@ export interface LoginViewProps {
   LinkComponent: LinkComponentType;
   footerRoute: string;
   handleGoogleLogin: () => void;
+  /** 左上角「返回首页」的地址，例如首屏路由 */
+  homeRoute?: string;
 }
 
 export function LoginView({
-  email, onEmailChange, password, onPasswordChange, formError, submitting, handleSubmit, LinkComponent, footerRoute, handleGoogleLogin
+  email, onEmailChange, password, onPasswordChange, formError, submitting, handleSubmit, LinkComponent, footerRoute, handleGoogleLogin, homeRoute
 }: LoginViewProps) {
   return (
     <AuthLayout
@@ -26,6 +28,7 @@ export function LoginView({
       title="登录妙搭"
       description="用邮箱继续，进入你的智能体工作台。"
       footer={{ text: '还没有账号？', label: '免费注册', to: footerRoute }}
+      homeRoute={homeRoute}
     >
       <form className={styles.form} onSubmit={handleSubmit}>
         <AuthField

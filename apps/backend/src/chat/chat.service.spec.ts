@@ -3,7 +3,7 @@ import type { PrismaService } from '../prisma/prisma.service';
 import type { ConversationsService } from '../modules/conversations/conversations.service';
 import type { MessagesService } from '../modules/conversations/messages.service';
 import type { AgentsService } from '../modules/agents/agents.service';
-import type { RuntimeClientService, RuntimeRequestBody, RuntimeSseEvent } from './runtime-client.service';
+import type { RuntimeClientService, RuntimeHistoryMessage, RuntimeRequestBody, RuntimeSseEvent } from './runtime-client.service';
 
 it.each([[0, 0], [5, 5], [100, 10]])('配置 %i 轮时只向 Runtime 发送最近 %i 个完整问答对', async (contextLimit, expectedTurns) => {
   const config = {
@@ -24,7 +24,7 @@ it.each([[0, 0], [5, 5], [100, 10]])('配置 %i 轮时只向 Runtime 发送最�
   const prisma = {
     $transaction: (callback: (tx: unknown) => Promise<unknown>) => callback({
       message: { findFirst: jest.fn().mockResolvedValue(null), create },
-      conversation: { update: jest.fn().mockResolvedValue({}) },
+      conversation: { update: jest.fn().mockResolvedValue({}), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
     }),
     message: { findMany, update },
   } as unknown as PrismaService;
@@ -92,4 +92,44 @@ it.each([[0, 0], [5, 5], [100, 10]])('配置 %i 轮时只向 Runtime 发送最�
     where: { id: assistantMessage.id }, data: { content: '40 元', status: 'completed' },
   });
   expect(events.map((event) => event.type)).toEqual(['run.started', 'message.delta', 'run.completed']);
+});
+
+it('保留摘要预算耗尽后的纯附件历史非空占位', async () => {
+  const rows = Array.from({ length: 6 }, (_, index) => [
+    {
+      id: `u${index}`,
+      role: 'user',
+      content: '',
+      attachments: [{
+        fileName: `附件-${index}.md`,
+        sourceType: 'MD',
+        extractedText: '内容'.repeat(175),
+        status: 'READY',
+      }],
+    },
+    {
+      id: `a${index}`,
+      role: 'assistant',
+      content: '回答',
+      attachments: [],
+    },
+  ]).flat();
+  const prisma = {
+    message: { findMany: jest.fn().mockResolvedValue(rows) },
+  } as unknown as PrismaService;
+  const service = new ChatService(
+    prisma,
+    {} as ConversationsService,
+    {} as MessagesService,
+    {} as RuntimeClientService,
+    {} as AgentsService,
+  );
+
+  const history = await (service as unknown as {
+    buildHistory(conversationId: string, contextLimit: number, excludeIds: string[]): Promise<RuntimeHistoryMessage[]>;
+  }).buildHistory('conversation-1', 10, []);
+
+  expect(history).toHaveLength(12);
+  expect(history.filter((message) => message.role === 'user').every((message) => message.content.length > 0)).toBe(true);
+  expect(history.find((message) => message.id === 'u3')?.content).toContain('内容已省略');
 });

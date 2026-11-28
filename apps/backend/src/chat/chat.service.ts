@@ -16,6 +16,7 @@ import { AgentsService } from '../modules/agents/agents.service';
 import {
   attachmentHistorySummary,
   buildAttachmentMessage,
+  buildRetrievalQuery,
   buildRecentAttachmentBlock,
   MAX_TOTAL_RECENT_ATTACHMENT_CHARS,
   MAX_TOTAL_SUMMARY_CHARS,
@@ -34,6 +35,7 @@ import {
 /** 契约规定：history 最多 20 条 = 10 个完整问答对 */
 const MAX_HISTORY_TURNS = 10;
 const MAX_HISTORY_CONTENT = 8000;
+const ATTACHMENT_ONLY_HISTORY_PLACEHOLDER = '（用户只发送了附件，附件内容已省略）';
 
 function historyExcerpt(content: string): string {
   if (content.length <= MAX_HISTORY_CONTENT) {return content;}
@@ -559,12 +561,16 @@ export class ChatService {
         },
       });
 
-      await tx.conversation.update({
-        where: { id: input.conversationId },
-        data: isFirstTurn
-          ? { title: input.content.slice(0, 20) }
-          : { updatedAt: new Date() },
-      });
+      const titled = isFirstTurn ? await tx.conversation.updateMany({
+        where: { id: input.conversationId, title: '新对话' },
+        data: { title: (input.content.trim() || attachments[0]?.fileName || '新对话').slice(0, 20) },
+      }) : null;
+      if (!titled?.count) {
+        await tx.conversation.update({
+          where: { id: input.conversationId },
+          data: { updatedAt: new Date() },
+        });
+      }
 
       return { userMessage, assistantMessage, attachments };
     });
@@ -586,6 +592,7 @@ export class ChatService {
         agentConfig: runtimeConfig,
         history,
         message: buildAttachmentMessage(input.content, turn.attachments),
+        retrievalQuery: buildRetrievalQuery(input.content, turn.attachments),
       },
     };
   }
@@ -749,7 +756,13 @@ export class ChatService {
           attachmentChars += summary.length;
         }
       }
-      return { id: row.id, role: 'user' as const, content: row.content + extra };
+      const content = row.content + extra;
+      return {
+        id: row.id,
+        role: 'user' as const,
+        // Runtime 要求 history.content 非空；摘要预算耗尽时仍保留附件轮次占位。
+        content: content || (row.attachments.length > 0 ? ATTACHMENT_ONLY_HISTORY_PLACEHOLDER : content),
+      };
     });
 
     this.logger.debug(

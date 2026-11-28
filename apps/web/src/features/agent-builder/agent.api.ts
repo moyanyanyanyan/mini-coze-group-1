@@ -38,6 +38,8 @@ export interface Agent {
   modelConfigId?: string | null;
   temperature: number;
   maxTokens: number;
+  /** Optional model context window, supplied by future model configuration APIs. */
+  contextWindowTokens?: number | null;
   contextLimit: number;
   openingMessage?: string;
   status: AgentStatus;
